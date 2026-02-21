@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useRef } from "react"
 import { useFrame } from "@react-three/fiber"
 import { Line, Html } from "@react-three/drei"
 import * as THREE from "three"
@@ -86,22 +86,19 @@ function interpolatePosition(
   out.lerpVectors(scenePoints[idx], scenePoints[nextIdx], alpha)
 }
 
-/* ── Module-level reusable vectors (avoid per-frame allocations) ───── */
-
-const _midDir = new THREE.Vector3()
-const _camDir2 = new THREE.Vector3()
-
 /* ── Component ───────────────────────────────────────────────────────── */
 
 export function ThreatIndicator({ threat, simTimeRef, satellites }: ThreatIndicatorProps) {
-  const [visible, setVisible] = useState(true)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lineRef = useRef<any>(null)
   const labelGroupRef = useRef<THREE.Group>(null)
+  const labelVisible = useRef(true)
 
   // Preallocated vectors for per-frame updates
   const currentPrimary = useRef(new THREE.Vector3())
   const currentSecondary = useRef(new THREE.Vector3())
   const currentMidpoint = useRef(new THREE.Vector3())
+  const _camDir = useRef(new THREE.Vector3())
 
   // Find matching satellites for animated position tracking
   const primarySat = useMemo(
@@ -195,19 +192,30 @@ export function ThreatIndicator({ threat, simTimeRef, satellites }: ThreatIndica
     currentMidpoint.current.lerpVectors(currentPrimary.current, currentSecondary.current, 0.5)
     if (labelGroupRef.current) {
       labelGroupRef.current.position.copy(currentMidpoint.current)
-    }
 
-    // Hide label when midpoint is behind the Earth relative to camera
-    _midDir.copy(currentMidpoint.current).normalize()
-    _camDir2.set(camera.position.x, camera.position.y, camera.position.z).normalize()
-    const shouldShow = _midDir.dot(_camDir2) > -0.1
-    if (shouldShow !== visible) setVisible(shouldShow)
+      // Manual occlusion: hide label when midpoint is behind the Earth relative to camera
+      // Use hysteresis thresholds to prevent flickering at the boundary
+      _camDir.current.copy(currentMidpoint.current).normalize()
+      const camNorm = _camDir.current.dot(
+        _camDir.current.set(camera.position.x, camera.position.y, camera.position.z).normalize()
+      )
+      const shouldShow = labelVisible.current ? camNorm > -0.15 : camNorm > 0.0
+      labelVisible.current = shouldShow
+      labelGroupRef.current.visible = shouldShow
+    }
   })
 
+  const km = threat.missDistanceKm
   const distanceLabel =
-    threat.missDistanceKm < 1
-      ? `${(threat.missDistanceKm * 1000).toFixed(0)}m`
-      : `${threat.missDistanceKm.toFixed(1)}km`
+    km < 1
+      ? `${(km * 1000).toFixed(0)}m`
+      : km < 100
+        ? `${km.toFixed(1)}km`
+        : km < 10_000
+          ? `${km.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}km`
+          : km < 1_000_000
+            ? `${(km / 1000).toFixed(1)}k km`
+            : `${(km / 1_000_000).toFixed(2)}M km`
 
   const severityLabel =
     threat.severity === "threatened"
@@ -231,48 +239,46 @@ export function ThreatIndicator({ threat, simTimeRef, satellites }: ThreatIndica
         gapSize={style.gapSize}
       />
 
-      {/* Distance + severity label at midpoint — tracks in useFrame */}
-      {visible && (
-        <group ref={labelGroupRef}>
-          <Html center occlude style={{ pointerEvents: "none" }}>
-            <div
+      {/* Distance + severity label at midpoint — always mounted, occlude handles Earth hiding */}
+      <group ref={labelGroupRef}>
+        <Html center style={{ pointerEvents: "none" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "1px",
+            }}
+          >
+            <span
               style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "1px",
+                fontFamily: "monospace",
+                fontSize: "9px",
+                fontWeight: 600,
+                color: style.color,
+                opacity: 0.9,
+                background: "rgba(0,0,0,0.6)",
+                padding: "1px 4px",
+                borderRadius: "2px",
+                letterSpacing: "0.5px",
               }}
             >
-              <span
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "9px",
-                  fontWeight: 600,
-                  color: style.color,
-                  opacity: 0.9,
-                  background: "rgba(0,0,0,0.6)",
-                  padding: "1px 4px",
-                  borderRadius: "2px",
-                  letterSpacing: "0.5px",
-                }}
-              >
-                {distanceLabel}
-              </span>
-              <span
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "7px",
-                  color: style.color,
-                  opacity: 0.5,
-                  letterSpacing: "1px",
-                }}
-              >
-                {severityLabel}
-              </span>
-            </div>
-          </Html>
-        </group>
-      )}
+              {distanceLabel}
+            </span>
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontSize: "7px",
+                color: style.color,
+                opacity: 0.5,
+                letterSpacing: "1px",
+              }}
+            >
+              {severityLabel}
+            </span>
+          </div>
+        </Html>
+      </group>
     </group>
   )
 }

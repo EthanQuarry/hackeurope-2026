@@ -45,10 +45,10 @@ export function SatelliteSearch({ className }: { className?: string }) {
 
   function handleSelect(sat: (typeof satellites)[number]) {
     selectSatellite(sat.id)
-    // Focus globe on the satellite's first trajectory point
+    // Focus globe on the satellite and track it
     if (sat.trajectory.length > 0) {
       const p = sat.trajectory[0]
-      setFocusTarget({ lat: p.lat, lon: p.lon, altKm: p.alt_km })
+      setFocusTarget({ lat: p.lat, lon: p.lon, altKm: p.alt_km, satelliteId: sat.id })
     }
     setQuery("")
     setOpen(false)

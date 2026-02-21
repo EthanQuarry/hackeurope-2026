@@ -29,26 +29,51 @@ TARGET_ALT_KM = 500.0
 TARGET_INC_DEG = 63.4
 TARGET_RAAN_DEG = 142.0
 
-# Phase boundaries in seconds
+# Phase boundaries in scenario-seconds (scaled by sim speed)
 _PHASE_BOUNDS = [0, 90, 180, 300]
 
 # Module-level start time — resets on import / reload
 _start_time: float = time.time()
 
+# Accumulated scenario time (integrates wall-clock dt × speed multiplier)
+_scenario_time: float = 0.0
+_last_tick: float = time.time()
+_speed: float = 1.0
+
 
 def reset() -> None:
     """Reset the scenario clock (useful for testing)."""
-    global _start_time
+    global _start_time, _scenario_time, _last_tick
     _start_time = time.time()
+    _scenario_time = 0.0
+    _last_tick = time.time()
+
+
+def set_speed(speed: float) -> None:
+    """Set the sim speed multiplier (called by frontend via query param)."""
+    global _speed
+    _speed = max(1.0, speed)
 
 
 # ---------------------------------------------------------------------------
 # Time helpers
 # ---------------------------------------------------------------------------
 
+def _tick() -> None:
+    """Advance scenario time by (wall dt × speed). Called on each access."""
+    global _scenario_time, _last_tick
+    now = time.time()
+    dt = now - _last_tick
+    _last_tick = now
+    # Cap dt to avoid huge jumps (e.g. after server sleep)
+    dt = min(dt, 5.0)
+    _scenario_time += dt * _speed
+
+
 def elapsed() -> float:
-    """Seconds since scenario start."""
-    return time.time() - _start_time
+    """Scenario-seconds since start (scaled by sim speed)."""
+    _tick()
+    return _scenario_time
 
 
 def current_phase() -> int:

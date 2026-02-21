@@ -76,7 +76,7 @@ export function AnomalyOps({ threats }: AnomalyOpsProps) {
 
   const handleSelect = useCallback((threat: AnomalyThreat) => {
     setSelectedId(threat.id)
-    setFocusTarget(threat.position)
+    setFocusTarget({ ...threat.position, satelliteId: threat.satelliteId })
   }, [setFocusTarget])
 
   const sorted = [...threats].sort((a, b) => {

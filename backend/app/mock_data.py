@@ -87,40 +87,6 @@ SATELLITE_CATALOG: dict[int, dict] = {
         "orbit_type": "LEO",
         "launch_year": 2022,
     },
-    # --- SUSPICIOUS: Pre-seeded threats for demo ---
-    9: {
-        "norad_id": 99901,
-        "name": "KOSMOS-2562",
-        "nation": "Russia",
-        "owner": "Russian Aerospace Forces",
-        "purpose": "Classified — suspected co-orbital ASAT weapon test platform",
-        "orbit_type": "LEO",
-        "launch_year": 2024,
-        "suspicious": True,
-        "threat_notes": "Recently performed sudden orbital maneuver, closing distance to USA-245. Matches pattern of Russian inspector/ASAT tests (Cosmos 2542/2543 precedent).",
-    },
-    10: {
-        "norad_id": 99902,
-        "name": "SJ-21 (SHIJIAN-21)",
-        "nation": "China",
-        "owner": "CNSA / PLA",
-        "purpose": "Officially 'space debris mitigation technology demonstration'",
-        "orbit_type": "GEO",
-        "launch_year": 2021,
-        "suspicious": True,
-        "threat_notes": "Demonstrated ability to grapple and relocate other satellites. Approached multiple GEO communication satellites at close range.",
-    },
-    11: {
-        "norad_id": 99903,
-        "name": "OBJECT 2024-117A",
-        "nation": "Unknown",
-        "owner": "Unknown",
-        "purpose": "Unidentified — no TLE catalog match, no launch notification filed",
-        "orbit_type": "LEO",
-        "launch_year": 2024,
-        "suspicious": True,
-        "threat_notes": "Appeared without prior launch detection. Highly eccentric orbit in LEO with retrograde inclination. No nation has claimed ownership.",
-    },
     # --- MEO: Navigation ---
     12: {
         "norad_id": 28474,
@@ -185,18 +151,6 @@ SATELLITE_CATALOG: dict[int, dict] = {
         "purpose": "Wideband Global SATCOM — military broadband communications",
         "orbit_type": "GEO",
         "launch_year": 2019,
-    },
-    # --- SUSPICIOUS: GEO threat ---
-    19: {
-        "norad_id": 99904,
-        "name": "LUCH (OLYMP-K2)",
-        "nation": "Russia",
-        "owner": "Russian Aerospace Forces",
-        "purpose": "Officially 'data relay' — assessed as signals intelligence platform",
-        "orbit_type": "GEO",
-        "launch_year": 2023,
-        "suspicious": True,
-        "threat_notes": "Has repositioned itself multiple times between Western military/government GEO satellites. Pattern consistent with SIGINT collection against SATCOM.",
     },
     # --- More LEO variety ---
     20: {

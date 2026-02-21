@@ -50,9 +50,10 @@ export function DashboardShell() {
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
 
   // Poll backend for live data — falls back to mocks on error
+  // Pass speed so scenario timing syncs with sim speed
   usePolling<SatelliteData[]>({
-    url: api.satellites,
-    intervalMs: 30_000,
+    url: `${api.satellites}?speed=${speed}`,
+    intervalMs: 10_000,
     onData: setSatellites,
   })
   usePolling<ThreatData[]>({

@@ -125,7 +125,7 @@ function Scene({
       {/* Hostile / foreign satellite markers from live threat data */}
       {hostileMarkers.map((h) => (
         <HostileMarker
-          key={h.id}
+          key={`hostile-${h.id}`}
           id={h.id}
           name={h.name}
           position={h.position}
@@ -168,7 +168,7 @@ function Scene({
         dampingFactor={0.05}
       />
 
-      <CameraFocus controlsRef={controlsRef} />
+      <CameraFocus controlsRef={controlsRef} simTimeRef={simTimeRef} />
     </>
   )
 }
@@ -198,11 +198,12 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
   const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
 
-  // Derive hostile markers from live ops threat data
-  const hostileMarkers = useMemo(
-    () => deriveHostileMarkers(proximityThreats, signalThreats, anomalyThreats),
-    [proximityThreats, signalThreats, anomalyThreats]
-  )
+  // Derive hostile markers, excluding IDs that already exist as fleet satellites
+  const hostileMarkers = useMemo(() => {
+    const fleetIds = new Set(satellites.map((s) => s.id))
+    return deriveHostileMarkers(proximityThreats, signalThreats, anomalyThreats)
+      .filter((h) => !fleetIds.has(h.id))
+  }, [satellites, proximityThreats, signalThreats, anomalyThreats])
 
   return (
     <div

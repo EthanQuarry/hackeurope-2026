@@ -30,7 +30,9 @@ function formatTCA(minutes: number): string {
 function formatDistance(km: number): string {
   if (km < 1) return `${(km * 1000).toFixed(0)} m`
   if (km < 100) return `${km.toFixed(1)} km`
-  return `${km.toFixed(0)} km`
+  if (km < 10_000) return `${km.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} km`
+  if (km < 1_000_000) return `${(km / 1000).toFixed(1)}k km`
+  return `${(km / 1_000_000).toFixed(2)}M km`
 }
 
 function StatBox({ label, value, alert }: { label: string; value: string | number; alert?: boolean }) {
@@ -64,7 +66,7 @@ export function ProximityOps({ threats }: ProximityOpsProps) {
 
   const handleSelect = useCallback((threat: ProximityThreat) => {
     setSelectedId(threat.id)
-    setFocusTarget(threat.primaryPosition)
+    setFocusTarget({ ...threat.primaryPosition, satelliteId: threat.foreignSatId })
   }, [setFocusTarget])
 
   const sorted = [...threats].sort((a, b) => {

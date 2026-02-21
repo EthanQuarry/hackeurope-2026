@@ -65,7 +65,7 @@ export function SignalOps({ threats }: SignalOpsProps) {
 
   const handleSelect = useCallback((threat: SignalThreat) => {
     setSelectedId(threat.id)
-    setFocusTarget(threat.position)
+    setFocusTarget({ ...threat.position, satelliteId: threat.interceptorId })
   }, [setFocusTarget])
 
   const sorted = [...threats].sort((a, b) => {

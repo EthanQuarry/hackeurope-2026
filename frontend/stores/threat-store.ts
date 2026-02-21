@@ -5,6 +5,8 @@ interface FocusTarget {
   lat: number
   lon: number
   altKm: number
+  /** If set, camera continuously tracks this satellite instead of staying at a fixed point */
+  satelliteId?: string
 }
 
 interface ThreatState {
