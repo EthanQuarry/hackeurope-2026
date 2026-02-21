@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useFrame } from "@react-three/fiber"
 import { Line, Html } from "@react-three/drei"
 import * as THREE from "three"
@@ -53,6 +53,7 @@ export function SatelliteMarker({
   const glowRef = useRef<THREE.Mesh>(null)
   const targetPos = useRef(new THREE.Vector3())
   const initialized = useRef(false)
+  const [labelVisible, setLabelVisible] = useState(true)
 
   const simTime = useGlobeStore((s) => s.simTime)
 
@@ -91,7 +92,7 @@ export function SatelliteMarker({
     return trail.length > 1 ? trail : scenePoints.slice(0, 2).map((p) => [p.x, p.y, p.z] as [number, number, number])
   }, [simTime, scenePoints, trajectory])
 
-  useFrame(() => {
+  useFrame(({ camera }) => {
     if (!meshRef.current || scenePoints.length < 2) return
 
     const currentSimTime = simTimeRef.current / 1000
@@ -118,6 +119,12 @@ export function SatelliteMarker({
     if (glowRef.current) {
       glowRef.current.position.copy(meshRef.current.position)
     }
+
+    // Hide label when satellite is behind the Earth
+    const pos = meshRef.current.position
+    const dot = pos.x * camera.position.x + pos.y * camera.position.y + pos.z * camera.position.z
+    const shouldShow = dot > 0
+    if (shouldShow !== labelVisible) setLabelVisible(shouldShow)
   })
 
   // Show labels for allied/watched/threatened satellites
@@ -201,41 +208,26 @@ export function SatelliteMarker({
           <meshBasicMaterial color={threeColor} />
         </mesh>
 
-        {/* Floating label above watched/threatened sats */}
-        {showLabel && (
+        {/* Small label just above the satellite — hidden when behind Earth */}
+        {showLabel && name && labelVisible && (
           <Html
             center
-            distanceFactor={5}
+            occlude
+            distanceFactor={6}
             style={{ pointerEvents: "none", userSelect: "none" }}
           >
             <div style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              transform: "translateY(-28px)",
+              transform: "translateY(-16px)",
               whiteSpace: "nowrap",
+              fontSize: "5px",
+              fontFamily: "monospace",
+              fontWeight: 500,
+              color: "rgba(255,220,100,0.6)",
+              letterSpacing: "0.4px",
+              textAlign: "center",
+              lineHeight: 1.2,
             }}>
-              {threatPercent != null && (
-                <div style={{
-                  fontSize: "9px",
-                  fontWeight: 500,
-                  fontFamily: "monospace",
-                  color: status === "threatened" ? "rgba(255,68,102,0.55)" : "rgba(245,158,11,0.45)",
-                  letterSpacing: "0.5px",
-                }}>
-                  {threatPercent}%
-                </div>
-              )}
-              {name && (
-                <div style={{
-                  fontSize: "7px",
-                  fontFamily: "monospace",
-                  color: status === "threatened" ? "rgba(255,102,136,0.4)" : status === "watched" ? "rgba(255,204,102,0.35)" : status === "allied" ? "rgba(100,150,255,0.5)" : "rgba(136,204,255,0.35)",
-                  letterSpacing: "0.3px",
-                }}>
-                  {name}
-                </div>
-              )}
+              {name}{threatPercent != null ? ` ${threatPercent}%` : ""}
             </div>
           </Html>
         )}

@@ -34,7 +34,7 @@
   --border: oklch(0.30 0.015 250);
   --input: oklch(0.30 0.015 250);
   --ring: oklch(0.75 0.05 230);
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 
   --chart-1: oklch(0.75 0.15 210);
   --chart-2: oklch(0.70 0.15 170);
@@ -162,5 +162,14 @@
 
   .font-mono {
     font-family: var(--font-mono);
+  }
+
+  .glass-card {
+    border-radius: 1rem;
+    border: 1px solid oklch(1 0 0 / 0.08);
+    background: oklch(0.17 0.012 250 / 0.6);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 8px 32px oklch(0 0 0 / 0.4),
+                inset 0 1px 0 oklch(1 0 0 / 0.05);
   }
 }
