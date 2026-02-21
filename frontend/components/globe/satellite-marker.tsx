@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useRef } from "react"
 import { useFrame } from "@react-three/fiber"
 import { Line, Html } from "@react-three/drei"
 import * as THREE from "three"
@@ -49,15 +49,14 @@ export function SatelliteMarker({
   simTimeRef,
   threatPercent,
 }: SatelliteMarkerProps) {
-  const meshRef = useRef<THREE.Group>(null)
+  const meshRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
   const targetPos = useRef(new THREE.Vector3())
   const initialized = useRef(false)
-  const [labelVisible, setLabelVisible] = useState(true)
 
   const simTime = useGlobeStore((s) => s.simTime)
 
-  const color = THREAT_COLORS[status].hex
+  const color = THREAT_COLORS[status]?.hex ?? "#00e5ff"
   const threeColor = useMemo(() => new THREE.Color(color), [color])
 
   const scenePoints = useMemo(() => {
@@ -66,6 +65,24 @@ export function SatelliteMarker({
       return new THREE.Vector3(x, y, z)
     })
   }, [trajectory])
+
+  // Trail colors — precomputed, only changes when color/status changes
+  const trailColors = useMemo(() => {
+    if (scenePoints.length < 2) return undefined
+    const baseOpacity = status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35
+    const len = Math.min(MAX_TRAIL_POINTS, Math.max(MIN_TRAIL_POINTS, Math.floor(scenePoints.length * TRAIL_FRACTION))) + 1
+    const colors: [number, number, number][] = []
+    for (let i = 0; i < len; i++) {
+      const t = i / (len - 1)
+      const fade = Math.pow(t, 2.5)
+      colors.push([
+        threeColor.r * fade * baseOpacity,
+        threeColor.g * fade * baseOpacity,
+        threeColor.b * fade * baseOpacity,
+      ])
+    }
+    return colors
+  }, [threeColor, status, scenePoints.length])
 
   const trailPoints = useMemo(() => {
     if (scenePoints.length < 2) {
@@ -92,7 +109,7 @@ export function SatelliteMarker({
     return trail.length > 1 ? trail : scenePoints.slice(0, 2).map((p) => [p.x, p.y, p.z] as [number, number, number])
   }, [simTime, scenePoints, trajectory])
 
-  useFrame(({ camera }) => {
+  useFrame(() => {
     if (!meshRef.current || scenePoints.length < 2) return
 
     const currentSimTime = simTimeRef.current / 1000
@@ -119,127 +136,74 @@ export function SatelliteMarker({
     if (glowRef.current) {
       glowRef.current.position.copy(meshRef.current.position)
     }
-
-    // Hide label when satellite is behind the Earth
-    const pos = meshRef.current.position
-    const dot = pos.x * camera.position.x + pos.y * camera.position.y + pos.z * camera.position.z
-    const shouldShow = dot > 0
-    if (shouldShow !== labelVisible) setLabelVisible(shouldShow)
   })
 
-  // Show labels for allied/watched/threatened satellites
-  const showLabel = status === "allied" || status === "threatened" || status === "watched"
+  // Only show label for selected or threatened satellites (not all of them)
+  const showLabel = selected || status === "threatened"
+  const markerSize = status === "threatened" ? size * 1.5 : size
 
   return (
     <group>
-      {/* Orbit trail with gradient fade */}
+      {/* Orbit trail */}
       <Line
         points={trailPoints}
-        vertexColors={trailPoints.map((_, i, arr) => {
-          const t = i / (arr.length - 1) // 0=tail, 1=head
-          const fade = Math.pow(t, 2.5) // steep curve — tail fades to invisible
-          const baseOpacity = status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35
-          const r = threeColor.r * fade * baseOpacity
-          const g = threeColor.g * fade * baseOpacity
-          const b = threeColor.b * fade * baseOpacity
-          return [r, g, b] as [number, number, number]
-        })}
+        vertexColors={trailColors}
         transparent
         opacity={1}
         lineWidth={status === "threatened" ? 1.8 : status === "watched" ? 1.4 : 1.0}
       />
 
-      {/* Satellite 3D model */}
-      <group
+      {/* Satellite dot */}
+      <mesh
         ref={meshRef}
         onClick={(e) => {
           e.stopPropagation()
           onSelect?.(id)
         }}
       >
-        {/* Bus body — gold foil insulation */}
-        <mesh>
-          <boxGeometry args={[size * 1.4, size * 1.0, size * 2.2]} />
-          <meshStandardMaterial color="#b8960c" emissive={threeColor} emissiveIntensity={0.2} metalness={0.7} roughness={0.35} />
-        </mesh>
-        {/* Solar panel strut left */}
-        <mesh position={[size * 1.2, 0, 0]}>
-          <boxGeometry args={[size * 0.6, size * 0.1, size * 0.1]} />
-          <meshStandardMaterial color="#555555" metalness={0.9} roughness={0.2} />
-        </mesh>
-        {/* Solar panel left */}
-        <mesh position={[size * 3.2, 0, 0]}>
-          <boxGeometry args={[size * 3.5, size * 0.08, size * 2.0]} />
-          <meshStandardMaterial color="#0a1e3d" emissive="#061430" emissiveIntensity={0.15} metalness={0.85} roughness={0.15} />
-        </mesh>
-        {/* Solar cell lines left */}
-        <mesh position={[size * 3.2, size * 0.05, 0]}>
-          <boxGeometry args={[size * 3.4, size * 0.02, size * 1.9]} />
-          <meshStandardMaterial color="#112244" metalness={0.9} roughness={0.1} />
-        </mesh>
-        {/* Solar panel strut right */}
-        <mesh position={[-size * 1.2, 0, 0]}>
-          <boxGeometry args={[size * 0.6, size * 0.1, size * 0.1]} />
-          <meshStandardMaterial color="#555555" metalness={0.9} roughness={0.2} />
-        </mesh>
-        {/* Solar panel right */}
-        <mesh position={[-size * 3.2, 0, 0]}>
-          <boxGeometry args={[size * 3.5, size * 0.08, size * 2.0]} />
-          <meshStandardMaterial color="#0a1e3d" emissive="#061430" emissiveIntensity={0.15} metalness={0.85} roughness={0.15} />
-        </mesh>
-        {/* Solar cell lines right */}
-        <mesh position={[-size * 3.2, size * 0.05, 0]}>
-          <boxGeometry args={[size * 3.4, size * 0.02, size * 1.9]} />
-          <meshStandardMaterial color="#112244" metalness={0.9} roughness={0.1} />
-        </mesh>
-        {/* Antenna dish */}
-        <mesh position={[0, size * 0.9, 0]} rotation={[0.4, 0, 0]}>
-          <coneGeometry args={[size * 0.5, size * 0.4, 12]} />
-          <meshStandardMaterial color="#cccccc" metalness={0.95} roughness={0.05} />
-        </mesh>
-        {/* Antenna feed */}
-        <mesh position={[0, size * 1.3, size * -0.15]}>
-          <cylinderGeometry args={[size * 0.04, size * 0.04, size * 0.5, 6]} />
-          <meshStandardMaterial color="#888888" metalness={0.9} roughness={0.1} />
-        </mesh>
-        {/* Status indicator light on body */}
-        <mesh position={[0, 0, size * 1.15]}>
-          <sphereGeometry args={[size * 0.15, 8, 8]} />
-          <meshBasicMaterial color={threeColor} />
-        </mesh>
+        <sphereGeometry args={[markerSize, 8, 8]} />
+        <meshBasicMaterial color={threeColor} />
 
-        {/* Small label just above the satellite — hidden when behind Earth */}
-        {showLabel && name && labelVisible && (
+        {showLabel && name && (
           <Html
             center
-            occlude
             distanceFactor={6}
             style={{ pointerEvents: "none", userSelect: "none" }}
           >
             <div style={{
-              transform: "translateY(-16px)",
+              transform: "translateY(-14px)",
               whiteSpace: "nowrap",
-              fontSize: "5px",
-              fontFamily: "monospace",
-              fontWeight: 500,
-              color: "rgba(255,220,100,0.6)",
-              letterSpacing: "0.4px",
               textAlign: "center",
-              lineHeight: 1.2,
             }}>
-              {name}{threatPercent != null ? ` ${threatPercent}%` : ""}
+              {threatPercent != null && (
+                <div style={{
+                  fontSize: "8px",
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  color: status === "threatened" ? "rgba(255,68,102,0.7)" : "rgba(255,145,0,0.6)",
+                }}>
+                  {threatPercent}%
+                </div>
+              )}
+              <div style={{
+                fontSize: "6px",
+                fontFamily: "monospace",
+                color: "rgba(200,220,255,0.45)",
+              }}>
+                {name}
+              </div>
             </div>
           </Html>
         )}
-      </group>
+      </mesh>
 
-      {/* Glow — pulsing for threatened */}
+      {/* Glow */}
       <mesh ref={glowRef}>
-        <sphereGeometry args={[size * (status === "threatened" ? 4 : 2.5), 14, 14]} />
+        <sphereGeometry args={[markerSize * 2.5, 8, 8]} />
         <meshBasicMaterial
           color={threeColor}
           transparent
-          opacity={selected ? 0.5 : status === "threatened" ? 0.35 : 0.2}
+          opacity={selected ? 0.4 : status === "threatened" ? 0.25 : 0.12}
         />
       </mesh>
     </group>

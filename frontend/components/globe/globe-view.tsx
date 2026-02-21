@@ -3,6 +3,7 @@
 import { useMemo, useRef } from "react"
 import { Canvas } from "@react-three/fiber"
 import { OrbitControls } from "@react-three/drei"
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 
 import { cn } from "@/lib/utils"
 import { Earth } from "@/components/globe/earth"
@@ -12,6 +13,7 @@ import { AnimationDriver } from "@/components/globe/animation-driver"
 import { ThreatIndicator } from "@/components/globe/threat-indicator"
 import { CollisionEffect } from "@/components/globe/collision-effect"
 import { Starfield } from "@/components/globe/starfield"
+import { CameraFocus } from "@/components/globe/camera-focus"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { MOCK_SATELLITES, generateMockDebris, MOCK_THREATS } from "@/lib/mock-data"
@@ -29,6 +31,7 @@ function Scene({
   onSelectSatellite,
   simTimeRef,
   speedRef,
+  controlsRef,
 }: {
   satellites: SatelliteData[]
   debris: DebrisData[]
@@ -37,6 +40,7 @@ function Scene({
   onSelectSatellite: (id: string) => void
   simTimeRef: React.RefObject<number>
   speedRef: React.RefObject<number>
+  controlsRef: React.RefObject<OrbitControlsImpl | null>
 }) {
   return (
     <>
@@ -95,6 +99,7 @@ function Scene({
       <AnimationDriver simTimeRef={simTimeRef} speedRef={speedRef} />
 
       <OrbitControls
+        ref={controlsRef}
         enablePan={true}
         enableZoom={true}
         minDistance={1.5}
@@ -102,6 +107,8 @@ function Scene({
         enableDamping={true}
         dampingFactor={0.05}
       />
+
+      <CameraFocus controlsRef={controlsRef} />
     </>
   )
 }
@@ -109,6 +116,7 @@ function Scene({
 export function GlobeView({ compacted = false }: GlobeViewProps) {
   const simTimeRef = useRef(Date.now())
   const speedRef = useRef(1)
+  const controlsRef = useRef<OrbitControlsImpl | null>(null)
 
   const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
@@ -144,6 +152,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
           onSelectSatellite={selectSatellite}
           simTimeRef={simTimeRef}
           speedRef={speedRef}
+          controlsRef={controlsRef}
         />
       </Canvas>
     </div>

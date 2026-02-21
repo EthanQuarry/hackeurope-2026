@@ -1,10 +1,10 @@
 /** Simulation speed presets — real-world time compression */
 export const SPEED_PRESETS = [
-  { label: "Real-time", multiplier: 1 },
-  { label: "1 day/min", multiplier: 1440 },
-  { label: "1 wk/min", multiplier: 10080 },
-  { label: "1 mo/min", multiplier: 43200 },
-  { label: "1 yr/min", multiplier: 525600 },
+  { label: "1x", multiplier: 1 },
+  { label: "10x", multiplier: 10 },
+  { label: "60x", multiplier: 60 },
+  { label: "300x", multiplier: 300 },
+  { label: "1hr/min", multiplier: 3600 },
 ] as const
 
 export type SpeedPreset = (typeof SPEED_PRESETS)[number]

@@ -112,9 +112,11 @@ function FleetOverviewCard() {
 
 export function StatsCards({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-end gap-4", className)}>
-      <ActiveThreatsCard />
-      <FleetOverviewCard />
+    <div className={cn("flex justify-end", className)}>
+      <div className="flex flex-col gap-3">
+        <ActiveThreatsCard />
+        <FleetOverviewCard />
+      </div>
     </div>
   )
 }

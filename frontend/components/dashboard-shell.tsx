@@ -98,7 +98,7 @@ export function DashboardShell() {
             </div>
 
             {/* Bottom center: AI Chat input bar */}
-            <div className="absolute bottom-20 left-1/2 -translate-x-1/2">
+            <div className="absolute bottom-36 left-1/2 -translate-x-1/2">
               <AiChatBar />
             </div>
 

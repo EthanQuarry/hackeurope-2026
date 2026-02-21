@@ -244,20 +244,36 @@ SATELLITE_CATALOG: dict[int, dict] = {
         "orbit_type": "LEO",
         "launch_year": 2023,
     },
+    # --- SJ-26: Evolving threat scenario (static shell — runtime data from scenario.py) ---
+    25: {
+        "norad_id": 99910,
+        "name": "SJ-26 (SHIJIAN-26)",
+        "nation": "China",
+        "owner": "CNSA",
+        "purpose": "Earth observation and atmospheric research",
+        "orbit_type": "LEO",
+        "launch_year": 2025,
+    },
 }
 
 
 def lookup_satellite(satellite_id: int) -> dict | None:
     """Look up a satellite by its simulation ID. Returns catalog entry or None."""
+    if satellite_id == 25:
+        from app.scenario import sj26_catalog_entry
+        return sj26_catalog_entry()
     return SATELLITE_CATALOG.get(satellite_id)
 
 
 def search_catalog(query: str) -> list[dict]:
     """Simple keyword search across satellite catalog entries."""
+    from app.scenario import sj26_catalog_entry, SJ26_CATALOG_ID
     query_lower = query.lower()
     results = []
     for sat_id, entry in SATELLITE_CATALOG.items():
-        searchable = " ".join(str(v) for v in entry.values()).lower()
+        # Use dynamic entry for SJ-26
+        effective = sj26_catalog_entry() if sat_id == SJ26_CATALOG_ID else entry
+        searchable = " ".join(str(v) for v in effective.values()).lower()
         if query_lower in searchable:
-            results.append({"id": sat_id, **entry})
+            results.append({"id": sat_id, **effective})
     return results

@@ -88,8 +88,58 @@ def _handle_search_satellite_database(input_data: dict) -> dict:
 
 def _handle_search_threat_intelligence(input_data: dict) -> dict:
     """Simulated threat intelligence search — returns pre-canned OSINT for demo satellites."""
+    from app import scenario
+
     query = input_data["query"].lower()
     results = []
+    phase = scenario.current_phase()
+
+    # --- SJ-26 phase-aware intelligence ---
+    if "sj-26" in query or "shijian-26" in query:
+        if phase == 0:
+            results.append({
+                "title": "SJ-26 (SHIJIAN-26) — routine Chinese earth-observation launch",
+                "snippet": "Launched 2025 by CNSA. Officially designated as an earth observation and atmospheric research satellite. No anomalous behavior detected. Standard sun-synchronous orbit.",
+                "source": "SpaceNews launch roundup",
+                "date": "2025-09",
+            })
+        elif phase == 1:
+            results.append({
+                "title": "SJ-26 performs unexpected orbital maneuver — analysts concerned",
+                "snippet": "SJ-26 executed an unscheduled inclination-change burn, shifting its orbital plane toward that of USA-245 (NRO reconnaissance). The maneuver is inconsistent with its stated earth-observation mission. Analysts note SJ-26 shares a bus design with the SJ-21 grappling satellite.",
+                "source": "SpaceNews / ExoAnalytic Solutions",
+                "date": "2025-12",
+            })
+        elif phase == 2:
+            results.append({
+                "title": "ALERT: SJ-26 trajectory converging on USA-245 — RF emissions detected",
+                "snippet": "SJ-26 has executed multiple maneuvers placing it on a converging trajectory with USA-245. Non-standard RF emissions detected on S-band frequencies consistent with Chinese military SATCOM. Miss distance projected at <10km within hours. US Space Command has raised alert level. Satellite assessed as successor to SJ-21 grappling program.",
+                "source": "18th Space Defense Squadron / CSIS",
+                "date": "2026-01",
+            })
+        else:
+            results.append({
+                "title": "CRITICAL: SJ-26 in close approach to USA-245 — grappling mechanism deployed",
+                "snippet": "SJ-26 is now within 1km of USA-245 and closing. IR signature indicates deployment of articulated robotic arm matching SJ-21 grappling mechanism profile. RF jamming of USA-245's downlink to Pine Gap suspected. This represents the most significant threat to a US national security space asset since the Cold War. USSPACECOM has reportedly briefed POTUS.",
+                "source": "Reuters / US Space Command FLASH traffic",
+                "date": "2026-02",
+            })
+
+    # --- Shijian series lineage ---
+    if "shijian" in query and ("series" in query or "lineage" in query or "program" in query or "history" in query):
+        results.append({
+            "title": "Shijian satellite series: from science to space weapons",
+            "snippet": (
+                "China's Shijian ('Practice') series has evolved from genuine scientific missions to "
+                "dual-use military platforms. Key milestones: SJ-17 (2016) demonstrated robotic arm "
+                "operations in GEO. SJ-21 (2022) grappled and relocated a defunct BeiDou satellite — "
+                "first confirmed satellite-to-satellite capture. SJ-26 (2025) officially 'earth observation' "
+                "but shares SJ-21 bus and reportedly carries improved grappling mechanism. The lineage "
+                "shows clear progression toward operational co-orbital ASAT capability."
+            ),
+            "source": "Secure World Foundation / CSIS Aerospace Security",
+            "date": "2025-11",
+        })
 
     if "russia" in query and ("asat" in query or "anti-satellite" in query or "history" in query):
         results.append({

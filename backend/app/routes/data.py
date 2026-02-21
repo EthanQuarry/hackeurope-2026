@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.spacetrack import get_client, gp_to_satellite, gp_to_debris
+from app import scenario
 
 logger = logging.getLogger(__name__)
 
@@ -91,33 +92,60 @@ FLEET_NORAD_IDS = [
 # Cached results
 _satellites_cache: list[dict] | None = None
 _satellites_cache_time: float = 0
+_scenario_phase_at_cache: int = -1
 _debris_cache: list[dict] | None = None
 _debris_cache_time: float = 0
 
 
 def _generate_fallback_satellites() -> list[dict]:
-    """Fallback mock data if Space-Track is unavailable."""
+    """Fallback mock data if Space-Track is unavailable.
+
+    Uses seeded RNG for deterministic orbits across cache rebuilds.
+    USA-245 (sat-6) has a fixed orbit.  SJ-26 (sat-25) is generated
+    dynamically from the scenario engine.
+    """
     from app.mock_data import SATELLITE_CATALOG
+    rng = random.Random(42)
     base_t = time.time()
     sats = []
     for idx, (sat_id, entry) in enumerate(SATELLITE_CATALOG.items()):
-        alt_km = {
-            "LEO": 400 + random.random() * 400,
-            "MEO": 2000 + random.random() * 18000,
-            "GEO": 35786,
-        }.get(entry.get("orbit_type", "LEO"), 500)
+        # --- SJ-26: fully dynamic from scenario engine ---
+        if sat_id == scenario.SJ26_CATALOG_ID:
+            dynamic_entry = scenario.sj26_catalog_entry()
+            alt_km = scenario.sj26_altitude_km()
+            inc_deg = scenario.TARGET_INC_DEG + scenario.sj26_inclination_offset()
+            raan_deg = scenario.TARGET_RAAN_DEG + scenario.sj26_raan_offset()
+            status = scenario.sj26_status()
+        # --- USA-245: fixed deterministic orbit ---
+        elif sat_id == scenario.TARGET_CATALOG_ID:
+            dynamic_entry = None
+            alt_km = scenario.TARGET_ALT_KM
+            inc_deg = scenario.TARGET_INC_DEG
+            raan_deg = scenario.TARGET_RAAN_DEG
+            nation = entry.get("nation", "Unknown")
+            status = "friendly"
+            if "Russia" in nation or "China" in nation:
+                status = "watched"
+            if entry.get("suspicious"):
+                status = "threatened"
+        else:
+            dynamic_entry = None
+            alt_km = {
+                "LEO": 400 + rng.random() * 400,
+                "MEO": 2000 + rng.random() * 18000,
+                "GEO": 35786,
+            }.get(entry.get("orbit_type", "LEO"), 500)
+            inc_deg = 51.6 + rng.random() * 40
+            raan_deg = rng.random() * 360
+            nation = entry.get("nation", "Unknown")
+            status = "friendly"
+            if "Russia" in nation or "China" in nation:
+                status = "watched"
+            if entry.get("suspicious"):
+                status = "threatened"
 
-        inc_deg = 51.6 + random.random() * 40
-        raan_deg = random.random() * 360
         period_min = 2 * math.pi * math.sqrt((6378.137 + alt_km) ** 3 / 398600.4418) / 60
         v_kms = math.sqrt(398600.4418 / (6378.137 + alt_km))
-
-        nation = entry.get("nation", "Unknown")
-        status = "friendly"
-        if "Russia" in nation or "China" in nation:
-            status = "watched"
-        if entry.get("suspicious"):
-            status = "threatened"
 
         trajectory = []
         period_sec = period_min * 60
@@ -135,10 +163,11 @@ def _generate_fallback_satellites() -> list[dict]:
             lon = math.degrees(math.atan2(ye, xe))
             trajectory.append({"t": t, "lat": round(lat, 2), "lon": round(lon, 2), "alt_km": round(alt_km, 1)})
 
+        eff = dynamic_entry or entry
         sats.append({
-            "id": f"sat-{idx}",
-            "name": entry.get("name", f"SAT-{sat_id}"),
-            "noradId": entry.get("norad_id", 99000 + idx),
+            "id": f"sat-{sat_id}",
+            "name": eff.get("name", f"SAT-{sat_id}"),
+            "noradId": eff.get("norad_id", 99000 + idx),
             "status": status,
             "altitude_km": round(alt_km, 1),
             "velocity_kms": round(v_kms, 2),
@@ -169,9 +198,17 @@ def _generate_fallback_debris(count: int = 2500) -> list[dict]:
 
 @router.get("/satellites")
 async def get_satellites():
-    global _satellites_cache, _satellites_cache_time
+    global _satellites_cache, _satellites_cache_time, _scenario_phase_at_cache
     now = time.time()
-    if _satellites_cache and (now - _satellites_cache_time) < 3600:
+    phase = scenario.current_phase()
+
+    # Invalidate cache on phase transitions so SJ-26 data evolves
+    cache_valid = (
+        _satellites_cache
+        and (now - _satellites_cache_time) < 30  # shorter TTL for scenario responsiveness
+        and _scenario_phase_at_cache == phase
+    )
+    if cache_valid:
         return _satellites_cache
 
     try:
@@ -185,6 +222,7 @@ async def get_satellites():
 
     _satellites_cache = sats
     _satellites_cache_time = now
+    _scenario_phase_at_cache = phase
     return sats
 
 
@@ -296,6 +334,48 @@ async def get_threats():
                 "intentClassification": intent,
                 "confidence": round(confidence, 2),
             })
+
+    # --- Inject deterministic SJ-26 → USA-245 conjunction in phases 2-3 ---
+    phase = scenario.current_phase()
+    if phase >= 2:
+        # Remove any naturally-generated SJ-26↔USA-245 pair to avoid duplicates
+        threats = [
+            t for t in threats
+            if not (
+                {t["primaryId"], t["secondaryId"]}
+                & {scenario.SJ26_SAT_ID, scenario.TARGET_SAT_ID}
+            )
+        ]
+        miss_km = scenario.sj26_miss_distance_km()
+        severity = "threatened" if miss_km < 10 else "watched"
+        tca_min = max(1, int(15 - phase * 4))
+
+        # Find SJ-26 and USA-245 positions from sat list
+        sj26_pos = {"lat": 0, "lon": 0, "altKm": scenario.sj26_altitude_km()}
+        target_pos = {"lat": 0, "lon": 0, "altKm": scenario.TARGET_ALT_KM}
+        for s in sats:
+            if s["id"] == scenario.SJ26_SAT_ID and s["trajectory"]:
+                p = s["trajectory"][0]
+                sj26_pos = {"lat": p["lat"], "lon": p["lon"], "altKm": s["altitude_km"]}
+            elif s["id"] == scenario.TARGET_SAT_ID and s["trajectory"]:
+                p = s["trajectory"][0]
+                target_pos = {"lat": p["lat"], "lon": p["lon"], "altKm": s["altitude_km"]}
+
+        threats.append({
+            "id": "threat-sj26",
+            "primaryId": scenario.TARGET_SAT_ID,
+            "secondaryId": scenario.SJ26_SAT_ID,
+            "primaryName": "USA-245 (NROL-65)",
+            "secondaryName": "SJ-26 (SHIJIAN-26)",
+            "severity": severity,
+            "missDistanceKm": round(miss_km, 2),
+            "tcaTime": now_ms + tca_min * 60 * 1000,
+            "tcaInMinutes": tca_min,
+            "primaryPosition": target_pos,
+            "secondaryPosition": sj26_pos,
+            "intentClassification": "Possible hostile approach" if phase == 2 else "Confirmed hostile — grappling deployment",
+            "confidence": round(0.7 + phase * 0.1, 2),
+        })
 
     # Sort by severity then TCA
     severity_order = {"threatened": 0, "watched": 1, "nominal": 2}

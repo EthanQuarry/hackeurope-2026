@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ThreatBadge } from "@/components/shared/threat-badge"
 import { cn } from "@/lib/utils"
+import { useThreatStore } from "@/stores/threat-store"
 import type { SignalThreat } from "@/types"
 
 interface SignalOpsProps {
@@ -35,7 +36,7 @@ function StatBox({ label, value, alert }: { label: string; value: string | numbe
 
 function DataRow({ label, value, alert }: { label: string; value: string | number; alert?: boolean }) {
   return (
-    <div className="flex items-center justify-between border-b border-border/20 py-2">
+    <div className="flex items-center justify-between border-b border-border/20 py-2.5">
       <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
       <span className={cn("font-mono text-sm tabular-nums", alert ? "text-red-400 font-semibold" : "text-foreground")}>
         {value}
@@ -60,6 +61,12 @@ function ProbabilityBar({ value }: { value: number }) {
 
 export function SignalOps({ threats }: SignalOpsProps) {
   const [selectedId, setSelectedId] = useState<string | null>(threats[0]?.id ?? null)
+  const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
+
+  const handleSelect = useCallback((threat: SignalThreat) => {
+    setSelectedId(threat.id)
+    setFocusTarget(threat.position)
+  }, [setFocusTarget])
 
   const sorted = [...threats].sort((a, b) => {
     const sev = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
@@ -72,9 +79,9 @@ export function SignalOps({ threats }: SignalOpsProps) {
   const maxProb = sorted.length > 0 ? Math.max(...sorted.map((t) => t.interceptionProbability)) : 0
 
   return (
-    <div className="flex h-full gap-4">
-      {/* Left panel — ops data */}
-      <div className="pointer-events-auto flex w-[520px] shrink-0 flex-col rounded-xl border border-border/50 bg-card/85 shadow-2xl backdrop-blur-xl">
+    <div className="mx-auto grid h-full w-full max-w-[1600px] grid-cols-[22rem_minmax(0,1fr)_22rem] gap-4">
+      {/* Left panel — header + KPIs + queue */}
+      <div className="pointer-events-auto flex flex-col overflow-hidden rounded-l-sm rounded-r-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
         {/* Header */}
         <div className="border-b border-border/40 px-5 py-3">
           <div className="flex items-center gap-2">
@@ -95,19 +102,19 @@ export function SignalOps({ threats }: SignalOpsProps) {
           <StatBox label="Max Prob" value={`${(maxProb * 100).toFixed(0)}%`} alert={maxProb > 0.3} />
         </div>
 
-        {/* Intercept List + Detail (single scroll region) */}
+        {/* Intercept Queue */}
+        <div className="border-b border-border/40 px-5 py-2">
+          <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+            Intercept Queue
+          </span>
+        </div>
         <ScrollArea className="min-h-0 flex-1">
-          <div className="border-b border-border/40 px-5 py-2">
-            <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-              Intercept Queue
-            </span>
-          </div>
           <div className="space-y-1 p-2">
             {sorted.map((threat) => (
               <button
                 key={threat.id}
                 type="button"
-                onClick={() => setSelectedId(threat.id)}
+                onClick={() => handleSelect(threat)}
                 className={cn(
                   "w-full rounded-md border px-3 py-2 text-left transition-all",
                   selectedId === threat.id
@@ -133,11 +140,18 @@ export function SignalOps({ threats }: SignalOpsProps) {
               </button>
             ))}
           </div>
+        </ScrollArea>
+      </div>
 
-          {/* Selected Threat Detail */}
-          {selected && (
-            <div className="border-t border-border/40 p-4">
-              <div className="mb-3 flex items-center justify-between">
+      {/* Center — globe shows through */}
+      <div />
+
+      {/* Right panel — selected intercept detail */}
+      <div className="pointer-events-auto flex flex-col overflow-hidden rounded-r-sm rounded-l-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
+        {selected ? (
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="p-4">
+              <div className="mb-4 flex items-center justify-between">
                 <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
                   Intercept Detail
                 </span>
@@ -155,19 +169,20 @@ export function SignalOps({ threats }: SignalOpsProps) {
                 <DataRow label="Confidence" value={`${(selected.confidence * 100).toFixed(0)}%`} />
               </div>
 
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
+              <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
                 <div
                   className="h-full rounded-full bg-primary/70 transition-all"
                   style={{ width: `${selected.confidence * 100}%` }}
                 />
               </div>
             </div>
-          )}
-        </ScrollArea>
+          </ScrollArea>
+        ) : (
+          <div className="flex flex-1 items-center justify-center p-4">
+            <p className="text-xs text-muted-foreground">No intercept selected</p>
+          </div>
+        )}
       </div>
-
-      {/* Right side — transparent gap for globe */}
-      <div className="flex-1" />
     </div>
   )
 }

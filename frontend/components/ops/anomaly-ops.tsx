@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ThreatBadge } from "@/components/shared/threat-badge"
 import { cn } from "@/lib/utils"
+import { useThreatStore } from "@/stores/threat-store"
 import type { AnomalyThreat } from "@/types"
 
 interface AnomalyOpsProps {
@@ -46,7 +47,7 @@ function StatBox({ label, value, alert }: { label: string; value: string | numbe
 
 function DataRow({ label, value, alert }: { label: string; value: string | number; alert?: boolean }) {
   return (
-    <div className="flex items-center justify-between border-b border-border/20 py-2">
+    <div className="flex items-center justify-between border-b border-border/20 py-2.5">
       <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
       <span className={cn("font-mono text-sm tabular-nums", alert ? "text-red-400 font-semibold" : "text-foreground")}>
         {value}
@@ -71,6 +72,12 @@ function DeviationBar({ value }: { value: number }) {
 
 export function AnomalyOps({ threats }: AnomalyOpsProps) {
   const [selectedId, setSelectedId] = useState<string | null>(threats[0]?.id ?? null)
+  const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
+
+  const handleSelect = useCallback((threat: AnomalyThreat) => {
+    setSelectedId(threat.id)
+    setFocusTarget(threat.position)
+  }, [setFocusTarget])
 
   const sorted = [...threats].sort((a, b) => {
     const sev = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
@@ -83,9 +90,9 @@ export function AnomalyOps({ threats }: AnomalyOpsProps) {
   const maxDeviation = sorted.length > 0 ? Math.max(...sorted.map((t) => t.baselineDeviation)) : 0
 
   return (
-    <div className="flex h-full gap-4">
-      {/* Left panel — ops data */}
-      <div className="pointer-events-auto flex w-[520px] shrink-0 flex-col rounded-xl border border-border/50 bg-card/85 shadow-2xl backdrop-blur-xl">
+    <div className="mx-auto grid h-full w-full max-w-[1600px] grid-cols-[22rem_minmax(0,1fr)_22rem] gap-4">
+      {/* Left panel — header + KPIs + queue */}
+      <div className="pointer-events-auto flex flex-col overflow-hidden rounded-l-sm rounded-r-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
         {/* Header */}
         <div className="border-b border-border/40 px-5 py-3">
           <div className="flex items-center gap-2">
@@ -106,19 +113,19 @@ export function AnomalyOps({ threats }: AnomalyOpsProps) {
           <StatBox label="Max Deviation" value={`${(maxDeviation * 100).toFixed(0)}%`} alert={maxDeviation > 0.7} />
         </div>
 
-        {/* Anomaly List + Detail (single scroll region) */}
+        {/* Anomaly Queue */}
+        <div className="border-b border-border/40 px-5 py-2">
+          <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+            Anomaly Queue
+          </span>
+        </div>
         <ScrollArea className="min-h-0 flex-1">
-          <div className="border-b border-border/40 px-5 py-2">
-            <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-              Anomaly Queue
-            </span>
-          </div>
           <div className="space-y-1 p-2">
             {sorted.map((threat) => (
               <button
                 key={threat.id}
                 type="button"
-                onClick={() => setSelectedId(threat.id)}
+                onClick={() => handleSelect(threat)}
                 className={cn(
                   "w-full rounded-md border px-3 py-2 text-left transition-all",
                   selectedId === threat.id
@@ -154,11 +161,18 @@ export function AnomalyOps({ threats }: AnomalyOpsProps) {
               </button>
             ))}
           </div>
+        </ScrollArea>
+      </div>
 
-          {/* Selected Threat Detail */}
-          {selected && (
-            <div className="border-t border-border/40 p-4">
-              <div className="mb-3 flex items-center justify-between">
+      {/* Center — globe shows through */}
+      <div />
+
+      {/* Right panel — selected anomaly detail */}
+      <div className="pointer-events-auto flex flex-col overflow-hidden rounded-r-sm rounded-l-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
+        {selected ? (
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="p-4">
+              <div className="mb-4 flex items-center justify-between">
                 <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
                   Anomaly Detail
                 </span>
@@ -173,26 +187,27 @@ export function AnomalyOps({ threats }: AnomalyOpsProps) {
                 <DataRow label="Confidence" value={`${(selected.confidence * 100).toFixed(0)}%`} />
               </div>
 
-              <div className="mt-3 rounded-md border border-border/30 bg-secondary/20 p-3">
+              <div className="mt-4 rounded-md border border-border/30 bg-secondary/20 p-3">
                 <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Analysis</span>
                 <p className="mt-1 text-xs leading-relaxed text-foreground/80">
                   {selected.description}
                 </p>
               </div>
 
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
+              <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
                 <div
                   className="h-full rounded-full bg-primary/70 transition-all"
                   style={{ width: `${selected.confidence * 100}%` }}
                 />
               </div>
             </div>
-          )}
-        </ScrollArea>
+          </ScrollArea>
+        ) : (
+          <div className="flex flex-1 items-center justify-center p-4">
+            <p className="text-xs text-muted-foreground">No anomaly selected</p>
+          </div>
+        )}
       </div>
-
-      {/* Right side — transparent gap for globe */}
-      <div className="flex-1" />
     </div>
   )
 }
