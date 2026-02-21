@@ -1,4 +1,4 @@
-import type { SatelliteData, DebrisData, ThreatData, TrajectoryPoint, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
+import type { SatelliteData, DebrisData, ThreatData, TrajectoryPoint, ProximityThreat, SignalThreat, AnomalyThreat, OrbitalSimilarityThreat } from "@/types"
 
 /**
  * Generate a circular orbit trajectory with evenly-spaced points.
@@ -341,5 +341,52 @@ export const MOCK_ANOMALY_THREATS: AnomalyThreat[] = [
     detectedAt: Date.now() - 3600000,
     confidence: 0.63,
     position: { lat: -22.4, lon: 56.8, altKm: 512 },
+  },
+]
+
+// ── Orbital Similarity ──
+
+export const MOCK_ORBITAL_SIMILARITY_THREATS: OrbitalSimilarityThreat[] = [
+  {
+    id: "osim-1",
+    foreignSatId: "foreign-1",
+    foreignSatName: "KOSMOS 2558",
+    targetAssetId: "sat-6",
+    targetAssetName: "SPECTER-4",
+    severity: "threatened",
+    inclinationDiffDeg: 0.4,
+    altitudeDiffKm: 3.2,
+    divergenceScore: 0.007,
+    pattern: "co-planar",
+    confidence: 0.94,
+    position: { lat: 35.2, lon: -42.8, altKm: 451 },
+  },
+  {
+    id: "osim-2",
+    foreignSatId: "foreign-2",
+    foreignSatName: "SJ-21",
+    targetAssetId: "sat-4",
+    targetAssetName: "OVERWATCH-2",
+    severity: "watched",
+    inclinationDiffDeg: 3.1,
+    altitudeDiffKm: 18.0,
+    divergenceScore: 0.071,
+    pattern: "co-inclination",
+    confidence: 0.68,
+    position: { lat: -12.1, lon: 78.5, altKm: 438 },
+  },
+  {
+    id: "osim-3",
+    foreignSatId: "foreign-3",
+    foreignSatName: "SHIJIAN-17",
+    targetAssetId: "sat-3",
+    targetAssetName: "AEGIS-7",
+    severity: "nominal",
+    inclinationDiffDeg: 7.2,
+    altitudeDiffKm: 65.0,
+    divergenceScore: 0.21,
+    pattern: "shadowing",
+    confidence: 0.41,
+    position: { lat: 52.3, lon: -95.7, altKm: 720 },
   },
 ]

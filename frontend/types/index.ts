@@ -106,6 +106,22 @@ export interface AnomalyThreat {
   position: { lat: number; lon: number; altKm: number }
 }
 
+/** Orbital similarity / co-orbital shadowing threat */
+export interface OrbitalSimilarityThreat {
+  id: string
+  foreignSatId: string
+  foreignSatName: string
+  targetAssetId: string
+  targetAssetName: string
+  severity: ThreatSeverity
+  inclinationDiffDeg: number
+  altitudeDiffKm: number
+  divergenceScore: number
+  pattern: "co-planar" | "co-altitude" | "co-inclination" | "shadowing"
+  confidence: number
+  position: { lat: number; lon: number; altKm: number }
+}
+
 /** AI terminal log entry */
 export interface TerminalLogEntry {
   id: number

@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import type { ThreatData, GlobalThreatLevel, DebrisData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
+import type { ThreatData, GlobalThreatLevel, DebrisData, ProximityThreat, SignalThreat, AnomalyThreat, OrbitalSimilarityThreat } from "@/types"
 
 interface FocusTarget {
   lat: number
@@ -15,6 +15,7 @@ interface ThreatState {
   proximityThreats: ProximityThreat[]
   signalThreats: SignalThreat[]
   anomalyThreats: AnomalyThreat[]
+  orbitalSimilarityThreats: OrbitalSimilarityThreat[]
   globalThreatLevel: GlobalThreatLevel
   selectedThreatId: string | null
   focusTarget: FocusTarget | null
@@ -24,6 +25,7 @@ interface ThreatState {
   setProximityThreats: (threats: ProximityThreat[]) => void
   setSignalThreats: (threats: SignalThreat[]) => void
   setAnomalyThreats: (threats: AnomalyThreat[]) => void
+  setOrbitalSimilarityThreats: (threats: OrbitalSimilarityThreat[]) => void
   setGlobalThreatLevel: (level: GlobalThreatLevel) => void
   selectThreat: (id: string | null) => void
   setFocusTarget: (target: FocusTarget | null) => void
@@ -35,6 +37,7 @@ export const useThreatStore = create<ThreatState>((set) => ({
   proximityThreats: [],
   signalThreats: [],
   anomalyThreats: [],
+  orbitalSimilarityThreats: [],
   globalThreatLevel: "NOMINAL",
   selectedThreatId: null,
   focusTarget: null,
@@ -44,6 +47,7 @@ export const useThreatStore = create<ThreatState>((set) => ({
   setProximityThreats: (threats) => set({ proximityThreats: threats }),
   setSignalThreats: (threats) => set({ signalThreats: threats }),
   setAnomalyThreats: (threats) => set({ anomalyThreats: threats }),
+  setOrbitalSimilarityThreats: (threats) => set({ orbitalSimilarityThreats: threats }),
   setGlobalThreatLevel: (level) => set({ globalThreatLevel: level }),
   selectThreat: (id) => set({ selectedThreatId: id }),
   setFocusTarget: (target) => set({ focusTarget: target }),

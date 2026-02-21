@@ -1,9 +1,13 @@
 "use client"
 
+import { useMemo } from "react"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants"
 import { useFleetStore } from "@/stores/fleet-store"
+import { useThreatStore } from "@/stores/threat-store"
+import { MOCK_PROXIMITY_THREATS, MOCK_ORBITAL_SIMILARITY_THREATS } from "@/lib/mock-data"
 import { ThreatBadge } from "@/components/shared/threat-badge"
 
 function MetricCell({ label, value, unit }: { label: string; value: string; unit?: string }) {
@@ -39,8 +43,32 @@ export function SatelliteCard({ className }: { className?: string }) {
   const selectedId = useFleetStore((s) => s.selectedSatelliteId)
   const satellites = useFleetStore((s) => s.satellites)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
+  const storeProximity = useThreatStore((s) => s.proximityThreats)
+  const storeOrbital = useThreatStore((s) => s.orbitalSimilarityThreats)
 
   const satellite = satellites.find((s) => s.id === selectedId)
+
+  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
+  const orbitalThreats = storeOrbital.length > 0 ? storeOrbital : MOCK_ORBITAL_SIMILARITY_THREATS
+
+  const proximityScore = useMemo(() => {
+    if (!satellite) return 0
+    return proximityThreats.reduce((max, t) => {
+      if (t.foreignSatId === satellite.id || t.targetAssetId === satellite.id) {
+        return Math.max(max, t.confidence)
+      }
+      return max
+    }, 0)
+  }, [satellite, proximityThreats])
+
+  const orbitalMatch = useMemo(() => {
+    if (!satellite) return null
+    const matches = orbitalThreats.filter(
+      (t) => t.foreignSatId === satellite.id || t.targetAssetId === satellite.id
+    )
+    if (matches.length === 0) return null
+    return matches.reduce((best, t) => t.divergenceScore < best.divergenceScore ? t : best)
+  }, [satellite, orbitalThreats])
 
   if (!satellite) return null
 
@@ -126,6 +154,82 @@ export function SatelliteCard({ className }: { className?: string }) {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Proximity threat score */}
+        <div className="border-t border-white/5 pt-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+              Proximity Risk
+            </p>
+            {proximityScore > PROXIMITY_FLAG_THRESHOLD && (
+              <span className="font-mono text-[10px] font-semibold" style={{ color: "#ffcc00" }}>
+                ⚠ FLAGGED
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${(proximityScore * 100).toFixed(0)}%`,
+                  backgroundColor:
+                    proximityScore > 0.6 ? "#ff1744" :
+                    proximityScore > PROXIMITY_FLAG_THRESHOLD ? "#ffcc00" :
+                    "#00e676",
+                }}
+              />
+            </div>
+            <span className="w-8 text-right font-mono text-[10px] text-gray-400">
+              {(proximityScore * 100).toFixed(0)}%
+            </span>
+          </div>
+          <p className="mt-1 text-[10px] text-gray-600">Bayesian posterior probability</p>
+        </div>
+
+        {/* Orbital similarity */}
+        <div className="border-t border-white/5 pt-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+              Orbital Match
+            </p>
+            {orbitalMatch && orbitalMatch.divergenceScore < 0.15 && (
+              <span className="font-mono text-[10px] font-semibold" style={{ color: "#ffaa00" }}>
+                ⚠ CO-ORBITAL
+              </span>
+            )}
+          </div>
+          {orbitalMatch ? (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.max(0, (1 - orbitalMatch.divergenceScore / 0.8) * 100).toFixed(0)}%`,
+                      backgroundColor:
+                        orbitalMatch.divergenceScore < 0.05 ? "#ff1744" :
+                        orbitalMatch.divergenceScore < 0.15 ? "#ffaa00" :
+                        "#00e676",
+                    }}
+                  />
+                </div>
+                <span className="w-14 text-right font-mono text-[10px] text-gray-400">
+                  {orbitalMatch.divergenceScore.toFixed(4)}
+                </span>
+              </div>
+              <p className="mt-1 text-[10px] text-gray-600">
+                {orbitalMatch.pattern.replace("-", " ")} · {(orbitalMatch.confidence * 100).toFixed(0)}% posterior · vs {
+                  orbitalMatch.foreignSatId === satellite?.id
+                    ? orbitalMatch.targetAssetName
+                    : orbitalMatch.foreignSatName
+                }
+              </p>
+            </>
+          ) : (
+            <p className="text-[10px] text-gray-600">No co-orbital match detected</p>
+          )}
         </div>
       </div>
     </div>

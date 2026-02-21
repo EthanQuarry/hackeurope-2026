@@ -13,6 +13,7 @@ import { ProximityOps } from "@/components/ops/proximity-ops"
 import { SignalOps } from "@/components/ops/signal-ops"
 import { AnomalyOps } from "@/components/ops/anomaly-ops"
 import { CommsOps } from "@/components/ops/comms-ops"
+import { OrbitalOps } from "@/components/ops/orbital-ops"
 import { useUIStore } from "@/stores/ui-store"
 import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
@@ -25,9 +26,10 @@ import {
   MOCK_PROXIMITY_THREATS,
   MOCK_SIGNAL_THREATS,
   MOCK_ANOMALY_THREATS,
+  MOCK_ORBITAL_SIMILARITY_THREATS,
 } from "@/lib/mock-data"
 import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants"
-import type { SatelliteData, ThreatData, DebrisData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
+import type { SatelliteData, ThreatData, DebrisData, ProximityThreat, SignalThreat, AnomalyThreat, OrbitalSimilarityThreat } from "@/types"
 
 export function DashboardShell() {
   const activeView = useUIStore((s) => s.activeView)
@@ -49,16 +51,19 @@ export function DashboardShell() {
   const setSpeed = useGlobeStore((s) => s.setSpeed)
   const togglePlaying = useGlobeStore((s) => s.togglePlaying)
 
+  const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId)
   const setSatellites = useFleetStore((s) => s.setSatellites)
   const setThreats = useThreatStore((s) => s.setThreats)
   const setDebris = useThreatStore((s) => s.setDebris)
   const setProximityThreats = useThreatStore((s) => s.setProximityThreats)
   const setSignalThreats = useThreatStore((s) => s.setSignalThreats)
   const setAnomalyThreats = useThreatStore((s) => s.setAnomalyThreats)
+  const setOrbitalSimilarityThreats = useThreatStore((s) => s.setOrbitalSimilarityThreats)
 
   const storeProximity = useThreatStore((s) => s.proximityThreats)
   const storeSignal = useThreatStore((s) => s.signalThreats)
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
+  const storeOrbital = useThreatStore((s) => s.orbitalSimilarityThreats)
 
   // Poll backend for live data — falls back to mocks on error
   // Pass speed so scenario timing syncs with sim speed
@@ -94,11 +99,17 @@ export function DashboardShell() {
     intervalMs: THREAT_REFRESH_MS,
     onData: setAnomalyThreats,
   })
+  usePolling<OrbitalSimilarityThreat[]>({
+    url: api.orbitalSimilarityThreats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setOrbitalSimilarityThreats,
+  })
 
   // Use live data when available, fall back to mocks
   const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
   const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
   const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+  const orbitalThreats = storeOrbital.length > 0 ? storeOrbital : MOCK_ORBITAL_SIMILARITY_THREATS
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -119,6 +130,7 @@ export function DashboardShell() {
               proximity: proximityThreats.length,
               signal: signalThreats.length,
               anomaly: anomalyThreats.length,
+              orbital: orbitalThreats.length,
             }}
           />
         </div>
@@ -148,10 +160,12 @@ export function DashboardShell() {
               <AiChatBar />
             </div>
 
-            {/* Bottom: Stats cards */}
-            <div className="absolute bottom-0 left-0 right-0">
-              <StatsCards />
-            </div>
+            {/* Bottom: Stats cards — hidden when satellite card is open to avoid overlap */}
+            {!selectedSatelliteId && (
+              <div className="absolute bottom-0 left-0 right-0">
+                <StatsCards />
+              </div>
+            )}
           </div>
         ) : (
           /* Ops pages: full mission view */
@@ -166,6 +180,9 @@ export function DashboardShell() {
               <AnomalyOps threats={anomalyThreats} />
             )}
             {activeView === "comms" && <CommsOps />}
+            {activeView === "orbital" && (
+              <OrbitalOps threats={orbitalThreats} />
+            )}
           </div>
         )}
       </div>

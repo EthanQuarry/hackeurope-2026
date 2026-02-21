@@ -9,6 +9,7 @@ export const api = {
   proximityThreats: `${BASE}/threats/proximity`,
   signalThreats: `${BASE}/threats/signal`,
   anomalyThreats: `${BASE}/threats/anomaly`,
+  orbitalSimilarityThreats: `${BASE}/threats/orbital-similarity`,
   analysisStream: `${BASE}/analysis/stream`,
   responses: `${BASE}/responses`,
   commsChat: `${BASE}/comms/chat`,

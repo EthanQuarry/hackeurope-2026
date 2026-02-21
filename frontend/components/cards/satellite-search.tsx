@@ -4,10 +4,10 @@ import { useState, useMemo, useRef, useEffect } from "react"
 import { Search, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { THREAT_COLORS } from "@/lib/constants"
+import { THREAT_COLORS, PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
-import { MOCK_SATELLITES } from "@/lib/mock-data"
+import { MOCK_SATELLITES, MOCK_PROXIMITY_THREATS } from "@/lib/mock-data"
 
 export function SatelliteSearch({ className }: { className?: string }) {
   const [query, setQuery] = useState("")
@@ -18,8 +18,19 @@ export function SatelliteSearch({ className }: { className?: string }) {
   const storeSatellites = useFleetStore((s) => s.satellites)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
   const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
+  const storeProximity = useThreatStore((s) => s.proximityThreats)
 
   const satellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
+  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
+
+  const satScores = useMemo(() => {
+    const scores: Record<string, number> = {}
+    for (const threat of proximityThreats) {
+      scores[threat.foreignSatId] = Math.max(scores[threat.foreignSatId] ?? 0, threat.confidence)
+      scores[threat.targetAssetId] = Math.max(scores[threat.targetAssetId] ?? 0, threat.confidence)
+    }
+    return scores
+  }, [proximityThreats])
 
   const filtered = useMemo(() => {
     if (!query.trim()) return satellites
@@ -95,6 +106,8 @@ export function SatelliteSearch({ className }: { className?: string }) {
           ) : (
             filtered.map((sat) => {
               const colors = THREAT_COLORS[sat.status]
+              const score = satScores[sat.id] ?? 0
+              const flagged = score > PROXIMITY_FLAG_THRESHOLD
               return (
                 <button
                   key={sat.id}
@@ -114,6 +127,15 @@ export function SatelliteSearch({ className }: { className?: string }) {
                       NORAD {sat.noradId} · {sat.altitude_km.toFixed(0)} km · {sat.status}
                     </p>
                   </div>
+                  {flagged && (
+                    <span
+                      className="shrink-0 font-mono text-[10px] font-semibold"
+                      style={{ color: "#ffcc00" }}
+                      title={`Proximity threat score: ${(score * 100).toFixed(0)}%`}
+                    >
+                      ⚠ {(score * 100).toFixed(0)}%
+                    </span>
+                  )}
                 </button>
               )
             })

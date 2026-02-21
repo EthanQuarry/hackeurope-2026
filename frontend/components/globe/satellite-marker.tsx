@@ -6,7 +6,7 @@ import { Line, Html } from "@react-three/drei"
 import * as THREE from "three"
 
 import { geodeticToSceneVec3 } from "@/lib/geo"
-import { THREAT_COLORS, type ThreatSeverity } from "@/lib/constants"
+import { THREAT_COLORS, PROXIMITY_FLAG_THRESHOLD, type ThreatSeverity } from "@/lib/constants"
 import type { TrajectoryPoint } from "@/types"
 
 interface SatelliteMarkerProps {
@@ -19,6 +19,7 @@ interface SatelliteMarkerProps {
   onSelect?: (id: string) => void
   simTimeRef: React.RefObject<number>
   threatPercent?: number
+  threatScore?: number
 }
 
 const TRAIL_FRACTION = 0.20
@@ -47,14 +48,17 @@ export function SatelliteMarker({
   onSelect,
   simTimeRef,
   threatPercent,
+  threatScore = 0,
 }: SatelliteMarkerProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
+  const flagRingRef = useRef<THREE.Mesh>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lineRef = useRef<any>(null)
   const targetPos = useRef(new THREE.Vector3())
   const initialized = useRef(false)
   const posFlatRef = useRef<Float32Array>(new Float32Array(0))
+  const isFlagged = threatScore > PROXIMITY_FLAG_THRESHOLD
 
   const color = THREAT_COLORS[status]?.hex ?? "#00e5ff"
   const threeColor = useMemo(() => new THREE.Color(color), [color])
@@ -158,6 +162,17 @@ export function SatelliteMarker({
 
     if (glowRef.current) {
       glowRef.current.position.copy(meshRef.current.position)
+    }
+
+    // Animate the Bayesian flag ring — pulse scale and opacity
+    if (flagRingRef.current && isFlagged) {
+      flagRingRef.current.position.copy(meshRef.current.position)
+      const t = (Date.now() % 1500) / 1500
+      const pulse = 0.5 - 0.5 * Math.cos(t * Math.PI * 2)
+      const ringScale = 2.5 + pulse * 2.5
+      flagRingRef.current.scale.setScalar(ringScale)
+      const mat = flagRingRef.current.material as THREE.MeshBasicMaterial
+      mat.opacity = 0.55 * (1 - pulse)
     }
 
     // ── Update trail positions in Line2 geometry ───────────────────────
@@ -268,6 +283,19 @@ export function SatelliteMarker({
           opacity={selected ? 0.4 : status === "threatened" ? 0.25 : 0.12}
         />
       </mesh>
+
+      {/* Bayesian threat flag ring — amber pulse when posterior > threshold */}
+      {isFlagged && (
+        <mesh ref={flagRingRef}>
+          <sphereGeometry args={[markerSize, 16, 16]} />
+          <meshBasicMaterial
+            color="#ffcc00"
+            transparent
+            opacity={0.5}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
     </group>
   )
 }

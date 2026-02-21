@@ -27,6 +27,7 @@ import {
 } from "@/lib/mock-data"
 import type { DebrisData, SatelliteData, ThreatData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
 import type { ThreatSeverity } from "@/lib/constants"
+import { PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants"
 
 interface HostileMarkerData {
   id: string
@@ -79,6 +80,7 @@ function Scene({
   simTimeRef,
   speedRef,
   controlsRef,
+  satScores,
 }: {
   satellites: SatelliteData[]
   debris: DebrisData[]
@@ -89,6 +91,7 @@ function Scene({
   simTimeRef: React.RefObject<number>
   speedRef: React.RefObject<number>
   controlsRef: React.RefObject<OrbitControlsImpl | null>
+  satScores: Record<string, number>
 }) {
   return (
     <>
@@ -118,6 +121,7 @@ function Scene({
             onSelect={onSelectSatellite}
             simTimeRef={simTimeRef}
             threatPercent={threatPercent}
+            threatScore={satScores[sat.id] ?? 0}
           />
         )
       })}
@@ -205,6 +209,16 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
       .filter((h) => !fleetIds.has(h.id))
   }, [satellites, proximityThreats, signalThreats, anomalyThreats])
 
+  // Derive per-satellite max Bayesian posterior from proximity threats
+  const satScores = useMemo(() => {
+    const scores: Record<string, number> = {}
+    for (const threat of proximityThreats) {
+      scores[threat.foreignSatId] = Math.max(scores[threat.foreignSatId] ?? 0, threat.confidence)
+      scores[threat.targetAssetId] = Math.max(scores[threat.targetAssetId] ?? 0, threat.confidence)
+    }
+    return scores
+  }, [proximityThreats])
+
   return (
     <div
       className={cn(
@@ -228,6 +242,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
           simTimeRef={simTimeRef}
           speedRef={speedRef}
           controlsRef={controlsRef}
+          satScores={satScores}
         />
       </Canvas>
     </div>

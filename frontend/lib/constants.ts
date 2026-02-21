@@ -15,6 +15,9 @@ export const THREAT_REFRESH_MS = 5_000
 /** Display limits */
 export const DISPLAY_DEBRIS_LIMIT = 2500
 
+/** Bayesian posterior threshold above which a satellite is visually flagged */
+export const PROXIMITY_FLAG_THRESHOLD = 0.3
+
 /** Threat severity colors — tech/military palette */
 export const THREAT_COLORS = {
   allied: { text: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40", hex: "#4488ff" },
