@@ -11,6 +11,7 @@ export const api = {
   anomalyThreats: `${BASE}/threats/anomaly`,
   analysisStream: `${BASE}/analysis/stream`,
   responses: `${BASE}/responses`,
+  commsChat: `${BASE}/comms/chat`,
   commsStream: `${BASE}/comms/stream`,
   commsSend: `${BASE}/comms/send`,
 } as const

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useCallback } from "react"
 
 import { GlobeView } from "@/components/globe/globe-view"
 import { DashboardHeader } from "@/components/dashboard-header"
@@ -12,6 +12,7 @@ import { SatelliteSearch } from "@/components/cards/satellite-search"
 import { ProximityOps } from "@/components/ops/proximity-ops"
 import { SignalOps } from "@/components/ops/signal-ops"
 import { AnomalyOps } from "@/components/ops/anomaly-ops"
+import { CommsOps } from "@/components/ops/comms-ops"
 import { useUIStore } from "@/stores/ui-store"
 import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
@@ -30,7 +31,17 @@ import type { SatelliteData, ThreatData, DebrisData, ProximityThreat, SignalThre
 
 export function DashboardShell() {
   const activeView = useUIStore((s) => s.activeView)
+  const setActiveView = useUIStore((s) => s.setActiveView)
   const terminalOpen = useUIStore((s) => s.terminalOpen)
+
+  const handleOpsBackdropClick = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest("[data-ops-panel]")) return
+      setActiveView("overview")
+    },
+    [setActiveView],
+  )
 
   const speed = useGlobeStore((s) => s.speed)
   const playing = useGlobeStore((s) => s.playing)
@@ -114,7 +125,10 @@ export function DashboardShell() {
       </div>
 
       {/* Content area — switches based on activeView */}
-      <div className="pointer-events-none absolute inset-0 z-10 px-6 pt-24 pb-6">
+      <div
+        className={`absolute inset-0 z-10 px-6 pt-24 pb-6 ${activeView === "overview" ? "pointer-events-none" : "pointer-events-auto cursor-pointer"}`}
+        onClick={activeView !== "overview" ? handleOpsBackdropClick : undefined}
+      >
         {activeView === "overview" ? (
           /* Overview: Floating glass cards over the globe */
           <div className="relative mx-auto h-full w-full max-w-[1600px]">
@@ -141,7 +155,7 @@ export function DashboardShell() {
           </div>
         ) : (
           /* Ops pages: full mission view */
-          <div className="mx-auto h-full w-full max-w-[1600px]">
+          <div className="h-full w-full">
             {activeView === "proximity" && (
               <ProximityOps threats={proximityThreats} />
             )}
@@ -151,6 +165,7 @@ export function DashboardShell() {
             {activeView === "anomaly" && (
               <AnomalyOps threats={anomalyThreats} />
             )}
+            {activeView === "comms" && <CommsOps />}
           </div>
         )}
       </div>

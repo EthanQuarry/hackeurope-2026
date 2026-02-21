@@ -194,3 +194,19 @@ class CommsTranscription(BaseModel):
 class CommsRequest(BaseModel):
     message: str
     target_satellite_id: str | None = None
+
+
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
+class CommsChatRequest(BaseModel):
+    messages: list[ChatMessage]
+
+
+class CommsChatResponse(BaseModel):
+    reply: str
+    command_ready: bool = False
+    parsed_command: str | None = None
+    parsed_intent: ParsedIntent | None = None

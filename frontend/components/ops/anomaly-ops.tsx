@@ -90,9 +90,9 @@ export function AnomalyOps({ threats }: AnomalyOpsProps) {
   const maxDeviation = sorted.length > 0 ? Math.max(...sorted.map((t) => t.baselineDeviation)) : 0
 
   return (
-    <div className="mx-auto grid h-full w-full max-w-[1600px] grid-cols-[22rem_minmax(0,1fr)_22rem] gap-4">
+    <div className="grid h-full w-full grid-cols-2 gap-4">
       {/* Left panel — header + KPIs + queue */}
-      <div className="pointer-events-auto flex flex-col overflow-hidden rounded-l-sm rounded-r-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
+      <div data-ops-panel className="pointer-events-auto flex flex-col overflow-hidden rounded-l-sm rounded-r-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
         {/* Header */}
         <div className="border-b border-border/40 px-5 py-3">
           <div className="flex items-center gap-2">
@@ -164,11 +164,8 @@ export function AnomalyOps({ threats }: AnomalyOpsProps) {
         </ScrollArea>
       </div>
 
-      {/* Center — globe shows through */}
-      <div />
-
       {/* Right panel — selected anomaly detail */}
-      <div className="pointer-events-auto flex flex-col overflow-hidden rounded-r-sm rounded-l-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
+      <div data-ops-panel className="pointer-events-auto flex flex-col overflow-hidden rounded-r-sm rounded-l-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
         {selected ? (
           <ScrollArea className="min-h-0 flex-1">
             <div className="p-4">

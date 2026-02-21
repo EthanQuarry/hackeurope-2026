@@ -270,7 +270,7 @@ export function CommsTranscriptionView() {
 
   if (!hasAnyData && !error) {
     return (
-      <div className="pointer-events-auto flex flex-col overflow-hidden rounded-r-sm rounded-l-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
+      <div data-ops-panel className="pointer-events-auto flex flex-col overflow-hidden rounded-r-sm rounded-l-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
         <div className="border-b border-border/40 px-5 py-3">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-zinc-500" />

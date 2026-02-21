@@ -209,3 +209,17 @@ export type CommsStage =
   | "at_commands"
   | "sbd_payload"
   | "gateway_routing"
+
+/** Chat message in the comms conversation */
+export interface CommsChatMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
+/** Response from the /comms/chat endpoint */
+export interface CommsChatResponse {
+  reply: string
+  command_ready: boolean
+  parsed_command: string | null
+  parsed_intent: ParsedIntent | null
+}
