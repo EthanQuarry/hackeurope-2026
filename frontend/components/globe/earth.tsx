@@ -130,11 +130,13 @@ interface EarthProps {
 export function Earth({ speedRef }: EarthProps) {
   const groupRef = useRef<THREE.Group>(null)
 
-  useFrame(() => {
+  // Earth rotates once per 86400 seconds (sidereal day).
+  // Scale by sim speed so Earth and satellites stay in sync.
+  useFrame((_, delta) => {
     if (!groupRef.current) return
-    // Gentle continuous rotation — subtle enough to feel alive, not distracting
-    const baseRate = 0.00015
-    groupRef.current.rotation.y += baseRate
+    const EARTH_ROTATION_RATE = (2 * Math.PI) / 86400 // rad/s real-time
+    const speed = speedRef.current ?? 1
+    groupRef.current.rotation.y += EARTH_ROTATION_RATE * delta * speed
   })
 
   return (
