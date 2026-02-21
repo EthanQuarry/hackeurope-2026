@@ -1,6 +1,6 @@
 "use client"
 
-import { type CSSProperties, useMemo } from "react"
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Satellite, Radio, ShieldCheck } from "lucide-react"
 
 import { GlobeView } from "@/components/globe/globe-view"
@@ -15,12 +15,15 @@ import { useUIStore } from "@/stores/ui-store"
 import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
-import { MOCK_THREATS, MOCK_SATELLITES } from "@/lib/mock-data"
+import { usePolling } from "@/hooks/use-polling"
+import { api } from "@/lib/api"
+import { MOCK_THREATS, MOCK_SATELLITES, generateMockDebris } from "@/lib/mock-data"
+import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants"
 import { cn } from "@/lib/utils"
-import type { ResponseRecommendation } from "@/types"
+import type { SatelliteData, ThreatData, DebrisData, ResponseRecommendation } from "@/types"
 
-// Mock response recommendations
-const MOCK_RECOMMENDATIONS: ResponseRecommendation[] = [
+// Fallback recommendations if backend is down
+const FALLBACK_RECOMMENDATIONS: ResponseRecommendation[] = [
   {
     id: "resp-1",
     threatId: "threat-1",
@@ -89,10 +92,39 @@ export function DashboardShell() {
   const togglePlaying = useGlobeStore((s) => s.togglePlaying)
 
   const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId)
+  const setSatellites = useFleetStore((s) => s.setSatellites)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
 
   const selectedThreatId = useThreatStore((s) => s.selectedThreatId)
+  const setThreats = useThreatStore((s) => s.setThreats)
+  const setDebris = useThreatStore((s) => s.setDebris)
   const selectThreat = useThreatStore((s) => s.selectThreat)
+
+  // Poll backend for live data — falls back to mocks on error
+  const { data: liveSatellites } = usePolling<SatelliteData[]>({
+    url: api.satellites,
+    intervalMs: 30_000,
+    onData: setSatellites,
+  })
+  const { data: liveThreats } = usePolling<ThreatData[]>({
+    url: api.threats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setThreats,
+  })
+  const { data: liveDebris } = usePolling<DebrisData[]>({
+    url: api.debris,
+    intervalMs: DEBRIS_REFRESH_MS,
+    onData: setDebris,
+  })
+  const { data: liveResponses } = usePolling<ResponseRecommendation[]>({
+    url: api.responses,
+    intervalMs: 10_000,
+  })
+
+  // Use live data when available, fall back to mocks
+  const satellites = liveSatellites ?? MOCK_SATELLITES
+  const threats = liveThreats ?? MOCK_THREATS
+  const recommendations = liveResponses ?? FALLBACK_RECOMMENDATIONS
 
   const panelColumns = useMemo(() => {
     const leftWidth = leftCollapsed ? "4.75rem" : "22rem"
@@ -150,12 +182,12 @@ export function DashboardShell() {
             />
             {leftActiveTab === "threats" ? (
               <ThreatPanel
-                threats={MOCK_THREATS}
+                threats={threats}
                 selectedThreatId={selectedThreatId}
                 onSelectThreat={selectThreat}
               />
             ) : (
-              <CommsPanel satellites={MOCK_SATELLITES} />
+              <CommsPanel satellites={satellites} />
             )}
           </SidePanel>
 
@@ -181,12 +213,12 @@ export function DashboardShell() {
             />
             {rightActiveTab === "fleet" ? (
               <FleetPanel
-                satellites={MOCK_SATELLITES}
+                satellites={satellites}
                 selectedSatelliteId={selectedSatelliteId}
                 onSelectSatellite={selectSatellite}
               />
             ) : (
-              <ResponsePanel recommendations={MOCK_RECOMMENDATIONS} />
+              <ResponsePanel recommendations={recommendations} />
             )}
           </SidePanel>
 
