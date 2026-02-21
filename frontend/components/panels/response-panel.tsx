@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
@@ -26,11 +27,25 @@ const typeColors: Record<ResponseRecommendation["type"], string> = {
 }
 
 export function ResponsePanel({ recommendations, onApprove, onReject }: ResponsePanelProps) {
+  const [decisions, setDecisions] = useState<Record<string, "approved" | "rejected">>({})
+
+  const handleApprove = (id: string) => {
+    setDecisions((prev) => ({ ...prev, [id]: "approved" }))
+    onApprove?.(id)
+  }
+
+  const handleReject = (id: string) => {
+    setDecisions((prev) => ({ ...prev, [id]: "rejected" }))
+    onReject?.(id)
+  }
+
+  const pendingCount = recommendations.filter((r) => !decisions[r.id]).length
+
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {recommendations.length} pending recommendations
+          {pendingCount} pending / {recommendations.length} total
         </span>
       </div>
 
@@ -73,22 +88,37 @@ export function ResponsePanel({ recommendations, onApprove, onReject }: Response
                 </p>
               )}
 
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => onApprove?.(rec.id)}
-                  className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-400 transition-colors hover:bg-emerald-500/20"
-                >
-                  APPROVE
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onReject?.(rec.id)}
-                  className="rounded border border-border/40 bg-secondary/30 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-secondary/50"
-                >
-                  REJECT
-                </button>
-              </div>
+              {decisions[rec.id] ? (
+                <div className="mt-2">
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-sm border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider",
+                      decisions[rec.id] === "approved"
+                        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+                        : "border-red-500/40 bg-red-500/15 text-red-400"
+                    )}
+                  >
+                    {decisions[rec.id] === "approved" ? "APPROVED" : "REJECTED"}
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleApprove(rec.id)}
+                    className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                  >
+                    APPROVE
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleReject(rec.id)}
+                    className="rounded border border-border/40 bg-secondary/30 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-secondary/50"
+                  >
+                    REJECT
+                  </button>
+                </div>
+              )}
             </div>
           ))}
 

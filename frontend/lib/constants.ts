@@ -1,5 +1,13 @@
-/** Simulation speed presets */
-export const SPEED_PRESETS = [1, 5, 10, 25, 50, 100] as const
+/** Simulation speed presets — real-world time compression */
+export const SPEED_PRESETS = [
+  { label: "Real-time", multiplier: 1 },
+  { label: "1 day/min", multiplier: 1440 },
+  { label: "1 wk/min", multiplier: 10080 },
+  { label: "1 mo/min", multiplier: 43200 },
+  { label: "1 yr/min", multiplier: 525600 },
+] as const
+
+export type SpeedPreset = (typeof SPEED_PRESETS)[number]
 
 /** Polling intervals (ms) */
 export const DEBRIS_REFRESH_MS = 15_000

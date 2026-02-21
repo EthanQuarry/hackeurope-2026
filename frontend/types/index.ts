@@ -54,6 +54,58 @@ export interface ThreatData {
 /** Global threat level */
 export type GlobalThreatLevel = "NOMINAL" | "ELEVATED" | "HIGH" | "CRITICAL"
 
+/** Proximity inspection / attack positioning threat */
+export interface ProximityThreat {
+  id: string
+  foreignSatId: string
+  foreignSatName: string
+  targetAssetId: string
+  targetAssetName: string
+  severity: ThreatSeverity
+  missDistanceKm: number
+  approachVelocityKms: number
+  tcaTime: number
+  tcaInMinutes: number
+  primaryPosition: { lat: number; lon: number; altKm: number }
+  secondaryPosition: { lat: number; lon: number; altKm: number }
+  approachPattern: "direct" | "co-orbital" | "sun-hiding" | "drift"
+  sunHidingDetected: boolean
+  confidence: number
+}
+
+/** Signal interception threat */
+export interface SignalThreat {
+  id: string
+  interceptorId: string
+  interceptorName: string
+  targetLinkAssetId: string
+  targetLinkAssetName: string
+  groundStationName: string
+  severity: ThreatSeverity
+  interceptionProbability: number
+  signalPathAngleDeg: number
+  commWindowsAtRisk: number
+  totalCommWindows: number
+  tcaTime: number
+  tcaInMinutes: number
+  position: { lat: number; lon: number; altKm: number }
+  confidence: number
+}
+
+/** Satellite hijacking / anomalous behavior threat */
+export interface AnomalyThreat {
+  id: string
+  satelliteId: string
+  satelliteName: string
+  severity: ThreatSeverity
+  anomalyType: "unexpected-maneuver" | "orientation-change" | "pointing-change" | "orbit-raise" | "orbit-lower" | "rf-emission"
+  baselineDeviation: number
+  description: string
+  detectedAt: number
+  confidence: number
+  position: { lat: number; lon: number; altKm: number }
+}
+
 /** AI terminal log entry */
 export interface TerminalLogEntry {
   id: number

@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { useThree } from "@react-three/fiber"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useFrame, useThree } from "@react-three/fiber"
 import { Line } from "@react-three/drei"
 import * as THREE from "three"
 
@@ -123,9 +123,22 @@ function Atmosphere() {
   )
 }
 
-export function Earth() {
+interface EarthProps {
+  speedRef: React.RefObject<number>
+}
+
+export function Earth({ speedRef }: EarthProps) {
+  const groupRef = useRef<THREE.Group>(null)
+
+  useFrame(() => {
+    if (!groupRef.current) return
+    // Gentle continuous rotation — subtle enough to feel alive, not distracting
+    const baseRate = 0.00015
+    groupRef.current.rotation.y += baseRate
+  })
+
   return (
-    <group>
+    <group ref={groupRef}>
       <EarthSphere />
       <Graticule />
       <Atmosphere />

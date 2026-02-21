@@ -44,7 +44,7 @@ function Scene({
       <Stars radius={112} depth={75} count={1400} factor={20.4} saturation={0} fade speed={0.18} />
       <Stars radius={115} depth={80} count={650} factor={25.8} saturation={0} fade speed={0.12} />
 
-      <Earth />
+      <Earth speedRef={speedRef} />
 
       {/* Debris field */}
       <DebrisCloud debris={debris} simTimeRef={simTimeRef} />

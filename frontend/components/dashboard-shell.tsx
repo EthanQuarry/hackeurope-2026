@@ -17,7 +17,14 @@ import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { usePolling } from "@/hooks/use-polling"
 import { api } from "@/lib/api"
-import { MOCK_THREATS, MOCK_SATELLITES, generateMockDebris } from "@/lib/mock-data"
+import {
+  MOCK_THREATS,
+  MOCK_SATELLITES,
+  MOCK_PROXIMITY_THREATS,
+  MOCK_SIGNAL_THREATS,
+  MOCK_ANOMALY_THREATS,
+  generateMockDebris,
+} from "@/lib/mock-data"
 import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import type { SatelliteData, ThreatData, DebrisData, ResponseRecommendation } from "@/types"
@@ -182,7 +189,9 @@ export function DashboardShell() {
             />
             {leftActiveTab === "threats" ? (
               <ThreatPanel
-                threats={threats}
+                proximityThreats={MOCK_PROXIMITY_THREATS}
+                signalThreats={MOCK_SIGNAL_THREATS}
+                anomalyThreats={MOCK_ANOMALY_THREATS}
                 selectedThreatId={selectedThreatId}
                 onSelectThreat={selectThreat}
               />

@@ -26,11 +26,14 @@ const threatLevelToSeverity: Record<GlobalThreatLevel, ThreatSeverity> = {
 }
 
 function formatSimTime(ms: number): string {
-  const totalSec = Math.floor(ms / 1000)
-  const h = Math.floor(totalSec / 3600)
-  const m = Math.floor((totalSec % 3600) / 60)
-  const s = totalSec % 60
-  return `T+ ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+  const date = new Date(ms)
+  const y = date.getUTCFullYear()
+  const mo = String(date.getUTCMonth() + 1).padStart(2, "0")
+  const d = String(date.getUTCDate()).padStart(2, "0")
+  const h = String(date.getUTCHours()).padStart(2, "0")
+  const m = String(date.getUTCMinutes()).padStart(2, "0")
+  const s = String(date.getUTCSeconds()).padStart(2, "0")
+  return `${y}-${mo}-${d} ${h}:${m}:${s}Z`
 }
 
 export function DashboardHeader({
@@ -75,17 +78,17 @@ export function DashboardHeader({
         <div className="flex items-center gap-1">
           {SPEED_PRESETS.map((preset) => (
             <button
-              key={preset}
+              key={preset.multiplier}
               type="button"
-              onClick={() => onSpeedChange(preset)}
+              onClick={() => onSpeedChange(preset.multiplier)}
               className={cn(
-                "rounded px-1.5 py-0.5 font-mono text-[10px] tabular-nums transition-colors",
-                speed === preset
+                "rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors",
+                speed === preset.multiplier
                   ? "bg-primary/20 text-primary"
                   : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
               )}
             >
-              {preset}x
+              {preset.label}
             </button>
           ))}
         </div>
