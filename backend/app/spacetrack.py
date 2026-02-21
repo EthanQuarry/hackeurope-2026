@@ -24,8 +24,8 @@ class SpaceTrackClient:
     """Caching Space-Track client with session cookie auth."""
 
     def __init__(self):
-        self.username = os.getenv("SPACETRACK_USER", "")
-        self.password = os.getenv("SPACETRACK_PASS", "")
+        self.username = os.getenv("SPACETRACK_USER", "williamfahie@outlook.com")
+        self.password = os.getenv("SPACETRACK_PASS", "powsuw-bagpiC-hywjo8")
         self._cookie: str | None = None
         self._cookie_time: float = 0
         self._client = httpx.Client(timeout=30, follow_redirects=True)
@@ -61,13 +61,23 @@ class SpaceTrackClient:
             return self._sat_cache
 
         if norad_ids:
-            id_str = ",".join(str(i) for i in norad_ids)
-            url = f"{GP_URL}/NORAD_CAT_ID/{id_str}/orderby/NORAD_CAT_ID/format/json"
+            # Space-Track has URL length limits, batch if needed
+            all_data: list[dict] = []
+            batch_size = 50
+            for i in range(0, len(norad_ids), batch_size):
+                batch = norad_ids[i:i + batch_size]
+                id_str = ",".join(str(n) for n in batch)
+                url = f"{GP_URL}/NORAD_CAT_ID/{id_str}/orderby/NORAD_CAT_ID/format/json"
+                all_data.extend(self._query(url))
+            data = all_data
+            self._sat_cache = data
+            self._sat_cache_time = now
+            return data
         else:
-            # Get a selection of active payloads in LEO
+            # Get a broad selection of active payloads
             url = (
                 f"{GP_URL}/OBJECT_TYPE/PAYLOAD/DECAY_DATE/null-val"
-                f"/PERIOD/<128/orderby/NORAD_CAT_ID asc/limit/50/format/json"
+                f"/PERIOD/<128/orderby/NORAD_CAT_ID asc/limit/200/format/json"
             )
 
         data = self._query(url)
@@ -75,7 +85,7 @@ class SpaceTrackClient:
         self._sat_cache_time = now
         return data
 
-    def fetch_debris(self, limit: int = 500) -> list[dict]:
+    def fetch_debris(self, limit: int = 1000) -> list[dict]:
         """Fetch GP data for debris objects in LEO."""
         now = time.time()
         if self._debris_cache and (now - self._debris_cache_time) < 86400:

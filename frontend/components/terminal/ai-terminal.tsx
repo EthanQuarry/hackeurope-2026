@@ -80,11 +80,16 @@ export const AITerminal = forwardRef<AITerminalHandle, AITerminalProps>(
     const [logs, setLogs] = useState<TerminalLogEntry[]>([
       {
         id: 0,
-        timestamp: formatTime(),
+        timestamp: "--:--:--",
         text: "orbital shield analysis terminal ready",
         color: "text-gray-500",
       },
     ])
+
+    // Fix hydration: set real timestamp after mount
+    useEffect(() => {
+      setLogs((prev) => prev.map((l) => l.id === 0 ? { ...l, timestamp: formatTime() } : l))
+    }, [])
     const [running, setRunning] = useState(false)
     const scrollRef = useRef<HTMLDivElement>(null)
     const abortRef = useRef(false)

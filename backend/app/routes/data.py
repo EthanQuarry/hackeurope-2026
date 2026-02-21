@@ -16,23 +16,76 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Well-known NORAD IDs to fetch as our "fleet"
+# Well-known NORAD IDs — key satellites across all orbit types
 FLEET_NORAD_IDS = [
-    25544,  # ISS
+    # --- Crewed / Space Stations ---
+    25544,  # ISS (ZARYA)
+    48274,  # COSMOS-2558 (Russian inspector)
+    49260,  # TIANHE (Chinese Space Station)
+    # --- Earth Observation ---
     43013,  # NOAA-20
     27424,  # AQUA
-    36508,  # CRYOSAT-2
-    44238,  # STARLINK-1007
-    39232,  # USA-245
-    48274,  # COSMOS-2558
-    43600,  # ICEYE-X1
-    49260,  # TIANHE (CSS)
     25994,  # TERRA
+    36508,  # CRYOSAT-2
     41240,  # SENTINEL-2A
-    28474,  # GPS IIR-M
-    40258,  # ASTRA 2G
+    39084,  # LANDSAT 8
+    43602,  # SENTINEL-3B
+    43600,  # ICEYE-X1
+    # --- Military / Reconnaissance ---
+    39232,  # USA-245 (NRO KH-11)
+    43232,  # USA-281 (NRO)
+    28884,  # USA-184 (NROL)
+    40258,  # ASTRA 2G (comms near military)
+    # --- Navigation (MEO) ---
+    28474,  # GPS IIR-M 3
+    32260,  # GPS IIF-1
+    40534,  # GPS III-1
+    36585,  # GLONASS-M
+    38857,  # GALILEO-IOV PFM
+    44204,  # BEIDOU-3 M17
+    # --- Communications (GEO & LEO) ---
     41866,  # INTELSAT 36
-    43435,  # WGS-10
+    43435,  # WGS-10 (US mil SATCOM)
+    40874,  # MUOS-4 (US Navy)
+    # --- Starlink constellation (sample) ---
+    44238,  # STARLINK-1007
+    44240,  # STARLINK-1008
+    44914,  # STARLINK-1032
+    45044,  # STARLINK-1180
+    45189,  # STARLINK-1305
+    45386,  # STARLINK-1436
+    45535,  # STARLINK-1564
+    45715,  # STARLINK-1680
+    46080,  # STARLINK-1902
+    47181,  # STARLINK-2415
+    48601,  # STARLINK-2737
+    # --- OneWeb ---
+    56700,  # ONEWEB-0453
+    49445,  # ONEWEB-0198
+    48078,  # ONEWEB-0131
+    # --- Science ---
+    20580,  # HUBBLE SPACE TELESCOPE
+    27386,  # ENVISAT (defunct, large debris risk)
+    43205,  # TESS (exoplanet hunter)
+    # --- Weather ---
+    29155,  # GOES 13
+    35491,  # GOES 14
+    36411,  # GOES 15
+    41882,  # GOES 16
+    43226,  # GOES 17
+    # --- Russian military ---
+    41032,  # COSMOS-2510
+    43063,  # COSMOS-2524
+    44398,  # COSMOS-2535
+    47719,  # COSMOS-2551
+    # --- Chinese military / dual-use ---
+    49492,  # YAOGAN-34
+    50258,  # YAOGAN-35C
+    41838,  # TIANLIAN-1-04
+    # --- Other notable ---
+    37820,  # TIANGONG-1 successor
+    28654,  # IRIDIUM 33 (collision remnant)
+    22675,  # COSMOS 2251 (collision remnant)
 ]
 
 # Cached results
@@ -173,52 +226,81 @@ async def get_threats():
     threats = []
     now_ms = int(time.time() * 1000)
 
-    # Generate threats from close pairs
+    # Compute realistic 3D distances between satellites at their current positions
+    # and generate conjunction events for close pairs
     for i in range(len(sats)):
         for j in range(i + 1, len(sats)):
             a = sats[i]
             b = sats[j]
-            alt_diff = abs(a["altitude_km"] - b["altitude_km"])
-            inc_diff = abs(a["inclination_deg"] - b["inclination_deg"])
 
-            # Satellites in similar orbits = potential conjunction
-            if alt_diff < 50 and inc_diff < 15:
-                miss_km = alt_diff + random.random() * 5
-                severity = "threatened" if miss_km < 5 else ("watched" if miss_km < 30 else "nominal")
-                tca_min = int(10 + random.random() * 110)
+            # Use first trajectory point as current position
+            a_traj = a["trajectory"][0] if a["trajectory"] else None
+            b_traj = b["trajectory"][0] if b["trajectory"] else None
+            if not a_traj or not b_traj:
+                continue
 
-                a_traj = a["trajectory"][0] if a["trajectory"] else {"lat": 0, "lon": 0, "altKm": a["altitude_km"]}
-                b_traj = b["trajectory"][0] if b["trajectory"] else {"lat": 0, "lon": 0, "altKm": b["altitude_km"]}
+            # Compute 3D Euclidean distance in km using geodetic coords
+            r_a = 6378.137 + a["altitude_km"]
+            r_b = 6378.137 + b["altitude_km"]
+            lat_a, lon_a = math.radians(a_traj["lat"]), math.radians(a_traj["lon"])
+            lat_b, lon_b = math.radians(b_traj["lat"]), math.radians(b_traj["lon"])
 
-                intent = "Uncontrolled debris"
-                confidence = 0.85 + random.random() * 0.1
-                if a["status"] == "watched" or b["status"] == "watched":
-                    intent = "Maneuvering — intent unclear"
-                    confidence = 0.5 + random.random() * 0.2
-                if a["status"] == "threatened" or b["status"] == "threatened":
-                    intent = "Possible hostile approach"
-                    confidence = 0.6 + random.random() * 0.3
+            xa = r_a * math.cos(lat_a) * math.cos(lon_a)
+            ya = r_a * math.cos(lat_a) * math.sin(lon_a)
+            za = r_a * math.sin(lat_a)
+            xb = r_b * math.cos(lat_b) * math.cos(lon_b)
+            yb = r_b * math.cos(lat_b) * math.sin(lon_b)
+            zb = r_b * math.sin(lat_b)
 
-                threats.append({
-                    "id": f"threat-{len(threats) + 1}",
-                    "primaryId": a["id"],
-                    "secondaryId": b["id"],
-                    "primaryName": a["name"],
-                    "secondaryName": b["name"],
-                    "severity": severity,
-                    "missDistanceKm": round(miss_km, 1),
-                    "tcaTime": now_ms + tca_min * 60 * 1000,
-                    "tcaInMinutes": tca_min,
-                    "primaryPosition": {"lat": a_traj.get("lat", 0), "lon": a_traj.get("lon", 0), "altKm": a["altitude_km"]},
-                    "secondaryPosition": {"lat": b_traj.get("lat", 0), "lon": b_traj.get("lon", 0), "altKm": b["altitude_km"]},
-                    "intentClassification": intent,
-                    "confidence": round(confidence, 2),
-                })
+            dist_km = math.sqrt((xa - xb)**2 + (ya - yb)**2 + (za - zb)**2)
 
-    # Sort by severity
+            # Flag conjunctions within 2000 km (snapshot distance)
+            # Real CDMs propagate forward — TCA miss distance will be much smaller
+            if dist_km > 2000:
+                continue
+
+            # Simulate the projected miss distance at TCA (much tighter than current snapshot)
+            miss_km = dist_km * (0.001 + random.random() * 0.05)  # TCA miss = 0.1-5% of current distance
+            miss_km = max(0.05, miss_km)  # Floor at 50 meters
+
+            if miss_km < 1.0:
+                severity = "threatened"
+            elif miss_km < 25.0:
+                severity = "watched"
+            else:
+                severity = "nominal"
+
+            tca_min = int(5 + random.random() * 175)  # 5 min to ~3 hours out
+
+            intent = "Uncontrolled debris"
+            confidence = 0.85 + random.random() * 0.1
+            if a["status"] == "watched" or b["status"] == "watched":
+                intent = "Maneuvering — intent unclear"
+                confidence = 0.5 + random.random() * 0.2
+            if a["status"] == "threatened" or b["status"] == "threatened":
+                intent = "Possible hostile approach"
+                confidence = 0.6 + random.random() * 0.3
+
+            threats.append({
+                "id": f"threat-{len(threats) + 1}",
+                "primaryId": a["id"],
+                "secondaryId": b["id"],
+                "primaryName": a["name"],
+                "secondaryName": b["name"],
+                "severity": severity,
+                "missDistanceKm": round(miss_km, 2),
+                "tcaTime": now_ms + tca_min * 60 * 1000,
+                "tcaInMinutes": tca_min,
+                "primaryPosition": {"lat": a_traj["lat"], "lon": a_traj["lon"], "altKm": a["altitude_km"]},
+                "secondaryPosition": {"lat": b_traj["lat"], "lon": b_traj["lon"], "altKm": b["altitude_km"]},
+                "intentClassification": intent,
+                "confidence": round(confidence, 2),
+            })
+
+    # Sort by severity then TCA
     severity_order = {"threatened": 0, "watched": 1, "nominal": 2}
     threats.sort(key=lambda t: (severity_order.get(t["severity"], 3), t["tcaInMinutes"]))
-    return threats[:10]  # Cap at 10 for UI
+    return threats[:15]
 
 
 @router.get("/responses")

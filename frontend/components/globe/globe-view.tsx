@@ -12,6 +12,7 @@ import { AnimationDriver } from "@/components/globe/animation-driver"
 import { ThreatIndicator } from "@/components/globe/threat-indicator"
 import { CollisionEffect } from "@/components/globe/collision-effect"
 import { useFleetStore } from "@/stores/fleet-store"
+import { useThreatStore } from "@/stores/threat-store"
 import { MOCK_SATELLITES, generateMockDebris, MOCK_THREATS } from "@/lib/mock-data"
 import type { DebrisData, SatelliteData, ThreatData } from "@/types"
 
@@ -49,17 +50,26 @@ function Scene({
       <DebrisCloud debris={debris} simTimeRef={simTimeRef} />
 
       {/* Satellites */}
-      {satellites.map((sat) => (
-        <SatelliteMarker
-          key={sat.id}
-          id={sat.id}
-          trajectory={sat.trajectory}
-          status={sat.status}
-          selected={sat.id === selectedSatelliteId}
-          onSelect={onSelectSatellite}
-          simTimeRef={simTimeRef}
-        />
-      ))}
+      {satellites.map((sat) => {
+        // Compute threat % for watched/threatened satellites
+        let threatPercent: number | undefined
+        if (sat.status === "threatened") threatPercent = 60 + Math.floor((parseInt(sat.id.replace(/\D/g, ""), 10) || 0) % 35)
+        else if (sat.status === "watched") threatPercent = 15 + Math.floor((parseInt(sat.id.replace(/\D/g, ""), 10) || 0) % 40)
+
+        return (
+          <SatelliteMarker
+            key={sat.id}
+            id={sat.id}
+            name={sat.name}
+            trajectory={sat.trajectory}
+            status={sat.status}
+            selected={sat.id === selectedSatelliteId}
+            onSelect={onSelectSatellite}
+            simTimeRef={simTimeRef}
+            threatPercent={threatPercent}
+          />
+        )
+      })}
 
       {/* Threat indicators */}
       {threats.map((threat) => (
@@ -103,11 +113,16 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
 
   const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
+  const storeSatellites = useFleetStore((s) => s.satellites)
+  const storeThreats = useThreatStore((s) => s.threats)
+  const storeDebris = useThreatStore((s) => s.debris)
 
-  // Use mock data for now — will be replaced with live API in Phase 8
-  const satellites = MOCK_SATELLITES
-  const debris = useMemo(() => generateMockDebris(2500), [])
-  const threats = MOCK_THREATS
+  const fallbackDebris = useMemo(() => generateMockDebris(2500), [])
+
+  // Use store data (populated by polling), fall back to mocks
+  const satellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
+  const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris
+  const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS
 
   return (
     <div
