@@ -8,6 +8,7 @@ import { InsightsCard } from "@/components/cards/insights-card"
 import { SatelliteCard } from "@/components/cards/satellite-card"
 import { AiChatBar } from "@/components/cards/ai-chat-bar"
 import { StatsCards } from "@/components/cards/stats-cards"
+import { SatelliteSearch } from "@/components/cards/satellite-search"
 import { ProximityOps } from "@/components/ops/proximity-ops"
 import { SignalOps } from "@/components/ops/signal-ops"
 import { AnomalyOps } from "@/components/ops/anomaly-ops"
@@ -25,7 +26,7 @@ import {
   MOCK_ANOMALY_THREATS,
 } from "@/lib/mock-data"
 import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants"
-import type { SatelliteData, ThreatData, DebrisData } from "@/types"
+import type { SatelliteData, ThreatData, DebrisData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
 
 export function DashboardShell() {
   const activeView = useUIStore((s) => s.activeView)
@@ -40,6 +41,13 @@ export function DashboardShell() {
   const setSatellites = useFleetStore((s) => s.setSatellites)
   const setThreats = useThreatStore((s) => s.setThreats)
   const setDebris = useThreatStore((s) => s.setDebris)
+  const setProximityThreats = useThreatStore((s) => s.setProximityThreats)
+  const setSignalThreats = useThreatStore((s) => s.setSignalThreats)
+  const setAnomalyThreats = useThreatStore((s) => s.setAnomalyThreats)
+
+  const storeProximity = useThreatStore((s) => s.proximityThreats)
+  const storeSignal = useThreatStore((s) => s.signalThreats)
+  const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
 
   // Poll backend for live data — falls back to mocks on error
   usePolling<SatelliteData[]>({
@@ -58,6 +66,28 @@ export function DashboardShell() {
     onData: setDebris,
   })
 
+  // Poll ops-level threat endpoints
+  usePolling<ProximityThreat[]>({
+    url: api.proximityThreats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setProximityThreats,
+  })
+  usePolling<SignalThreat[]>({
+    url: api.signalThreats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setSignalThreats,
+  })
+  usePolling<AnomalyThreat[]>({
+    url: api.anomalyThreats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setAnomalyThreats,
+  })
+
+  // Use live data when available, fall back to mocks
+  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
+  const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
+  const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
       {/* Full-screen globe background */}
@@ -74,9 +104,9 @@ export function DashboardShell() {
             onSpeedChange={setSpeed}
             onPlayToggle={togglePlaying}
             threatCounts={{
-              proximity: MOCK_PROXIMITY_THREATS.length,
-              signal: MOCK_SIGNAL_THREATS.length,
-              anomaly: MOCK_ANOMALY_THREATS.length,
+              proximity: proximityThreats.length,
+              signal: signalThreats.length,
+              anomaly: anomalyThreats.length,
             }}
           />
         </div>
@@ -87,9 +117,10 @@ export function DashboardShell() {
         {activeView === "overview" ? (
           /* Overview: Floating glass cards over the globe */
           <div className="relative mx-auto h-full w-full max-w-[1600px]">
-            {/* Left: AI Insights card */}
-            <div className="absolute left-0 top-0 bottom-20">
-              <InsightsCard />
+            {/* Left: Search + AI Insights */}
+            <div className="absolute left-0 top-0 bottom-20 flex flex-col gap-3">
+              <SatelliteSearch />
+              <InsightsCard className="min-h-0 flex-1" />
             </div>
 
             {/* Right: Satellite detail card (only when selected) */}
@@ -98,7 +129,7 @@ export function DashboardShell() {
             </div>
 
             {/* Bottom center: AI Chat input bar */}
-            <div className="absolute bottom-36 left-1/2 -translate-x-1/2">
+            <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
               <AiChatBar />
             </div>
 
@@ -111,13 +142,13 @@ export function DashboardShell() {
           /* Ops pages: full mission view */
           <div className="mx-auto h-full w-full max-w-[1600px]">
             {activeView === "proximity" && (
-              <ProximityOps threats={MOCK_PROXIMITY_THREATS} />
+              <ProximityOps threats={proximityThreats} />
             )}
             {activeView === "signal" && (
-              <SignalOps threats={MOCK_SIGNAL_THREATS} />
+              <SignalOps threats={signalThreats} />
             )}
             {activeView === "anomaly" && (
-              <AnomalyOps threats={MOCK_ANOMALY_THREATS} />
+              <AnomalyOps threats={anomalyThreats} />
             )}
           </div>
         )}

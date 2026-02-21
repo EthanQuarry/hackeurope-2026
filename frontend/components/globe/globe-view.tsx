@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { Earth } from "@/components/globe/earth"
 import { DebrisCloud } from "@/components/globe/debris-cloud"
 import { SatelliteMarker } from "@/components/globe/satellite-marker"
+import { HostileMarker } from "@/components/globe/hostile-marker"
 import { AnimationDriver } from "@/components/globe/animation-driver"
 import { ThreatIndicator } from "@/components/globe/threat-indicator"
 import { CollisionEffect } from "@/components/globe/collision-effect"
@@ -16,8 +17,53 @@ import { Starfield } from "@/components/globe/starfield"
 import { CameraFocus } from "@/components/globe/camera-focus"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
-import { MOCK_SATELLITES, generateMockDebris, MOCK_THREATS } from "@/lib/mock-data"
-import type { DebrisData, SatelliteData, ThreatData } from "@/types"
+import {
+  MOCK_SATELLITES,
+  generateMockDebris,
+  MOCK_THREATS,
+  MOCK_PROXIMITY_THREATS,
+  MOCK_SIGNAL_THREATS,
+  MOCK_ANOMALY_THREATS,
+} from "@/lib/mock-data"
+import type { DebrisData, SatelliteData, ThreatData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
+import type { ThreatSeverity } from "@/lib/constants"
+
+interface HostileMarkerData {
+  id: string
+  name: string
+  position: { lat: number; lon: number; altKm: number }
+  severity: ThreatSeverity
+}
+
+/** Derive hostile markers from live ops threat data */
+function deriveHostileMarkers(
+  proximity: ProximityThreat[],
+  signal: SignalThreat[],
+  anomaly: AnomalyThreat[],
+): HostileMarkerData[] {
+  const markers: HostileMarkerData[] = []
+  const seen = new Set<string>()
+
+  for (const t of proximity) {
+    if (!seen.has(t.foreignSatId)) {
+      seen.add(t.foreignSatId)
+      markers.push({ id: t.foreignSatId, name: t.foreignSatName, position: t.primaryPosition, severity: t.severity })
+    }
+  }
+  for (const t of signal) {
+    if (!seen.has(t.interceptorId)) {
+      seen.add(t.interceptorId)
+      markers.push({ id: t.interceptorId, name: t.interceptorName, position: t.position, severity: t.severity })
+    }
+  }
+  for (const t of anomaly) {
+    if (!seen.has(t.satelliteId)) {
+      seen.add(t.satelliteId)
+      markers.push({ id: t.satelliteId, name: t.satelliteName, position: t.position, severity: t.severity })
+    }
+  }
+  return markers
+}
 
 interface GlobeViewProps {
   compacted?: boolean
@@ -27,6 +73,7 @@ function Scene({
   satellites,
   debris,
   threats,
+  hostileMarkers,
   selectedSatelliteId,
   onSelectSatellite,
   simTimeRef,
@@ -36,6 +83,7 @@ function Scene({
   satellites: SatelliteData[]
   debris: DebrisData[]
   threats: ThreatData[]
+  hostileMarkers: HostileMarkerData[]
   selectedSatelliteId: string | null
   onSelectSatellite: (id: string) => void
   simTimeRef: React.RefObject<number>
@@ -74,12 +122,24 @@ function Scene({
         )
       })}
 
-      {/* Threat indicators */}
+      {/* Hostile / foreign satellite markers from live threat data */}
+      {hostileMarkers.map((h) => (
+        <HostileMarker
+          key={h.id}
+          id={h.id}
+          name={h.name}
+          position={h.position}
+          severity={h.severity}
+        />
+      ))}
+
+      {/* Threat indicators — pass satellites for animated position tracking */}
       {threats.map((threat) => (
         <ThreatIndicator
           key={threat.id}
           threat={threat}
           simTimeRef={simTimeRef}
+          satellites={satellites}
         />
       ))}
 
@@ -123,6 +183,9 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const storeSatellites = useFleetStore((s) => s.satellites)
   const storeThreats = useThreatStore((s) => s.threats)
   const storeDebris = useThreatStore((s) => s.debris)
+  const storeProximity = useThreatStore((s) => s.proximityThreats)
+  const storeSignal = useThreatStore((s) => s.signalThreats)
+  const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
 
   const fallbackDebris = useMemo(() => generateMockDebris(2500), [])
 
@@ -130,6 +193,16 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const satellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
   const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris
   const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS
+
+  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
+  const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
+  const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+
+  // Derive hostile markers from live ops threat data
+  const hostileMarkers = useMemo(
+    () => deriveHostileMarkers(proximityThreats, signalThreats, anomalyThreats),
+    [proximityThreats, signalThreats, anomalyThreats]
+  )
 
   return (
     <div
@@ -148,6 +221,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
           satellites={satellites}
           debris={debris}
           threats={threats}
+          hostileMarkers={hostileMarkers}
           selectedSatelliteId={selectedSatelliteId}
           onSelectSatellite={selectSatellite}
           simTimeRef={simTimeRef}

@@ -1,13 +1,12 @@
 "use client"
 
-import { useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useFrame } from "@react-three/fiber"
 import { Line, Html } from "@react-three/drei"
 import * as THREE from "three"
 
 import { geodeticToSceneVec3 } from "@/lib/geo"
 import { THREAT_COLORS, type ThreatSeverity } from "@/lib/constants"
-import { useGlobeStore } from "@/stores/globe-store"
 import type { TrajectoryPoint } from "@/types"
 
 interface SatelliteMarkerProps {
@@ -51,10 +50,11 @@ export function SatelliteMarker({
 }: SatelliteMarkerProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lineRef = useRef<any>(null)
   const targetPos = useRef(new THREE.Vector3())
   const initialized = useRef(false)
-
-  const simTime = useGlobeStore((s) => s.simTime)
+  const posFlatRef = useRef<Float32Array>(new Float32Array(0))
 
   const color = THREAT_COLORS[status]?.hex ?? "#00e5ff"
   const threeColor = useMemo(() => new THREE.Color(color), [color])
@@ -66,14 +66,37 @@ export function SatelliteMarker({
     })
   }, [trajectory])
 
-  // Trail colors — precomputed, only changes when color/status changes
+  const trailLen = useMemo(
+    () =>
+      Math.min(
+        MAX_TRAIL_POINTS,
+        Math.max(MIN_TRAIL_POINTS, Math.floor(scenePoints.length * TRAIL_FRACTION)),
+      ) + 1,
+    [scenePoints.length],
+  )
+
+  // Initial trail points — placeholder, useFrame updates within one tick
+  const initialTrailPoints = useMemo(() => {
+    if (scenePoints.length < 2) {
+      return scenePoints
+        .slice(0, 2)
+        .map((p) => [p.x, p.y, p.z] as [number, number, number])
+    }
+    const pts: [number, number, number][] = []
+    for (let i = 0; i < trailLen; i++) {
+      const p = scenePoints[i % scenePoints.length]
+      pts.push([p.x, p.y, p.z])
+    }
+    return pts
+  }, [scenePoints, trailLen])
+
+  // Trail vertex colors — fades from dim tail to bright head
   const trailColors = useMemo(() => {
-    if (scenePoints.length < 2) return undefined
-    const baseOpacity = status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35
-    const len = Math.min(MAX_TRAIL_POINTS, Math.max(MIN_TRAIL_POINTS, Math.floor(scenePoints.length * TRAIL_FRACTION))) + 1
+    const baseOpacity =
+      status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35
     const colors: [number, number, number][] = []
-    for (let i = 0; i < len; i++) {
-      const t = i / (len - 1)
+    for (let i = 0; i < trailLen; i++) {
+      const t = i / Math.max(1, trailLen - 1)
       const fade = Math.pow(t, 2.5)
       colors.push([
         threeColor.r * fade * baseOpacity,
@@ -82,32 +105,31 @@ export function SatelliteMarker({
       ])
     }
     return colors
-  }, [threeColor, status, scenePoints.length])
+  }, [threeColor, status, trailLen])
 
-  const trailPoints = useMemo(() => {
-    if (scenePoints.length < 2) {
-      return scenePoints.slice(0, 2).map((p) => [p.x, p.y, p.z] as [number, number, number])
+  // Sync Line2 colors when status / color changes after mount
+  useEffect(() => {
+    const geo = lineRef.current?.geometry
+    if (!geo?.setColors) return
+    const flat: number[] = []
+    const baseOpacity =
+      status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35
+    for (let i = 0; i < trailLen; i++) {
+      const t = i / Math.max(1, trailLen - 1)
+      const fade = Math.pow(t, 2.5)
+      flat.push(
+        threeColor.r * fade * baseOpacity,
+        threeColor.g * fade * baseOpacity,
+        threeColor.b * fade * baseOpacity,
+      )
     }
+    geo.setColors(flat)
+  }, [threeColor, status, trailLen])
 
-    const simTimeSec = simTime / 1000
-    const totalDuration = trajectory[trajectory.length - 1].t - trajectory[0].t
-    if (totalDuration <= 0) {
-      return scenePoints.slice(0, 2).map((p) => [p.x, p.y, p.z] as [number, number, number])
-    }
-
-    const elapsed = simTimeSec - trajectory[0].t
-    const loopedTime = trajectory[0].t + ((elapsed % totalDuration) + totalDuration) % totalDuration
-    const trailLength = Math.min(MAX_TRAIL_POINTS, Math.max(MIN_TRAIL_POINTS, Math.floor(scenePoints.length * TRAIL_FRACTION)))
-    const currentLoopIdx = Math.floor(((loopedTime - trajectory[0].t) / totalDuration) * scenePoints.length)
-
-    const trail: [number, number, number][] = []
-    for (let i = trailLength; i >= 0; i--) {
-      const trailIdx = ((currentLoopIdx - i) % scenePoints.length + scenePoints.length) % scenePoints.length
-      const p = scenePoints[trailIdx]
-      trail.push([p.x, p.y, p.z])
-    }
-    return trail.length > 1 ? trail : scenePoints.slice(0, 2).map((p) => [p.x, p.y, p.z] as [number, number, number])
-  }, [simTime, scenePoints, trajectory])
+  // Keep reusable flat array sized correctly
+  useEffect(() => {
+    posFlatRef.current = new Float32Array(trailLen * 3)
+  }, [trailLen])
 
   useFrame(() => {
     if (!meshRef.current || scenePoints.length < 2) return
@@ -117,7 +139,8 @@ export function SatelliteMarker({
     if (totalDuration <= 0) return
 
     const elapsed = currentSimTime - trajectory[0].t
-    const loopedTime = trajectory[0].t + ((elapsed % totalDuration) + totalDuration) % totalDuration
+    const loopedTime =
+      trajectory[0].t + (((elapsed % totalDuration) + totalDuration) % totalDuration)
     const idx = findTimeIndex(trajectory, loopedTime)
     const nextIdx = Math.min(idx + 1, trajectory.length - 1)
     const t0 = trajectory[idx].t
@@ -136,6 +159,35 @@ export function SatelliteMarker({
     if (glowRef.current) {
       glowRef.current.position.copy(meshRef.current.position)
     }
+
+    // ── Update trail positions in Line2 geometry ───────────────────────
+    const geo = lineRef.current?.geometry
+    if (geo?.setPositions) {
+      const flat = posFlatRef.current
+      if (flat.length !== trailLen * 3) return // guard against size mismatch
+
+      const trailSegments = trailLen - 1
+      const numPts = scenePoints.length
+      const currentLoopIdx = Math.floor(
+        ((loopedTime - trajectory[0].t) / totalDuration) * numPts,
+      )
+
+      for (let i = trailSegments; i >= 1; i--) {
+        const trailIdx =
+          ((currentLoopIdx - i) % numPts + numPts) % numPts
+        const p = scenePoints[trailIdx]
+        const j = trailSegments - i
+        flat[j * 3] = p.x
+        flat[j * 3 + 1] = p.y
+        flat[j * 3 + 2] = p.z
+      }
+      // Last point = satellite's actual animated position
+      flat[trailSegments * 3] = meshRef.current.position.x
+      flat[trailSegments * 3 + 1] = meshRef.current.position.y
+      flat[trailSegments * 3 + 2] = meshRef.current.position.z
+
+      geo.setPositions(flat)
+    }
   })
 
   // Only show label for selected or threatened satellites (not all of them)
@@ -144,9 +196,10 @@ export function SatelliteMarker({
 
   return (
     <group>
-      {/* Orbit trail */}
+      {/* Orbit trail — positions updated every frame in useFrame */}
       <Line
-        points={trailPoints}
+        ref={lineRef}
+        points={initialTrailPoints}
         vertexColors={trailColors}
         transparent
         opacity={1}
@@ -161,7 +214,7 @@ export function SatelliteMarker({
           onSelect?.(id)
         }}
       >
-        <sphereGeometry args={[markerSize, 8, 8]} />
+        <sphereGeometry args={[markerSize, 32, 32]} />
         <meshBasicMaterial color={threeColor} />
 
         {showLabel && name && (
@@ -170,26 +223,35 @@ export function SatelliteMarker({
             distanceFactor={6}
             style={{ pointerEvents: "none", userSelect: "none" }}
           >
-            <div style={{
-              transform: "translateY(-14px)",
-              whiteSpace: "nowrap",
-              textAlign: "center",
-            }}>
+            <div
+              style={{
+                transform: "translateY(-14px)",
+                whiteSpace: "nowrap",
+                textAlign: "center",
+              }}
+            >
               {threatPercent != null && (
-                <div style={{
-                  fontSize: "8px",
-                  fontWeight: 600,
-                  fontFamily: "monospace",
-                  color: status === "threatened" ? "rgba(255,68,102,0.7)" : "rgba(255,145,0,0.6)",
-                }}>
+                <div
+                  style={{
+                    fontSize: "8px",
+                    fontWeight: 600,
+                    fontFamily: "monospace",
+                    color:
+                      status === "threatened"
+                        ? "rgba(255,68,102,0.7)"
+                        : "rgba(255,145,0,0.6)",
+                  }}
+                >
                   {threatPercent}%
                 </div>
               )}
-              <div style={{
-                fontSize: "6px",
-                fontFamily: "monospace",
-                color: "rgba(200,220,255,0.45)",
-              }}>
+              <div
+                style={{
+                  fontSize: "6px",
+                  fontFamily: "monospace",
+                  color: "rgba(200,220,255,0.45)",
+                }}
+              >
                 {name}
               </div>
             </div>
@@ -199,7 +261,7 @@ export function SatelliteMarker({
 
       {/* Glow */}
       <mesh ref={glowRef}>
-        <sphereGeometry args={[markerSize * 2.5, 8, 8]} />
+        <sphereGeometry args={[markerSize * 2.5, 32, 32]} />
         <meshBasicMaterial
           color={threeColor}
           transparent

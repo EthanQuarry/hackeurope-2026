@@ -297,13 +297,11 @@ async def get_threats():
             if dist_km > 2000:
                 continue
 
-            # Simulate the projected miss distance at TCA (much tighter than current snapshot)
-            miss_km = dist_km * (0.001 + random.random() * 0.05)  # TCA miss = 0.1-5% of current distance
-            miss_km = max(0.05, miss_km)  # Floor at 50 meters
+            miss_km = round(dist_km, 2)
 
-            if miss_km < 1.0:
+            if miss_km < 50:
                 severity = "threatened"
-            elif miss_km < 25.0:
+            elif miss_km < 500:
                 severity = "watched"
             else:
                 severity = "nominal"

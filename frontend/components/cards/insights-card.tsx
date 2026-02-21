@@ -37,19 +37,19 @@ export function InsightsCard({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "pointer-events-auto w-[280px] rounded-2xl border border-white/10 bg-card/60 backdrop-blur-xl shadow-2xl",
+        "pointer-events-auto flex w-[280px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-card/60 backdrop-blur-xl shadow-2xl",
         className
       )}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+      <div className="shrink-0 flex items-center gap-2 border-b border-white/5 px-4 py-3">
         <Brain className="h-4 w-4 text-cyan-400" />
         <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-300">
           AI Insights
         </h2>
       </div>
 
-      <ScrollArea className="h-[calc(100vh-280px)] max-h-[520px]">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-4 p-4">
           {/* Predictions section */}
           <div>
