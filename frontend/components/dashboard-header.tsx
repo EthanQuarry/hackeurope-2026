@@ -1,13 +1,14 @@
 "use client"
 
-import { Play, Pause, Shield, Crosshair, Radio, AlertTriangle, LayoutGrid } from "lucide-react"
+import { useState } from "react"
+import { Play, Pause, Shield, Crosshair, Radio, AlertTriangle, LayoutGrid, ChevronDown, Globe } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { ThreatBadge } from "@/components/shared/threat-badge"
-import { SPEED_PRESETS } from "@/lib/constants"
+import { SPEED_PRESETS, PLANET_CONFIG } from "@/lib/constants"
 import type { ThreatSeverity } from "@/lib/constants"
 import type { GlobalThreatLevel } from "@/types"
-import { useUIStore, type ActiveView } from "@/stores/ui-store"
+import { useUIStore, type ActiveView, type Planet } from "@/stores/ui-store"
 
 interface DashboardHeaderProps {
   globalThreatLevel: GlobalThreatLevel
@@ -44,6 +45,58 @@ function formatSimTime(ms: number): string {
   return `${y}-${mo}-${d} ${h}:${m}:${s}Z`
 }
 
+const PLANETS: { id: Planet; label: string }[] = [
+  { id: "earth", label: "Earth" },
+  { id: "moon", label: "Moon" },
+  { id: "mars", label: "Mars" },
+]
+
+function PlanetSelector() {
+  const activePlanet = useUIStore((s) => s.activePlanet)
+  const setActivePlanet = useUIStore((s) => s.setActivePlanet)
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative z-50">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/60 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+      >
+        <Globe className="h-3 w-3" />
+        <span>{PLANET_CONFIG[activePlanet].label}</span>
+        <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-[70] mt-1 w-28 rounded-md border border-border/60 bg-card/95 py-1 shadow-xl backdrop-blur-xl">
+            {PLANETS.map((planet) => (
+              <button
+                key={planet.id}
+                type="button"
+                onClick={() => {
+                  setActivePlanet(planet.id)
+                  setOpen(false)
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors",
+                  activePlanet === planet.id
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                )}
+              >
+                {planet.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function DashboardHeader({
   globalThreatLevel,
   speed,
@@ -64,14 +117,15 @@ export function DashboardHeader({
 
   return (
     <header className="flex flex-col gap-2">
-      {/* Top row: Branding + sim time + speed controls */}
-      <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/80 px-5 py-2.5 shadow-lg backdrop-blur-lg">
+      {/* Top row: Branding + sim time + speed controls — z-10 so dropdown clears the nav tabs below */}
+      <div className="relative z-10 flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/80 px-5 py-2.5 shadow-lg backdrop-blur-lg">
         {/* Left: Branding */}
         <div className="flex items-center gap-3">
           <Shield className="h-5 w-5 text-primary" />
           <h1 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground">
             Orbital Shield
           </h1>
+          <PlanetSelector />
           <ThreatBadge severity={threatLevelToSeverity[globalThreatLevel]} />
         </div>
 

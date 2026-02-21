@@ -27,3 +27,31 @@ export const THREAT_COLORS = {
 } as const
 
 export type ThreatSeverity = keyof typeof THREAT_COLORS
+
+/** Planet configurations */
+export const PLANET_CONFIG = {
+  earth: {
+    label: "Earth",
+    texture: "/textures/earth/blue-marble-day.jpg",
+    fallbackColor: "#0d3b66",
+    atmosphereColor: "#73a5ff",
+    atmosphereOpacity: 0.1,
+    graticuleOpacity: 0.25,
+  },
+  moon: {
+    label: "Moon",
+    texture: "/textures/moon/moon-surface.jpg",
+    fallbackColor: "#3a3a3a",
+    atmosphereColor: "#888888",
+    atmosphereOpacity: 0.03,
+    graticuleOpacity: 0.15,
+  },
+  mars: {
+    label: "Mars",
+    texture: "/textures/mars/mars-surface.jpg",
+    fallbackColor: "#8b3a1a",
+    atmosphereColor: "#d4845a",
+    atmosphereOpacity: 0.08,
+    graticuleOpacity: 0.2,
+  },
+} as const

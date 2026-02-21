@@ -1,9 +1,11 @@
 import { create } from "zustand"
 
 export type ActiveView = "overview" | "proximity" | "signal" | "anomaly"
+export type Planet = "earth" | "moon" | "mars"
 
 interface UIState {
   activeView: ActiveView
+  activePlanet: Planet
   leftPanelCollapsed: boolean
   rightPanelCollapsed: boolean
   terminalOpen: boolean
@@ -11,6 +13,7 @@ interface UIState {
   rightActiveTab: "fleet" | "responses"
 
   setActiveView: (view: ActiveView) => void
+  setActivePlanet: (planet: Planet) => void
   toggleLeftPanel: () => void
   toggleRightPanel: () => void
   toggleTerminal: () => void
@@ -20,6 +23,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   activeView: "overview",
+  activePlanet: "earth",
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
   terminalOpen: false,
@@ -27,6 +31,7 @@ export const useUIStore = create<UIState>((set) => ({
   rightActiveTab: "fleet",
 
   setActiveView: (view) => set({ activeView: view }),
+  setActivePlanet: (planet) => set({ activePlanet: planet }),
   toggleLeftPanel: () => set((s) => ({ leftPanelCollapsed: !s.leftPanelCollapsed })),
   toggleRightPanel: () => set((s) => ({ rightPanelCollapsed: !s.rightPanelCollapsed })),
   toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen })),

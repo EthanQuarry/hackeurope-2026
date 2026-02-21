@@ -6,6 +6,8 @@ import { Line } from "@react-three/drei"
 import * as THREE from "three"
 
 import { geodeticToUnitVector } from "@/lib/geo"
+import { PLANET_CONFIG } from "@/lib/constants"
+import { useUIStore } from "@/stores/ui-store"
 import {
   earthVertexShader,
   earthFragmentShader,
@@ -41,6 +43,8 @@ function useTexture(path: string) {
   return tex
 }
 
+/* ── Earth-specific: custom shaders with day/night/clouds ── */
+
 function EarthSphere() {
   const matRef = useRef<THREE.ShaderMaterial>(null)
   const dayMap = useTexture(DAY_PATH)
@@ -55,7 +59,6 @@ function EarthSphere() {
     uTime: { value: 0 },
   }), [])
 
-  // Update texture uniforms as they load
   useEffect(() => {
     if (matRef.current && dayMap) {
       matRef.current.uniforms.dayMap.value = dayMap
@@ -124,7 +127,35 @@ function AtmosphereGlow() {
   )
 }
 
-function Graticule() {
+/* ── Moon/Mars: simple textured sphere with basic atmosphere ── */
+
+function PlanetSphere({ texturePath, fallbackColor }: { texturePath: string; fallbackColor: string }) {
+  const surfaceMap = useTexture(texturePath)
+
+  return (
+    <mesh>
+      <sphereGeometry args={[1, 64, 64]} />
+      <meshBasicMaterial
+        map={surfaceMap ?? undefined}
+        color={surfaceMap ? "#ffffff" : fallbackColor}
+        toneMapped={false}
+      />
+    </mesh>
+  )
+}
+
+function PlanetAtmosphere({ color, opacity }: { color: string; opacity: number }) {
+  return (
+    <mesh>
+      <sphereGeometry args={[1.015, 64, 64]} />
+      <meshBasicMaterial color={color} transparent opacity={opacity} side={THREE.BackSide} />
+    </mesh>
+  )
+}
+
+/* ── Shared graticule ── */
+
+function Graticule({ opacity = 1 }: { opacity?: number }) {
   const latLines = useMemo(() => {
     return [-60, -30, 0, 30, 60].map((lat) => {
       const points: [number, number, number][] = []
@@ -157,16 +188,18 @@ function Graticule() {
           points={points}
           color={isEquator ? "#00ddff" : "#1a3355"}
           transparent
-          opacity={isEquator ? 0.12 : 0.04}
+          opacity={(isEquator ? 0.12 : 0.04) * opacity}
           lineWidth={isEquator ? 0.5 : 0.3}
         />
       ))}
       {lonLines.map((points, i) => (
-        <Line key={`lon-${i}`} points={points} color="#1a3355" transparent opacity={0.03} lineWidth={0.3} />
+        <Line key={`lon-${i}`} points={points} color="#1a3355" transparent opacity={0.03 * opacity} lineWidth={0.3} />
       ))}
     </group>
   )
 }
+
+/* ── Main export ── */
 
 interface EarthProps {
   speedRef: React.RefObject<number>
@@ -174,6 +207,8 @@ interface EarthProps {
 
 export function Earth({ speedRef }: EarthProps) {
   const groupRef = useRef<THREE.Group>(null)
+  const activePlanet = useUIStore((s) => s.activePlanet)
+  const config = PLANET_CONFIG[activePlanet]
 
   useFrame((_, delta) => {
     if (!groupRef.current) return
@@ -181,13 +216,23 @@ export function Earth({ speedRef }: EarthProps) {
     groupRef.current.rotation.y += ((2 * Math.PI) / 86400) * delta * speed
   })
 
-  return (
-    <group>
-      <group ref={groupRef}>
-        <EarthSphere />
-        <Graticule />
+  if (activePlanet === "earth") {
+    return (
+      <group>
+        <group ref={groupRef}>
+          <EarthSphere />
+          <Graticule />
+        </group>
+        <AtmosphereGlow />
       </group>
-      <AtmosphereGlow />
+    )
+  }
+
+  return (
+    <group ref={groupRef}>
+      <PlanetSphere texturePath={config.texture} fallbackColor={config.fallbackColor} />
+      <Graticule opacity={config.graticuleOpacity} />
+      <PlanetAtmosphere color={config.atmosphereColor} opacity={config.atmosphereOpacity} />
     </group>
   )
 }

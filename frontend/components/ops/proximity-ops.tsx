@@ -71,9 +71,9 @@ export function ProximityOps({ threats }: ProximityOpsProps) {
   const closestDist = sorted.length > 0 ? Math.min(...sorted.map((t) => t.missDistanceKm)) : 0
 
   return (
-    <div className="pointer-events-auto flex h-full gap-4">
+    <div className="flex h-full gap-4">
       {/* Left panel — ops data */}
-      <div className="flex w-[520px] shrink-0 flex-col rounded-xl border border-border/50 bg-card/85 shadow-2xl backdrop-blur-xl">
+      <div className="pointer-events-auto flex w-[520px] shrink-0 flex-col rounded-xl border border-border/50 bg-card/85 shadow-2xl backdrop-blur-xl">
         {/* Header */}
         <div className="border-b border-border/40 px-5 py-3">
           <div className="flex items-center gap-2">
