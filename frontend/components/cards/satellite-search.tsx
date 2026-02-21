@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { THREAT_COLORS } from "@/lib/constants"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
+import { useUIStore } from "@/stores/ui-store"
 import { MOCK_SATELLITES } from "@/lib/mock-data"
 
 export function SatelliteSearch({ className }: { className?: string }) {
@@ -18,6 +19,7 @@ export function SatelliteSearch({ className }: { className?: string }) {
   const storeSatellites = useFleetStore((s) => s.satellites)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
   const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
+  const setActiveView = useUIStore((s) => s.setActiveView)
 
   const satellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
 
@@ -50,6 +52,7 @@ export function SatelliteSearch({ className }: { className?: string }) {
       const p = sat.trajectory[0]
       setFocusTarget({ lat: p.lat, lon: p.lon, altKm: p.alt_km, satelliteId: sat.id })
     }
+    setActiveView("satellite-detail")
     setQuery("")
     setOpen(false)
   }

@@ -4,6 +4,7 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useFleetStore } from "@/stores/fleet-store"
+import { useUIStore } from "@/stores/ui-store"
 import { ThreatBadge } from "@/components/shared/threat-badge"
 
 function MetricCell({ label, value, unit }: { label: string; value: string; unit?: string }) {
@@ -39,6 +40,7 @@ export function SatelliteCard({ className }: { className?: string }) {
   const selectedId = useFleetStore((s) => s.selectedSatelliteId)
   const satellites = useFleetStore((s) => s.satellites)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
+  const setActiveView = useUIStore((s) => s.setActiveView)
 
   const satellite = satellites.find((s) => s.id === selectedId)
 
@@ -127,6 +129,15 @@ export function SatelliteCard({ className }: { className?: string }) {
             ))}
           </div>
         </div>
+
+        {/* View Details button */}
+        <button
+          type="button"
+          onClick={() => setActiveView("satellite-detail")}
+          className="w-full border-t border-white/5 px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-gray-400 transition-colors hover:bg-white/[0.06] hover:text-gray-200"
+        >
+          View Details
+        </button>
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef } from "react"
+import { useCallback, useMemo, useRef } from "react"
 import { Canvas } from "@react-three/fiber"
 import { OrbitControls } from "@react-three/drei"
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
@@ -17,6 +17,7 @@ import { Starfield } from "@/components/globe/starfield"
 import { CameraFocus } from "@/components/globe/camera-focus"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
+import { useUIStore } from "@/stores/ui-store"
 import {
   MOCK_SATELLITES,
   generateMockDebris,
@@ -180,6 +181,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
 
   const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
+  const setActiveView = useUIStore((s) => s.setActiveView)
   const storeSatellites = useFleetStore((s) => s.satellites)
   const storeThreats = useThreatStore((s) => s.threats)
   const storeDebris = useThreatStore((s) => s.debris)
@@ -197,6 +199,12 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
   const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
   const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+
+  // Select satellite AND open detail page on globe click
+  const handleSelectSatellite = useCallback((id: string) => {
+    selectSatellite(id)
+    setActiveView("satellite-detail")
+  }, [selectSatellite, setActiveView])
 
   // Derive hostile markers, excluding IDs that already exist as fleet satellites
   const hostileMarkers = useMemo(() => {
@@ -224,7 +232,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
           threats={threats}
           hostileMarkers={hostileMarkers}
           selectedSatelliteId={selectedSatelliteId}
-          onSelectSatellite={selectSatellite}
+          onSelectSatellite={handleSelectSatellite}
           simTimeRef={simTimeRef}
           speedRef={speedRef}
           controlsRef={controlsRef}

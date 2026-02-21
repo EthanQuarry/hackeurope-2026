@@ -13,6 +13,7 @@ import { ProximityOps } from "@/components/ops/proximity-ops"
 import { SignalOps } from "@/components/ops/signal-ops"
 import { AnomalyOps } from "@/components/ops/anomaly-ops"
 import { CommsOps } from "@/components/ops/comms-ops"
+import { SatelliteDetailPage } from "@/components/satellite-detail-page"
 import { useUIStore } from "@/stores/ui-store"
 import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
@@ -166,6 +167,7 @@ export function DashboardShell() {
               <AnomalyOps threats={anomalyThreats} />
             )}
             {activeView === "comms" && <CommsOps />}
+            {activeView === "satellite-detail" && <SatelliteDetailPage />}
           </div>
         )}
       </div>
