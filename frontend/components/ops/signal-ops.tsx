@@ -95,77 +95,75 @@ export function SignalOps({ threats }: SignalOpsProps) {
           <StatBox label="Max Prob" value={`${(maxProb * 100).toFixed(0)}%`} alert={maxProb > 0.3} />
         </div>
 
-        {/* Threat List */}
-        <div className="flex min-h-0 flex-1 flex-col">
+        {/* Intercept List + Detail (single scroll region) */}
+        <ScrollArea className="min-h-0 flex-1">
           <div className="border-b border-border/40 px-5 py-2">
             <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
               Intercept Queue
             </span>
           </div>
-          <ScrollArea className="flex-1">
-            <div className="space-y-1 p-2">
-              {sorted.map((threat) => (
-                <button
-                  key={threat.id}
-                  type="button"
-                  onClick={() => setSelectedId(threat.id)}
-                  className={cn(
-                    "w-full rounded-md border px-3 py-2 text-left transition-all",
-                    selectedId === threat.id
-                      ? "border-primary/50 bg-primary/10"
-                      : "border-transparent hover:bg-secondary/40"
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ThreatBadge severity={threat.severity} />
-                      <span className="font-mono text-[10px] font-medium text-foreground">
-                        {threat.interceptorName}
-                      </span>
-                    </div>
-                    <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-                      {(threat.interceptionProbability * 100).toFixed(0)}%
+          <div className="space-y-1 p-2">
+            {sorted.map((threat) => (
+              <button
+                key={threat.id}
+                type="button"
+                onClick={() => setSelectedId(threat.id)}
+                className={cn(
+                  "w-full rounded-md border px-3 py-2 text-left transition-all",
+                  selectedId === threat.id
+                    ? "border-primary/50 bg-primary/10"
+                    : "border-transparent hover:bg-secondary/40"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ThreatBadge severity={threat.severity} />
+                    <span className="font-mono text-[10px] font-medium text-foreground">
+                      {threat.interceptorName}
                     </span>
                   </div>
-                  <div className="mt-1 text-[10px] text-muted-foreground">
-                    {threat.targetLinkAssetName} ↔ {threat.groundStationName}
-                  </div>
-                  <ProbabilityBar value={threat.interceptionProbability} />
-                </button>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-
-        {/* Selected Threat Detail */}
-        {selected && (
-          <div className="border-t border-border/40 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                Intercept Detail
-              </span>
-              <ThreatBadge severity={selected.severity} />
-            </div>
-
-            <div className="space-y-0">
-              <DataRow label="Interceptor" value={selected.interceptorName} />
-              <DataRow label="Target Asset" value={selected.targetLinkAssetName} />
-              <DataRow label="Ground Station" value={selected.groundStationName} />
-              <DataRow label="Intercept Prob" value={`${(selected.interceptionProbability * 100).toFixed(1)}%`} alert={selected.interceptionProbability > 0.3} />
-              <DataRow label="Signal Path" value={`${selected.signalPathAngleDeg.toFixed(1)}\u00b0`} />
-              <DataRow label="Windows at Risk" value={`${selected.commWindowsAtRisk} / ${selected.totalCommWindows}`} alert={selected.commWindowsAtRisk > 2} />
-              <DataRow label="TCA" value={formatTCA(selected.tcaInMinutes)} />
-              <DataRow label="Confidence" value={`${(selected.confidence * 100).toFixed(0)}%`} />
-            </div>
-
-            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
-              <div
-                className="h-full rounded-full bg-primary/70 transition-all"
-                style={{ width: `${selected.confidence * 100}%` }}
-              />
-            </div>
+                  <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                    {(threat.interceptionProbability * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  {threat.targetLinkAssetName} ↔ {threat.groundStationName}
+                </div>
+                <ProbabilityBar value={threat.interceptionProbability} />
+              </button>
+            ))}
           </div>
-        )}
+
+          {/* Selected Threat Detail */}
+          {selected && (
+            <div className="border-t border-border/40 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                  Intercept Detail
+                </span>
+                <ThreatBadge severity={selected.severity} />
+              </div>
+
+              <div className="space-y-0">
+                <DataRow label="Interceptor" value={selected.interceptorName} />
+                <DataRow label="Target Asset" value={selected.targetLinkAssetName} />
+                <DataRow label="Ground Station" value={selected.groundStationName} />
+                <DataRow label="Intercept Prob" value={`${(selected.interceptionProbability * 100).toFixed(1)}%`} alert={selected.interceptionProbability > 0.3} />
+                <DataRow label="Signal Path" value={`${selected.signalPathAngleDeg.toFixed(1)}\u00b0`} />
+                <DataRow label="Windows at Risk" value={`${selected.commWindowsAtRisk} / ${selected.totalCommWindows}`} alert={selected.commWindowsAtRisk > 2} />
+                <DataRow label="TCA" value={formatTCA(selected.tcaInMinutes)} />
+                <DataRow label="Confidence" value={`${(selected.confidence * 100).toFixed(0)}%`} />
+              </div>
+
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
+                <div
+                  className="h-full rounded-full bg-primary/70 transition-all"
+                  style={{ width: `${selected.confidence * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </ScrollArea>
       </div>
 
       {/* Right side — transparent gap for globe */}

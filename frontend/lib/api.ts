@@ -6,6 +6,9 @@ export const api = {
   satellites: `${BASE}/satellites`,
   debris: `${BASE}/debris`,
   threats: `${BASE}/threats`,
+  proximityThreats: `${BASE}/threats/proximity`,
+  signalThreats: `${BASE}/threats/signal`,
+  anomalyThreats: `${BASE}/threats/anomaly`,
   analysisStream: `${BASE}/analysis/stream`,
   responses: `${BASE}/responses`,
 } as const

@@ -13,6 +13,7 @@ from app.routes.analyze import router as analyze_router
 from app.routes.websocket import router as ws_router
 from app.routes.data import router as data_router
 from app.routes.stream import router as stream_router
+from app.routes.threats import router as threats_router
 
 # Load .env before anything else
 load_dotenv()
@@ -49,6 +50,7 @@ app.include_router(analyze_router)
 app.include_router(ws_router)
 app.include_router(data_router)
 app.include_router(stream_router)
+app.include_router(threats_router)
 
 
 @app.get("/api/health", response_model=HealthResponse)

@@ -125,13 +125,21 @@ export function SatelliteMarker({
 
   return (
     <group>
-      {/* Orbit trail */}
+      {/* Orbit trail with gradient fade */}
       <Line
         points={trailPoints}
-        color={color}
+        vertexColors={trailPoints.map((_, i, arr) => {
+          const t = i / (arr.length - 1) // 0=tail, 1=head
+          const fade = Math.pow(t, 2.5) // steep curve — tail fades to invisible
+          const baseOpacity = status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35
+          const r = threeColor.r * fade * baseOpacity
+          const g = threeColor.g * fade * baseOpacity
+          const b = threeColor.b * fade * baseOpacity
+          return [r, g, b] as [number, number, number]
+        })}
         transparent
-        opacity={status === "threatened" ? 0.8 : status === "watched" ? 0.5 : 0.35}
-        lineWidth={status === "threatened" ? 1.8 : 1.2}
+        opacity={1}
+        lineWidth={status === "threatened" ? 1.8 : status === "watched" ? 1.4 : 1.0}
       />
 
       {/* Satellite 3D model */}

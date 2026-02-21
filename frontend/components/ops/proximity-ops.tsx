@@ -94,90 +94,88 @@ export function ProximityOps({ threats }: ProximityOpsProps) {
           <StatBox label="Closest" value={formatDistance(closestDist)} alert={closestDist < 5} />
         </div>
 
-        {/* Threat List */}
-        <div className="flex min-h-0 flex-1 flex-col">
+        {/* Threat List + Detail (single scroll region) */}
+        <ScrollArea className="min-h-0 flex-1">
           <div className="border-b border-border/40 px-5 py-2">
             <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
               Threat Queue
             </span>
           </div>
-          <ScrollArea className="flex-1">
-            <div className="space-y-1 p-2">
-              {sorted.map((threat) => (
-                <button
-                  key={threat.id}
-                  type="button"
-                  onClick={() => setSelectedId(threat.id)}
-                  className={cn(
-                    "w-full rounded-md border px-3 py-2 text-left transition-all",
-                    selectedId === threat.id
-                      ? "border-primary/50 bg-primary/10"
-                      : "border-transparent hover:bg-secondary/40"
+          <div className="space-y-1 p-2">
+            {sorted.map((threat) => (
+              <button
+                key={threat.id}
+                type="button"
+                onClick={() => setSelectedId(threat.id)}
+                className={cn(
+                  "w-full rounded-md border px-3 py-2 text-left transition-all",
+                  selectedId === threat.id
+                    ? "border-primary/50 bg-primary/10"
+                    : "border-transparent hover:bg-secondary/40"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ThreatBadge severity={threat.severity} />
+                    <span className="font-mono text-[10px] font-medium text-foreground">
+                      {threat.foreignSatName}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                    {formatDistance(threat.missDistanceKm)}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">→ {threat.targetAssetName}</span>
+                  <span className={cn(
+                    "rounded px-1 py-0.5 font-mono text-[8px] font-bold uppercase",
+                    threat.approachPattern === "sun-hiding"
+                      ? "bg-red-500/20 text-red-400"
+                      : "bg-secondary/50 text-muted-foreground"
+                  )}>
+                    {PATTERN_LABELS[threat.approachPattern]}
+                  </span>
+                  {threat.sunHidingDetected && (
+                    <span className="rounded bg-red-500/20 px-1 py-0.5 font-mono text-[8px] font-bold uppercase text-red-400">
+                      SUN-HIDE
+                    </span>
                   )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ThreatBadge severity={threat.severity} />
-                      <span className="font-mono text-[10px] font-medium text-foreground">
-                        {threat.foreignSatName}
-                      </span>
-                    </div>
-                    <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-                      {formatDistance(threat.missDistanceKm)}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className="text-[10px] text-muted-foreground">→ {threat.targetAssetName}</span>
-                    <span className={cn(
-                      "rounded px-1 py-0.5 font-mono text-[8px] font-bold uppercase",
-                      threat.approachPattern === "sun-hiding"
-                        ? "bg-red-500/20 text-red-400"
-                        : "bg-secondary/50 text-muted-foreground"
-                    )}>
-                      {PATTERN_LABELS[threat.approachPattern]}
-                    </span>
-                    {threat.sunHidingDetected && (
-                      <span className="rounded bg-red-500/20 px-1 py-0.5 font-mono text-[8px] font-bold uppercase text-red-400">
-                        SUN-HIDE
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-
-        {/* Selected Threat Detail */}
-        {selected && (
-          <div className="border-t border-border/40 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                Threat Detail
-              </span>
-              <ThreatBadge severity={selected.severity} />
-            </div>
-
-            <div className="space-y-0">
-              <DataRow label="Foreign Asset" value={selected.foreignSatName} />
-              <DataRow label="Target Asset" value={selected.targetAssetName} />
-              <DataRow label="Miss Distance" value={formatDistance(selected.missDistanceKm)} alert={selected.missDistanceKm < 5} />
-              <DataRow label="Approach Velocity" value={`${selected.approachVelocityKms.toFixed(3)} km/s`} />
-              <DataRow label="TCA" value={formatTCA(selected.tcaInMinutes)} alert={selected.tcaInMinutes < 30} />
-              <DataRow label="Approach Pattern" value={PATTERN_LABELS[selected.approachPattern]} />
-              <DataRow label="Sun-Hiding" value={selected.sunHidingDetected ? "DETECTED" : "NEGATIVE"} alert={selected.sunHidingDetected} />
-              <DataRow label="Confidence" value={`${(selected.confidence * 100).toFixed(0)}%`} />
-            </div>
-
-            {/* Confidence bar */}
-            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
-              <div
-                className="h-full rounded-full bg-primary/70 transition-all"
-                style={{ width: `${selected.confidence * 100}%` }}
-              />
-            </div>
+                </div>
+              </button>
+            ))}
           </div>
-        )}
+
+          {/* Selected Threat Detail */}
+          {selected && (
+            <div className="border-t border-border/40 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                  Threat Detail
+                </span>
+                <ThreatBadge severity={selected.severity} />
+              </div>
+
+              <div className="space-y-0">
+                <DataRow label="Foreign Asset" value={selected.foreignSatName} />
+                <DataRow label="Target Asset" value={selected.targetAssetName} />
+                <DataRow label="Miss Distance" value={formatDistance(selected.missDistanceKm)} alert={selected.missDistanceKm < 5} />
+                <DataRow label="Approach Velocity" value={`${selected.approachVelocityKms.toFixed(3)} km/s`} />
+                <DataRow label="TCA" value={formatTCA(selected.tcaInMinutes)} alert={selected.tcaInMinutes < 30} />
+                <DataRow label="Approach Pattern" value={PATTERN_LABELS[selected.approachPattern]} />
+                <DataRow label="Sun-Hiding" value={selected.sunHidingDetected ? "DETECTED" : "NEGATIVE"} alert={selected.sunHidingDetected} />
+                <DataRow label="Confidence" value={`${(selected.confidence * 100).toFixed(0)}%`} />
+              </div>
+
+              {/* Confidence bar */}
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
+                <div
+                  className="h-full rounded-full bg-primary/70 transition-all"
+                  style={{ width: `${selected.confidence * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </ScrollArea>
       </div>
 
       {/* Right side — transparent gap for globe */}

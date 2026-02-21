@@ -106,91 +106,89 @@ export function AnomalyOps({ threats }: AnomalyOpsProps) {
           <StatBox label="Max Deviation" value={`${(maxDeviation * 100).toFixed(0)}%`} alert={maxDeviation > 0.7} />
         </div>
 
-        {/* Threat List */}
-        <div className="flex min-h-0 flex-1 flex-col">
+        {/* Anomaly List + Detail (single scroll region) */}
+        <ScrollArea className="min-h-0 flex-1">
           <div className="border-b border-border/40 px-5 py-2">
             <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
               Anomaly Queue
             </span>
           </div>
-          <ScrollArea className="flex-1">
-            <div className="space-y-1 p-2">
-              {sorted.map((threat) => (
-                <button
-                  key={threat.id}
-                  type="button"
-                  onClick={() => setSelectedId(threat.id)}
-                  className={cn(
-                    "w-full rounded-md border px-3 py-2 text-left transition-all",
-                    selectedId === threat.id
-                      ? "border-primary/50 bg-primary/10"
-                      : "border-transparent hover:bg-secondary/40"
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ThreatBadge severity={threat.severity} />
-                      <span className="font-mono text-[10px] font-medium text-foreground">
-                        {threat.satelliteName}
-                      </span>
-                    </div>
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      {timeAgo(threat.detectedAt)}
+          <div className="space-y-1 p-2">
+            {sorted.map((threat) => (
+              <button
+                key={threat.id}
+                type="button"
+                onClick={() => setSelectedId(threat.id)}
+                className={cn(
+                  "w-full rounded-md border px-3 py-2 text-left transition-all",
+                  selectedId === threat.id
+                    ? "border-primary/50 bg-primary/10"
+                    : "border-transparent hover:bg-secondary/40"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ThreatBadge severity={threat.severity} />
+                    <span className="font-mono text-[10px] font-medium text-foreground">
+                      {threat.satelliteName}
                     </span>
                   </div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className={cn(
-                      "rounded px-1 py-0.5 font-mono text-[8px] font-bold uppercase",
-                      threat.severity === "threatened"
-                        ? "bg-red-500/20 text-red-400"
-                        : "bg-amber-500/20 text-amber-300"
-                    )}>
-                      {ANOMALY_LABELS[threat.anomalyType]}
-                    </span>
-                    <span className="font-mono text-[9px] tabular-nums text-muted-foreground">
-                      {(threat.baselineDeviation * 100).toFixed(0)}% dev
-                    </span>
-                  </div>
-                  <DeviationBar value={threat.baselineDeviation} />
-                </button>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-
-        {/* Selected Threat Detail */}
-        {selected && (
-          <div className="border-t border-border/40 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                Anomaly Detail
-              </span>
-              <ThreatBadge severity={selected.severity} />
-            </div>
-
-            <div className="space-y-0">
-              <DataRow label="Satellite" value={selected.satelliteName} />
-              <DataRow label="Anomaly Type" value={ANOMALY_LABELS[selected.anomalyType]} />
-              <DataRow label="Baseline Deviation" value={`${(selected.baselineDeviation * 100).toFixed(0)}%`} alert={selected.baselineDeviation > 0.7} />
-              <DataRow label="Detected" value={timeAgo(selected.detectedAt)} />
-              <DataRow label="Confidence" value={`${(selected.confidence * 100).toFixed(0)}%`} />
-            </div>
-
-            <div className="mt-3 rounded-md border border-border/30 bg-secondary/20 p-3">
-              <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Analysis</span>
-              <p className="mt-1 text-xs leading-relaxed text-foreground/80">
-                {selected.description}
-              </p>
-            </div>
-
-            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
-              <div
-                className="h-full rounded-full bg-primary/70 transition-all"
-                style={{ width: `${selected.confidence * 100}%` }}
-              />
-            </div>
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    {timeAgo(threat.detectedAt)}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className={cn(
+                    "rounded px-1 py-0.5 font-mono text-[8px] font-bold uppercase",
+                    threat.severity === "threatened"
+                      ? "bg-red-500/20 text-red-400"
+                      : "bg-amber-500/20 text-amber-300"
+                  )}>
+                    {ANOMALY_LABELS[threat.anomalyType]}
+                  </span>
+                  <span className="font-mono text-[9px] tabular-nums text-muted-foreground">
+                    {(threat.baselineDeviation * 100).toFixed(0)}% dev
+                  </span>
+                </div>
+                <DeviationBar value={threat.baselineDeviation} />
+              </button>
+            ))}
           </div>
-        )}
+
+          {/* Selected Threat Detail */}
+          {selected && (
+            <div className="border-t border-border/40 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                  Anomaly Detail
+                </span>
+                <ThreatBadge severity={selected.severity} />
+              </div>
+
+              <div className="space-y-0">
+                <DataRow label="Satellite" value={selected.satelliteName} />
+                <DataRow label="Anomaly Type" value={ANOMALY_LABELS[selected.anomalyType]} />
+                <DataRow label="Baseline Deviation" value={`${(selected.baselineDeviation * 100).toFixed(0)}%`} alert={selected.baselineDeviation > 0.7} />
+                <DataRow label="Detected" value={timeAgo(selected.detectedAt)} />
+                <DataRow label="Confidence" value={`${(selected.confidence * 100).toFixed(0)}%`} />
+              </div>
+
+              <div className="mt-3 rounded-md border border-border/30 bg-secondary/20 p-3">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Analysis</span>
+                <p className="mt-1 text-xs leading-relaxed text-foreground/80">
+                  {selected.description}
+                </p>
+              </div>
+
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
+                <div
+                  className="h-full rounded-full bg-primary/70 transition-all"
+                  style={{ width: `${selected.confidence * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </ScrollArea>
       </div>
 
       {/* Right side — transparent gap for globe */}
