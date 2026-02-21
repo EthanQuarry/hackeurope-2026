@@ -19,6 +19,7 @@ export const DISPLAY_DEBRIS_LIMIT = 2500
 
 /** Threat severity colors — tech/military palette */
 export const THREAT_COLORS = {
+  allied: { text: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40", hex: "#4488ff" },
   nominal: { text: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40", hex: "#00e5ff" },
   watched: { text: "text-amber-300", bg: "bg-amber-500/15", border: "border-amber-500/40", hex: "#ff9100" },
   threatened: { text: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", hex: "#ff1744" },

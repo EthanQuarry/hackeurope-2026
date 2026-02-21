@@ -10,7 +10,7 @@ interface ProximityOpsProps {
   threats: ProximityThreat[]
 }
 
-const SEVERITY_ORDER = { threatened: 0, watched: 1, nominal: 2, friendly: 3 }
+const SEVERITY_ORDER: Record<string, number> = { threatened: 0, watched: 1, nominal: 2, allied: 3, friendly: 3 }
 
 const PATTERN_LABELS: Record<ProximityThreat["approachPattern"], string> = {
   "co-orbital": "CO-ORBITAL",

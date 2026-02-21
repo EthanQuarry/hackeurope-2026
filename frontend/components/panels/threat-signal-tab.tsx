@@ -11,7 +11,7 @@ interface ThreatSignalTabProps {
   onSelectThreat?: (id: string) => void
 }
 
-const SEVERITY_ORDER = { threatened: 0, watched: 1, nominal: 2, friendly: 3 }
+const SEVERITY_ORDER: Record<string, number> = { threatened: 0, watched: 1, nominal: 2, allied: 3, friendly: 3 }
 
 function formatTCA(minutes: number): string {
   if (minutes < 60) return `${minutes}m`

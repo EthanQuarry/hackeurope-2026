@@ -8,6 +8,7 @@ interface StatusDotProps {
 }
 
 const dotColorMap: Record<ThreatSeverity, string> = {
+  allied: "bg-blue-400",
   nominal: "bg-cyan-400",
   watched: "bg-amber-400",
   threatened: "bg-red-400",
@@ -15,6 +16,7 @@ const dotColorMap: Record<ThreatSeverity, string> = {
 }
 
 const pulseColorMap: Record<ThreatSeverity, string> = {
+  allied: "bg-blue-400/50",
   nominal: "bg-cyan-400/50",
   watched: "bg-amber-400/50",
   threatened: "bg-red-400/50",

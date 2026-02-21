@@ -130,10 +130,17 @@ def gp_to_satellite(gp: dict, idx: int) -> dict:
     # Orbital velocity
     v_kms = math.sqrt(MU / semi_major_km) if semi_major_km > 0 else 7.5
 
-    # Determine threat status based on country + orbit
-    status = "friendly"
-    if country in ("PRC", "RUS", "CIS", "PRK", "IRN"):
+    # Determine status: allied (ours), friendly (neutral), watched (adversary)
+    ALLIED_COUNTRIES = {"USA", "UK", "FR", "GBR", "CA", "ESA", "EU", "JPN", "AUS", "NZ", "DE", "IT", "NOR"}
+    ADVERSARY_COUNTRIES = {"PRC", "RUS", "CIS", "PRK", "IRN"}
+
+    if country in ALLIED_COUNTRIES:
+        status = "allied"
+    elif country in ADVERSARY_COUNTRIES:
         status = "watched"
+    else:
+        status = "friendly"  # neutral / commercial / unknown
+
     if ecc > 0.05 and alt_km < 600:
         status = "watched"
 

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef } from "react"
 import { Canvas } from "@react-three/fiber"
-import { OrbitControls, Stars } from "@react-three/drei"
+import { OrbitControls } from "@react-three/drei"
 
 import { cn } from "@/lib/utils"
 import { Earth } from "@/components/globe/earth"
@@ -11,6 +11,7 @@ import { SatelliteMarker } from "@/components/globe/satellite-marker"
 import { AnimationDriver } from "@/components/globe/animation-driver"
 import { ThreatIndicator } from "@/components/globe/threat-indicator"
 import { CollisionEffect } from "@/components/globe/collision-effect"
+import { Starfield } from "@/components/globe/starfield"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { MOCK_SATELLITES, generateMockDebris, MOCK_THREATS } from "@/lib/mock-data"
@@ -39,10 +40,8 @@ function Scene({
 }) {
   return (
     <>
-      {/* Three-layer parallax starfield */}
-      <Stars radius={110} depth={70} count={2600} factor={13.8} saturation={0} fade speed={0.15} />
-      <Stars radius={112} depth={75} count={1400} factor={20.4} saturation={0} fade speed={0.18} />
-      <Stars radius={115} depth={80} count={650} factor={25.8} saturation={0} fade speed={0.12} />
+      {/* Custom shader starfield with twinkling */}
+      <Starfield />
 
       <Earth speedRef={speedRef} />
 

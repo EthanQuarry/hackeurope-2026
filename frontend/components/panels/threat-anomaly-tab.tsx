@@ -11,7 +11,7 @@ interface ThreatAnomalyTabProps {
   onSelectThreat?: (id: string) => void
 }
 
-const SEVERITY_ORDER = { threatened: 0, watched: 1, nominal: 2, friendly: 3 }
+const SEVERITY_ORDER: Record<string, number> = { threatened: 0, watched: 1, nominal: 2, allied: 3, friendly: 3 }
 
 const ANOMALY_LABELS: Record<AnomalyThreat["anomalyType"], string> = {
   "unexpected-maneuver": "UNEXPECTED MANEUVER",

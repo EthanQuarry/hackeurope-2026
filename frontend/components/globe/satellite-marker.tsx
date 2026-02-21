@@ -120,8 +120,8 @@ export function SatelliteMarker({
     }
   })
 
-  // Show labels for watched/threatened satellites
-  const showLabel = status === "threatened" || status === "watched"
+  // Show labels for allied/watched/threatened satellites
+  const showLabel = status === "allied" || status === "threatened" || status === "watched"
 
   return (
     <group>
@@ -142,25 +142,55 @@ export function SatelliteMarker({
           onSelect?.(id)
         }}
       >
-        {/* Main body */}
+        {/* Bus body — gold foil insulation */}
         <mesh>
-          <boxGeometry args={[size * 1.2, size * 1.2, size * 2]} />
-          <meshStandardMaterial color={threeColor} emissive={threeColor} emissiveIntensity={0.4} metalness={0.6} roughness={0.3} />
+          <boxGeometry args={[size * 1.4, size * 1.0, size * 2.2]} />
+          <meshStandardMaterial color="#b8960c" emissive={threeColor} emissiveIntensity={0.2} metalness={0.7} roughness={0.35} />
+        </mesh>
+        {/* Solar panel strut left */}
+        <mesh position={[size * 1.2, 0, 0]}>
+          <boxGeometry args={[size * 0.6, size * 0.1, size * 0.1]} />
+          <meshStandardMaterial color="#555555" metalness={0.9} roughness={0.2} />
         </mesh>
         {/* Solar panel left */}
-        <mesh position={[size * 2.5, 0, 0]}>
-          <boxGeometry args={[size * 3, size * 0.15, size * 1.8]} />
-          <meshStandardMaterial color="#1a3a5c" emissive="#0a2040" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
+        <mesh position={[size * 3.2, 0, 0]}>
+          <boxGeometry args={[size * 3.5, size * 0.08, size * 2.0]} />
+          <meshStandardMaterial color="#0a1e3d" emissive="#061430" emissiveIntensity={0.15} metalness={0.85} roughness={0.15} />
+        </mesh>
+        {/* Solar cell lines left */}
+        <mesh position={[size * 3.2, size * 0.05, 0]}>
+          <boxGeometry args={[size * 3.4, size * 0.02, size * 1.9]} />
+          <meshStandardMaterial color="#112244" metalness={0.9} roughness={0.1} />
+        </mesh>
+        {/* Solar panel strut right */}
+        <mesh position={[-size * 1.2, 0, 0]}>
+          <boxGeometry args={[size * 0.6, size * 0.1, size * 0.1]} />
+          <meshStandardMaterial color="#555555" metalness={0.9} roughness={0.2} />
         </mesh>
         {/* Solar panel right */}
-        <mesh position={[-size * 2.5, 0, 0]}>
-          <boxGeometry args={[size * 3, size * 0.15, size * 1.8]} />
-          <meshStandardMaterial color="#1a3a5c" emissive="#0a2040" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
+        <mesh position={[-size * 3.2, 0, 0]}>
+          <boxGeometry args={[size * 3.5, size * 0.08, size * 2.0]} />
+          <meshStandardMaterial color="#0a1e3d" emissive="#061430" emissiveIntensity={0.15} metalness={0.85} roughness={0.15} />
+        </mesh>
+        {/* Solar cell lines right */}
+        <mesh position={[-size * 3.2, size * 0.05, 0]}>
+          <boxGeometry args={[size * 3.4, size * 0.02, size * 1.9]} />
+          <meshStandardMaterial color="#112244" metalness={0.9} roughness={0.1} />
         </mesh>
         {/* Antenna dish */}
-        <mesh position={[0, size * 1, 0]} rotation={[0.3, 0, 0]}>
-          <coneGeometry args={[size * 0.5, size * 0.6, 8]} />
+        <mesh position={[0, size * 0.9, 0]} rotation={[0.4, 0, 0]}>
+          <coneGeometry args={[size * 0.5, size * 0.4, 12]} />
+          <meshStandardMaterial color="#cccccc" metalness={0.95} roughness={0.05} />
+        </mesh>
+        {/* Antenna feed */}
+        <mesh position={[0, size * 1.3, size * -0.15]}>
+          <cylinderGeometry args={[size * 0.04, size * 0.04, size * 0.5, 6]} />
           <meshStandardMaterial color="#888888" metalness={0.9} roughness={0.1} />
+        </mesh>
+        {/* Status indicator light on body */}
+        <mesh position={[0, 0, size * 1.15]}>
+          <sphereGeometry args={[size * 0.15, 8, 8]} />
+          <meshBasicMaterial color={threeColor} />
         </mesh>
 
         {/* Floating label above watched/threatened sats */}
@@ -192,7 +222,7 @@ export function SatelliteMarker({
                 <div style={{
                   fontSize: "7px",
                   fontFamily: "monospace",
-                  color: status === "threatened" ? "rgba(255,102,136,0.4)" : status === "watched" ? "rgba(255,204,102,0.35)" : "rgba(136,204,255,0.35)",
+                  color: status === "threatened" ? "rgba(255,102,136,0.4)" : status === "watched" ? "rgba(255,204,102,0.35)" : status === "allied" ? "rgba(100,150,255,0.5)" : "rgba(136,204,255,0.35)",
                   letterSpacing: "0.3px",
                 }}>
                   {name}
