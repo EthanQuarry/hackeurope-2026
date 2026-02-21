@@ -14,6 +14,7 @@ import { SignalOps } from "@/components/ops/signal-ops"
 import { AnomalyOps } from "@/components/ops/anomaly-ops"
 import { CommsOps } from "@/components/ops/comms-ops"
 import { OrbitalOps } from "@/components/ops/orbital-ops"
+import { SatelliteDetailPage } from "@/components/satellite-detail-page"
 import { useUIStore } from "@/stores/ui-store"
 import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
@@ -183,6 +184,7 @@ export function DashboardShell() {
             {activeView === "orbital" && (
               <OrbitalOps threats={orbitalThreats} />
             )}
+            {activeView === "satellite-detail" && <SatelliteDetailPage />}
           </div>
         )}
       </div>
