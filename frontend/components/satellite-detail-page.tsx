@@ -35,6 +35,7 @@ import type {
   ProximityThreat,
   SignalThreat,
   AnomalyThreat,
+  OrbitalSimilarityThreat,
   CommsChatMessage,
   CommsChatResponse,
   ParsedIntent,
@@ -146,17 +147,20 @@ function formatDistance(km: number): string {
 
 function buildSatelliteContext(
   satellite: SatelliteData,
-  threats: { proximity: ProximityThreat[]; signal: SignalThreat[]; anomaly: AnomalyThreat[] },
+  threats: { proximity: ProximityThreat[]; signal: SignalThreat[]; anomaly: AnomalyThreat[]; orbital: OrbitalSimilarityThreat[] },
 ): string {
   let ctx = `You are an AI assistant for satellite operations. The operator is viewing ${satellite.name} (NORAD ${satellite.noradId}).`
   ctx += ` Orbital: alt ${satellite.altitude_km.toFixed(0)}km, vel ${satellite.velocity_kms.toFixed(2)} km/s, inc ${satellite.inclination_deg.toFixed(1)}°, period ${satellite.period_min.toFixed(1)}min.`
   ctx += ` Health: power ${satellite.health.power}%, comms ${satellite.health.comms}%, propellant ${satellite.health.propellant}%.`
   ctx += ` Status: ${satellite.status}.`
-  const total = threats.proximity.length + threats.signal.length + threats.anomaly.length
+  const total = threats.proximity.length + threats.signal.length + threats.anomaly.length + threats.orbital.length
   if (total > 0) {
     ctx += ` Active threats (${total}):`
     for (const pt of threats.proximity) {
       ctx += ` Proximity — ${pt.foreignSatName}, miss ${pt.missDistanceKm.toFixed(1)}km, TCA ${pt.tcaInMinutes}min, ${pt.approachPattern}.`
+    }
+    for (const ot of threats.orbital) {
+      ctx += ` Orbital similarity — ${ot.foreignSatName}, divergence ${ot.divergenceScore.toFixed(3)}, pattern ${ot.pattern}, inc diff ${ot.inclinationDiffDeg.toFixed(1)}°, alt diff ${ot.altitudeDiffKm.toFixed(0)}km, ${(ot.confidence * 100).toFixed(0)}% confidence.`
     }
     for (const st of threats.signal) {
       ctx += ` Signal — ${st.interceptorName}, ${(st.interceptionProbability * 100).toFixed(0)}% intercept, ${st.commWindowsAtRisk}/${st.totalCommWindows} windows.`
@@ -323,6 +327,40 @@ function AnomalyThreatCard({ threat }: { threat: AnomalyThreat }) {
   )
 }
 
+function OrbitalSimilarityThreatCard({ threat }: { threat: OrbitalSimilarityThreat }) {
+  return (
+    <div className="rounded-md border border-border/30 bg-secondary/10 px-3 py-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Orbit className="h-3 w-3 text-muted-foreground" />
+          <span className="font-mono text-[10px] font-medium text-foreground">{threat.foreignSatName}</span>
+        </div>
+        <ThreatBadge severity={threat.severity} />
+      </div>
+      <div className="mt-1.5 flex items-center gap-3">
+        <span className={cn("font-mono text-[9px] tabular-nums", threat.divergenceScore < 0.05 ? "font-semibold text-red-400" : "text-muted-foreground")}>
+          Δ{threat.divergenceScore.toFixed(3)}
+        </span>
+        <span className="font-mono text-[9px] tabular-nums text-muted-foreground">
+          inc ±{threat.inclinationDiffDeg.toFixed(1)}°
+        </span>
+        <span className="font-mono text-[9px] tabular-nums text-muted-foreground">
+          alt ±{threat.altitudeDiffKm.toFixed(0)}km
+        </span>
+        <span className={cn(
+          "rounded px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase",
+          threat.pattern === "co-planar" ? "bg-red-500/20 text-red-400" : "bg-secondary/50 text-muted-foreground",
+        )}>
+          {threat.pattern}
+        </span>
+      </div>
+      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/5">
+        <div className="h-full rounded-full bg-primary/50 transition-all" style={{ width: `${threat.confidence * 100}%` }} />
+      </div>
+    </div>
+  )
+}
+
 /* ═══════════════════════════════════════════════════════
    Main Component — 3-column mission hub
    ═══════════════════════════════════════════════════════ */
@@ -340,6 +378,7 @@ export function SatelliteDetailPage() {
   const allProximity = useThreatStore((s) => s.proximityThreats)
   const allSignal = useThreatStore((s) => s.signalThreats)
   const allAnomaly = useThreatStore((s) => s.anomalyThreats)
+  const allOrbitalSimilarity = useThreatStore((s) => s.orbitalSimilarityThreats)
 
   const proximityThreats = useMemo(
     () => allProximity.filter((t) => t.targetAssetId === selectedId || t.foreignSatId === selectedId),
@@ -353,7 +392,11 @@ export function SatelliteDetailPage() {
     () => allAnomaly.filter((t) => t.satelliteId === selectedId),
     [allAnomaly, selectedId],
   )
-  const totalThreats = proximityThreats.length + signalThreats.length + anomalyThreats.length
+  const orbitalSimilarityThreats = useMemo(
+    () => allOrbitalSimilarity.filter((t) => t.targetAssetId === selectedId || t.foreignSatId === selectedId),
+    [allOrbitalSimilarity, selectedId],
+  )
+  const totalThreats = proximityThreats.length + signalThreats.length + anomalyThreats.length + orbitalSimilarityThreats.length
 
   /* ── Comms ── */
   const { sendCommand } = useCommsStream()
@@ -427,6 +470,7 @@ export function SatelliteDetailPage() {
       proximity: proximityThreats,
       signal: signalThreats,
       anomaly: anomalyThreats,
+      orbital: orbitalSimilarityThreats,
     })
 
     const newMsgs: CommsChatMessage[] = [...chatMessages, { role: "user", content: msg }]
@@ -583,6 +627,79 @@ export function SatelliteDetailPage() {
             </div>
           </div>
 
+          {/* Orbital Proximity */}
+          <div className="border-b border-border/40 px-4 py-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground">Orbital Proximity</span>
+              <span className={cn(
+                "rounded-sm px-1.5 py-0.5 font-mono text-[9px] font-bold tabular-nums",
+                orbitalSimilarityThreats.length > 0 ? "bg-amber-500/15 text-amber-400" : "bg-secondary/30 text-muted-foreground",
+              )}>
+                {orbitalSimilarityThreats.length}
+              </span>
+            </div>
+            {orbitalSimilarityThreats.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-3 text-center">
+                <Orbit className="mb-1.5 h-4 w-4 text-muted-foreground/30" />
+                <p className="font-mono text-[10px] text-muted-foreground/60">No co-orbital matches detected</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {orbitalSimilarityThreats.map((t) => (
+                  <div key={t.id} className="rounded-md border border-border/30 bg-secondary/10 px-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Orbit className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-mono text-[10px] font-medium text-foreground">{t.foreignSatName}</span>
+                      </div>
+                      <ThreatBadge severity={t.severity} />
+                    </div>
+                    {/* Divergence bar */}
+                    <div className="mt-2 mb-1">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="font-mono text-[8px] text-muted-foreground">Divergence</span>
+                        <span className={cn("font-mono text-[9px] tabular-nums font-semibold", t.divergenceScore < 0.05 ? "text-red-400" : t.divergenceScore < 0.15 ? "text-amber-400" : "text-muted-foreground")}>
+                          {t.divergenceScore.toFixed(3)}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+                        <div
+                          className={cn("h-full rounded-full transition-all", t.divergenceScore < 0.05 ? "bg-red-500/70" : t.divergenceScore < 0.15 ? "bg-amber-500/70" : "bg-primary/40")}
+                          style={{ width: `${Math.max(5, 100 - t.divergenceScore * 200)}%` }}
+                        />
+                      </div>
+                    </div>
+                    {/* Orbital deltas */}
+                    <div className="mt-1.5 grid grid-cols-2 gap-x-3">
+                      <div>
+                        <span className="font-mono text-[8px] text-muted-foreground">Inclination Δ</span>
+                        <div className="font-mono text-[10px] tabular-nums text-foreground">±{t.inclinationDiffDeg.toFixed(2)}°</div>
+                      </div>
+                      <div>
+                        <span className="font-mono text-[8px] text-muted-foreground">Altitude Δ</span>
+                        <div className="font-mono text-[10px] tabular-nums text-foreground">±{t.altitudeDiffKm.toFixed(1)} km</div>
+                      </div>
+                    </div>
+                    {/* Pattern + confidence */}
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className={cn(
+                        "rounded px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase",
+                        t.pattern === "co-planar" ? "bg-red-500/20 text-red-400" :
+                        t.pattern === "co-altitude" ? "bg-amber-500/20 text-amber-400" :
+                        "bg-secondary/50 text-muted-foreground",
+                      )}>
+                        {t.pattern}
+                      </span>
+                      <span className="font-mono text-[9px] tabular-nums text-muted-foreground">
+                        {(t.confidence * 100).toFixed(0)}% confidence
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Active Threats */}
           <div className="px-4 py-3">
             <div className="flex items-center justify-between mb-1.5">
@@ -602,6 +719,7 @@ export function SatelliteDetailPage() {
             ) : (
               <div className="space-y-2">
                 {proximityThreats.map((t) => <ProximityThreatCard key={t.id} threat={t} />)}
+                {orbitalSimilarityThreats.map((t) => <OrbitalSimilarityThreatCard key={t.id} threat={t} />)}
                 {signalThreats.map((t) => <SignalThreatCard key={t.id} threat={t} />)}
                 {anomalyThreats.map((t) => <AnomalyThreatCard key={t.id} threat={t} />)}
               </div>
