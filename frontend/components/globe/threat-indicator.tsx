@@ -1,8 +1,7 @@
 "use client"
 
-import { useRef, useMemo } from "react"
-import { useFrame } from "@react-three/fiber"
-import { Line, Html, Billboard } from "@react-three/drei"
+import { useMemo } from "react"
+import { Line, Html } from "@react-three/drei"
 import * as THREE from "three"
 
 import { geodeticToSceneVec3 } from "@/lib/geo"
@@ -13,17 +12,19 @@ interface ThreatIndicatorProps {
   simTimeRef: React.RefObject<number>
 }
 
-function getProximityColor(distanceKm: number): string {
-  if (distanceKm < 1) return "#ef4444" // red
-  if (distanceKm < 50) return "#f59e0b" // amber
-  return "#ffffff" // white
+function getThreatStyle(severity: string, distanceKm: number) {
+  if (severity === "threatened" || distanceKm < 1) {
+    return { color: "#ff2244", opacity: 0.9, lineWidth: 2.5, dashSize: 0.015, gapSize: 0.008 }
+  }
+  if (severity === "watched" || distanceKm < 25) {
+    return { color: "#ff9100", opacity: 0.7, lineWidth: 2, dashSize: 0.02, gapSize: 0.012 }
+  }
+  return { color: "#44aaff", opacity: 0.4, lineWidth: 1.2, dashSize: 0.025, gapSize: 0.015 }
 }
 
-export function ThreatIndicator({ threat, simTimeRef }: ThreatIndicatorProps) {
-  const ringRef = useRef<THREE.Mesh>(null)
-  const lineColor = getProximityColor(threat.missDistanceKm)
+export function ThreatIndicator({ threat }: ThreatIndicatorProps) {
+  const style = getThreatStyle(threat.severity, threat.missDistanceKm)
 
-  // Positions of the two objects
   const primaryPos = useMemo(() => {
     const [x, y, z] = geodeticToSceneVec3(
       threat.primaryPosition.lat,
@@ -42,7 +43,6 @@ export function ThreatIndicator({ threat, simTimeRef }: ThreatIndicatorProps) {
     return new THREE.Vector3(x, y, z)
   }, [threat.secondaryPosition])
 
-  // Dashed line points
   const linePoints = useMemo(
     () =>
       [
@@ -52,63 +52,66 @@ export function ThreatIndicator({ threat, simTimeRef }: ThreatIndicatorProps) {
     [primaryPos, secondaryPos]
   )
 
-  // Midpoint for distance label
   const midpoint = useMemo(
     () => new THREE.Vector3().lerpVectors(primaryPos, secondaryPos, 0.5),
     [primaryPos, secondaryPos]
   )
 
-  // Pulsing ring animation around the primary (threatened) asset
-  useFrame(() => {
-    if (!ringRef.current) return
-    const t = simTimeRef.current * 0.003
-    const pulse = 1 + 0.15 * Math.sin(t)
-    ringRef.current.scale.setScalar(pulse)
-  })
-
-  const ringColor = useMemo(() => new THREE.Color(lineColor), [lineColor])
-
   const distanceLabel =
     threat.missDistanceKm < 1
-      ? `${(threat.missDistanceKm * 1000).toFixed(0)} m`
-      : `${threat.missDistanceKm.toFixed(1)} km`
+      ? `${(threat.missDistanceKm * 1000).toFixed(0)}m`
+      : `${threat.missDistanceKm.toFixed(1)}km`
+
+  const severityLabel =
+    threat.severity === "threatened" ? "CRITICAL" :
+    threat.severity === "watched" ? "WARN" : "LOW"
 
   return (
     <group>
-      {/* Proximity line between objects */}
+      {/* Dashed threat line */}
       <Line
         points={linePoints}
-        color={lineColor}
+        color={style.color}
         transparent
-        opacity={0.7}
-        lineWidth={1.5}
+        opacity={style.opacity}
+        lineWidth={style.lineWidth}
         dashed
-        dashSize={0.02}
-        gapSize={0.015}
+        dashSize={style.dashSize}
+        gapSize={style.gapSize}
       />
 
-      {/* Distance label at midpoint */}
+      {/* Distance + severity label at midpoint */}
       <Html position={midpoint} center style={{ pointerEvents: "none" }}>
-        <span
-          className="whitespace-nowrap rounded bg-black/70 px-1.5 py-0.5 font-mono text-[10px] backdrop-blur-sm"
-          style={{ color: lineColor }}
-        >
-          {distanceLabel}
-        </span>
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "1px",
+        }}>
+          <span style={{
+            fontFamily: "monospace",
+            fontSize: "9px",
+            fontWeight: 600,
+            color: style.color,
+            opacity: 0.9,
+            background: "rgba(0,0,0,0.6)",
+            padding: "1px 4px",
+            borderRadius: "2px",
+            letterSpacing: "0.5px",
+          }}>
+            {distanceLabel}
+          </span>
+          <span style={{
+            fontFamily: "monospace",
+            fontSize: "7px",
+            color: style.color,
+            opacity: 0.5,
+            letterSpacing: "1px",
+          }}>
+            {severityLabel}
+          </span>
+        </div>
       </Html>
-
-      {/* Pulsing ring around primary asset — billboarded to always face camera */}
-      <Billboard position={primaryPos}>
-        <mesh ref={ringRef}>
-          <ringGeometry args={[0.025, 0.03, 32]} />
-          <meshBasicMaterial
-            color={ringColor}
-            transparent
-            opacity={0.6}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-      </Billboard>
     </group>
   )
 }

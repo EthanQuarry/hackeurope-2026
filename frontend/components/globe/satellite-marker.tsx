@@ -49,7 +49,7 @@ export function SatelliteMarker({
   simTimeRef,
   threatPercent,
 }: SatelliteMarkerProps) {
-  const meshRef = useRef<THREE.Mesh>(null)
+  const meshRef = useRef<THREE.Group>(null)
   const glowRef = useRef<THREE.Mesh>(null)
   const targetPos = useRef(new THREE.Vector3())
   const initialized = useRef(false)
@@ -134,16 +134,34 @@ export function SatelliteMarker({
         lineWidth={status === "threatened" ? 1.8 : 1.2}
       />
 
-      {/* Satellite marker */}
-      <mesh
+      {/* Satellite 3D model */}
+      <group
         ref={meshRef}
         onClick={(e) => {
           e.stopPropagation()
           onSelect?.(id)
         }}
       >
-        <sphereGeometry args={[status === "threatened" ? size * 1.5 : size, 14, 14]} />
-        <meshBasicMaterial color={threeColor} />
+        {/* Main body */}
+        <mesh>
+          <boxGeometry args={[size * 1.2, size * 1.2, size * 2]} />
+          <meshStandardMaterial color={threeColor} emissive={threeColor} emissiveIntensity={0.4} metalness={0.6} roughness={0.3} />
+        </mesh>
+        {/* Solar panel left */}
+        <mesh position={[size * 2.5, 0, 0]}>
+          <boxGeometry args={[size * 3, size * 0.15, size * 1.8]} />
+          <meshStandardMaterial color="#1a3a5c" emissive="#0a2040" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
+        </mesh>
+        {/* Solar panel right */}
+        <mesh position={[-size * 2.5, 0, 0]}>
+          <boxGeometry args={[size * 3, size * 0.15, size * 1.8]} />
+          <meshStandardMaterial color="#1a3a5c" emissive="#0a2040" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
+        </mesh>
+        {/* Antenna dish */}
+        <mesh position={[0, size * 1, 0]} rotation={[0.3, 0, 0]}>
+          <coneGeometry args={[size * 0.5, size * 0.6, 8]} />
+          <meshStandardMaterial color="#888888" metalness={0.9} roughness={0.1} />
+        </mesh>
 
         {/* Floating label above watched/threatened sats */}
         {showLabel && (
@@ -161,28 +179,20 @@ export function SatelliteMarker({
             }}>
               {threatPercent != null && (
                 <div style={{
-                  fontSize: "10px",
-                  fontWeight: 700,
+                  fontSize: "9px",
+                  fontWeight: 500,
                   fontFamily: "monospace",
-                  color: status === "threatened" ? "#ff4466" : "#f59e0b",
-                  background: "rgba(0,0,0,0.75)",
-                  border: `1px solid ${status === "threatened" ? "#ff446666" : "#f59e0b66"}`,
-                  borderRadius: "3px",
-                  padding: "1px 5px",
-                  marginBottom: "2px",
+                  color: status === "threatened" ? "rgba(255,68,102,0.55)" : "rgba(245,158,11,0.45)",
                   letterSpacing: "0.5px",
                 }}>
-                  {threatPercent}% THREAT
+                  {threatPercent}%
                 </div>
               )}
               {name && (
                 <div style={{
-                  fontSize: "8px",
+                  fontSize: "7px",
                   fontFamily: "monospace",
-                  color: status === "threatened" ? "#ff6688" : status === "watched" ? "#ffcc66" : "#88ccff",
-                  background: "rgba(0,0,0,0.6)",
-                  borderRadius: "2px",
-                  padding: "0px 3px",
+                  color: status === "threatened" ? "rgba(255,102,136,0.4)" : status === "watched" ? "rgba(255,204,102,0.35)" : "rgba(136,204,255,0.35)",
                   letterSpacing: "0.3px",
                 }}>
                   {name}
@@ -191,7 +201,7 @@ export function SatelliteMarker({
             </div>
           </Html>
         )}
-      </mesh>
+      </group>
 
       {/* Glow — pulsing for threatened */}
       <mesh ref={glowRef}>

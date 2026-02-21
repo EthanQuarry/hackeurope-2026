@@ -102,6 +102,8 @@ function Scene({
         maxDistance={20}
         enableDamping={true}
         dampingFactor={0.05}
+        autoRotate
+        autoRotateSpeed={0.3}
       />
     </>
   )
