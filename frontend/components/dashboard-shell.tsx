@@ -11,6 +11,9 @@ import { FleetPanel } from "@/components/panels/fleet-panel"
 import { CommsPanel } from "@/components/panels/comms-panel"
 import { ResponsePanel } from "@/components/panels/response-panel"
 import { AITerminal } from "@/components/terminal/ai-terminal"
+import { ProximityOps } from "@/components/ops/proximity-ops"
+import { SignalOps } from "@/components/ops/signal-ops"
+import { AnomalyOps } from "@/components/ops/anomaly-ops"
 import { useUIStore } from "@/stores/ui-store"
 import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
@@ -81,6 +84,7 @@ function TabBar({
 }
 
 export function DashboardShell() {
+  const activeView = useUIStore((s) => s.activeView)
   const leftCollapsed = useUIStore((s) => s.leftPanelCollapsed)
   const rightCollapsed = useUIStore((s) => s.rightPanelCollapsed)
   const terminalOpen = useUIStore((s) => s.terminalOpen)
@@ -160,84 +164,105 @@ export function DashboardShell() {
             simTime={simTime}
             onSpeedChange={setSpeed}
             onPlayToggle={togglePlaying}
+            threatCounts={{
+              proximity: MOCK_PROXIMITY_THREATS.length,
+              signal: MOCK_SIGNAL_THREATS.length,
+              anomaly: MOCK_ANOMALY_THREATS.length,
+            }}
           />
         </div>
       </div>
 
-      {/* Three-column panel grid */}
-      <div className="pointer-events-none absolute inset-0 z-10 p-6 pt-28 pb-6">
-        <div
-          className="mx-auto grid h-full w-full max-w-[1600px] grid-cols-1 gap-4 transition-[grid-template-columns] duration-500 ease-in-out lg:[grid-template-columns:var(--panel-cols)] lg:grid-rows-[minmax(0,1fr)_auto]"
-          style={{ "--panel-cols": panelColumns } as CSSProperties}
-        >
-          {/* Left panel: Threats / Comms */}
-          <SidePanel
-            className="lg:col-start-1 lg:row-span-2"
-            side="left"
-            collapsed={leftCollapsed}
-            onToggle={toggleLeft}
-            icon={leftIcon}
-            title={leftTitle}
+      {/* Content area — switches based on activeView */}
+      <div className="pointer-events-none absolute inset-0 z-10 p-6 pt-36 pb-6">
+        {activeView === "overview" ? (
+          /* Overview: Three-column panel grid */
+          <div
+            className="mx-auto grid h-full w-full max-w-[1600px] grid-cols-1 gap-4 transition-[grid-template-columns] duration-500 ease-in-out lg:[grid-template-columns:var(--panel-cols)] lg:grid-rows-[minmax(0,1fr)_auto]"
+            style={{ "--panel-cols": panelColumns } as CSSProperties}
           >
-            <TabBar
-              tabs={[
-                { id: "threats", label: "Threats" },
-                { id: "comms", label: "Comms" },
-              ]}
-              activeTab={leftActiveTab}
-              onTabChange={(id) => setLeftActiveTab(id as "threats" | "comms")}
-            />
-            {leftActiveTab === "threats" ? (
-              <ThreatPanel
-                proximityThreats={MOCK_PROXIMITY_THREATS}
-                signalThreats={MOCK_SIGNAL_THREATS}
-                anomalyThreats={MOCK_ANOMALY_THREATS}
-                selectedThreatId={selectedThreatId}
-                onSelectThreat={selectThreat}
+            {/* Left panel: Threats / Comms */}
+            <SidePanel
+              className="lg:col-start-1 lg:row-span-2"
+              side="left"
+              collapsed={leftCollapsed}
+              onToggle={toggleLeft}
+              icon={leftIcon}
+              title={leftTitle}
+            >
+              <TabBar
+                tabs={[
+                  { id: "threats", label: "Threats" },
+                  { id: "comms", label: "Comms" },
+                ]}
+                activeTab={leftActiveTab}
+                onTabChange={(id) => setLeftActiveTab(id as "threats" | "comms")}
               />
-            ) : (
-              <CommsPanel satellites={satellites} />
-            )}
-          </SidePanel>
+              {leftActiveTab === "threats" ? (
+                <ThreatPanel
+                  proximityThreats={MOCK_PROXIMITY_THREATS}
+                  signalThreats={MOCK_SIGNAL_THREATS}
+                  anomalyThreats={MOCK_ANOMALY_THREATS}
+                  selectedThreatId={selectedThreatId}
+                  onSelectThreat={selectThreat}
+                />
+              ) : (
+                <CommsPanel satellites={satellites} />
+              )}
+            </SidePanel>
 
-          {/* Center transparent gap — globe shows through */}
-          <div className="hidden lg:block lg:col-start-2 lg:row-start-1" />
+            {/* Center transparent gap — globe shows through */}
+            <div className="hidden lg:block lg:col-start-2 lg:row-start-1" />
 
-          {/* Right panel: Fleet / Responses */}
-          <SidePanel
-            className="lg:col-start-3 lg:row-span-2"
-            side="right"
-            collapsed={rightCollapsed}
-            onToggle={toggleRight}
-            icon={rightIcon}
-            title={rightTitle}
-          >
-            <TabBar
-              tabs={[
-                { id: "fleet", label: "Fleet" },
-                { id: "responses", label: "Responses" },
-              ]}
-              activeTab={rightActiveTab}
-              onTabChange={(id) => setRightActiveTab(id as "fleet" | "responses")}
-            />
-            {rightActiveTab === "fleet" ? (
-              <FleetPanel
-                satellites={satellites}
-                selectedSatelliteId={selectedSatelliteId}
-                onSelectSatellite={selectSatellite}
+            {/* Right panel: Fleet / Responses */}
+            <SidePanel
+              className="lg:col-start-3 lg:row-span-2"
+              side="right"
+              collapsed={rightCollapsed}
+              onToggle={toggleRight}
+              icon={rightIcon}
+              title={rightTitle}
+            >
+              <TabBar
+                tabs={[
+                  { id: "fleet", label: "Fleet" },
+                  { id: "responses", label: "Responses" },
+                ]}
+                activeTab={rightActiveTab}
+                onTabChange={(id) => setRightActiveTab(id as "fleet" | "responses")}
               />
-            ) : (
-              <ResponsePanel recommendations={recommendations} />
-            )}
-          </SidePanel>
+              {rightActiveTab === "fleet" ? (
+                <FleetPanel
+                  satellites={satellites}
+                  selectedSatelliteId={selectedSatelliteId}
+                  onSelectSatellite={selectSatellite}
+                />
+              ) : (
+                <ResponsePanel recommendations={recommendations} />
+              )}
+            </SidePanel>
 
-          {/* Bottom: AI Terminal */}
-          <AITerminal
-            className="lg:col-start-2 lg:row-start-2"
-            isOpen={terminalOpen}
-            onToggle={toggleTerminal}
-          />
-        </div>
+            {/* Bottom: AI Terminal */}
+            <AITerminal
+              className="lg:col-start-2 lg:row-start-2"
+              isOpen={terminalOpen}
+              onToggle={toggleTerminal}
+            />
+          </div>
+        ) : (
+          /* Ops pages: full mission view */
+          <div className="mx-auto h-full w-full max-w-[1600px]">
+            {activeView === "proximity" && (
+              <ProximityOps threats={MOCK_PROXIMITY_THREATS} />
+            )}
+            {activeView === "signal" && (
+              <SignalOps threats={MOCK_SIGNAL_THREATS} />
+            )}
+            {activeView === "anomaly" && (
+              <AnomalyOps threats={MOCK_ANOMALY_THREATS} />
+            )}
+          </div>
+        )}
       </div>
     </main>
   )
