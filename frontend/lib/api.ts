@@ -11,6 +11,8 @@ export const api = {
   anomalyThreats: `${BASE}/threats/anomaly`,
   analysisStream: `${BASE}/analysis/stream`,
   responses: `${BASE}/responses`,
+  commsStream: `${BASE}/comms/stream`,
+  commsSend: `${BASE}/comms/send`,
 } as const
 
 /** Typed fetch with AbortController support */

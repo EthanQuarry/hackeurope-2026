@@ -125,3 +125,87 @@ export interface ResponseRecommendation {
   confidence: number
   timestamp: number
 }
+
+// --- Iridium SBD Communication Types ---
+
+/** Iridium ground station gateway */
+export interface IridiumGateway {
+  name: string
+  location: string
+  lat: number
+  lon: number
+  region: string
+  status: string
+}
+
+/** Parsed intent from natural language */
+export interface ParsedIntent {
+  command_type: string
+  target_satellite_id: string
+  target_satellite_name: string
+  parameters: Record<string, unknown>
+  urgency: "normal" | "urgent" | "emergency"
+  summary: string
+}
+
+/** Single AT command */
+export interface ATCommand {
+  command: string
+  description: string
+  expected_response: string
+}
+
+/** AT command sequence */
+export interface ATCommandSequence {
+  commands: ATCommand[]
+  total_commands: number
+  estimated_duration_ms: number
+}
+
+/** Binary SBD payload structure */
+export interface SBDPayload {
+  protocol_revision: number
+  overall_message_length: number
+  mt_header_iei: string
+  mt_header_length: number
+  unique_client_message_id: string
+  imei: string
+  mt_disposition_flags: string
+  mt_payload_iei: string
+  mt_payload_length: number
+  mt_payload_hex: string
+  mt_payload_human_readable: string
+  total_bytes: number
+}
+
+/** Gateway routing decision */
+export interface GatewayRouting {
+  selected_gateway: IridiumGateway
+  routing_reason: string
+  satellite_position: { lat: number; lon: number; altKm: number }
+  signal_hops: number
+  estimated_latency_ms: number
+  alternative_gateways: IridiumGateway[]
+}
+
+/** Full communication transcription */
+export interface CommsTranscription {
+  transcription_id: string
+  timestamp: number
+  human_input: string
+  parsed_intent: ParsedIntent
+  at_commands: ATCommandSequence
+  sbd_payload: SBDPayload
+  gateway_routing: GatewayRouting
+  agent_reasoning: string
+  status: "processing" | "complete" | "error"
+}
+
+/** SSE stage names for comms streaming */
+export type CommsStage =
+  | "human_input"
+  | "agent_reasoning"
+  | "parsed_intent"
+  | "at_commands"
+  | "sbd_payload"
+  | "gateway_routing"
