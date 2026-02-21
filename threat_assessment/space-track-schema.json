@@ -1,0 +1,149 @@
+{
+  "source": "https://www.space-track.org",
+  "rate_limits": {
+    "GP": "1/hour",
+    "GP_HISTORY": "1/lifetime per object (download once, cache)",
+    "SATCAT": "1/day",
+    "SATCAT_DEBUT": "1/day",
+    "DECAY": "1/day (store locally, do not re-download)",
+    "CDM": "3/day for all, 1/hour for specific conjunction"
+  },
+  "identifiers": {
+    "primary": {
+      "NORAD_CAT_ID": "US Space Force catalog number. Synonym: OBJECT_NUMBER, Catalog Number. Integer.",
+      "OBJECT_ID": "International designator (e.g. 1998-067A). Format: YYYY-NNNxx.",
+      "OBJECT_NAME": "Common name / satellite name. Synonym: SATNAME, Common Name.",
+      "INTLDES": "International designator (SATCAT/decay classes). Same as OBJECT_ID."
+    },
+    "secondary": {
+      "GP_ID": "Unique record ID for GP/GP_HISTORY rows.",
+      "FILE": "Source file ID for the data record.",
+      "ELEMENT_SET_NO": "Running elset number for the object."
+    }
+  },
+  "classes": {
+    "GP": {
+      "description": "General Perturbations - newest orbital element set per object. Use for current ephemerides.",
+      "loader": "load_gp, load_active_satellites, load_starlink, load_iss",
+      "formats": ["json", "tle", "xml", "kvn", "csv", "html"],
+      "fields": [
+        {"name": "CCSDS_OMM_VERS", "type": "varchar(3)", "description": "OMM format version"},
+        {"name": "COMMENT", "type": "varchar(33)", "description": "Free-text comment"},
+        {"name": "CREATION_DATE", "type": "datetime", "description": "When elset was created/published"},
+        {"name": "ORIGINATOR", "type": "varchar(7)", "description": "Data source (e.g. 18SDS)"},
+        {"name": "OBJECT_NAME", "type": "varchar(25)", "description": "Satellite common name", "identifier": true},
+        {"name": "OBJECT_ID", "type": "varchar(12)", "description": "International designator YYYY-NNNxx", "identifier": true},
+        {"name": "CENTER_NAME", "type": "varchar(5)", "description": "Reference body (EARTH)"},
+        {"name": "REF_FRAME", "type": "varchar(4)", "description": "Reference frame"},
+        {"name": "TIME_SYSTEM", "type": "varchar(3)", "description": "Time system"},
+        {"name": "MEAN_ELEMENT_THEORY", "type": "varchar(4)", "description": "Propagation theory (e.g. SGP4)"},
+        {"name": "EPOCH", "type": "datetime", "description": "Element epoch (UTC)"},
+        {"name": "MEAN_MOTION", "type": "decimal(13,8)", "description": "Revolutions per day"},
+        {"name": "ECCENTRICITY", "type": "decimal(13,8)", "description": "Orbit shape (0=circular)"},
+        {"name": "INCLINATION", "type": "decimal(7,4)", "description": "Inclination in degrees"},
+        {"name": "RA_OF_ASC_NODE", "type": "decimal(7,4)", "description": "Right ascension of ascending node (degrees)"},
+        {"name": "ARG_OF_PERICENTER", "type": "decimal(7,4)", "description": "Argument of perigee (degrees)"},
+        {"name": "MEAN_ANOMALY", "type": "decimal(7,4)", "description": "Mean anomaly (degrees)"},
+        {"name": "EPHEMERIS_TYPE", "type": "tinyint", "description": "Ephemeris type"},
+        {"name": "CLASSIFICATION_TYPE", "type": "char(1)", "description": "Classification (U/C/S)"},
+        {"name": "NORAD_CAT_ID", "type": "int", "description": "NORAD catalog number", "identifier": true},
+        {"name": "ELEMENT_SET_NO", "type": "smallint", "description": "Elset number"},
+        {"name": "REV_AT_EPOCH", "type": "mediumint", "description": "Revolution number at epoch"},
+        {"name": "BSTAR", "type": "decimal(19,14)", "description": "Drag / radiation pressure coefficient"},
+        {"name": "MEAN_MOTION_DOT", "type": "decimal(9,8)", "description": "First derivative of mean motion"},
+        {"name": "MEAN_MOTION_DDOT", "type": "decimal(22,13)", "description": "Second derivative of mean motion"},
+        {"name": "SEMIMAJOR_AXIS", "type": "double", "description": "Semi-major axis (km)"},
+        {"name": "PERIOD", "type": "double", "description": "Orbital period (minutes)"},
+        {"name": "APOAPSIS", "type": "double", "description": "Apogee (km)"},
+        {"name": "PERIAPSIS", "type": "double", "description": "Perigee (km)"},
+        {"name": "OBJECT_TYPE", "type": "varchar(12)", "description": "PAYLOAD, R/B, DEBRIS, etc."},
+        {"name": "RCS_SIZE", "type": "char(6)", "description": "Radar cross-section: SMALL, MEDIUM, LARGE"},
+        {"name": "COUNTRY_CODE", "type": "char(6)", "description": "Owner country (USA, PRC, RUS, etc.)"},
+        {"name": "LAUNCH_DATE", "type": "date", "description": "Launch date"},
+        {"name": "SITE", "type": "char(5)", "description": "Launch site code"},
+        {"name": "DECAY_DATE", "type": "date", "description": "Decay date or null if on-orbit"},
+        {"name": "FILE", "type": "bigint", "description": "Source file ID"},
+        {"name": "GP_ID", "type": "int", "description": "Unique GP record ID", "identifier": true},
+        {"name": "TLE_LINE0", "type": "varchar(27)", "description": "Optional object name line"},
+        {"name": "TLE_LINE1", "type": "varchar(71)", "description": "TLE line 1"},
+        {"name": "TLE_LINE2", "type": "varchar(71)", "description": "TLE line 2"}
+      ],
+      "query_predicates": ["norad_cat_id", "object_name", "country_code", "object_type", "mean_motion", "inclination", "period", "apogee", "perigee", "decay_date", "epoch", "creation_date"]
+    },
+    "GP_HISTORY": {
+      "description": "Historical GP data. Same fields as GP. Use sparingly - 1/lifetime per object.",
+      "loader": "load_gp_history",
+      "formats": ["json", "tle", "xml", "kvn", "csv"],
+      "fields": "same as GP",
+      "query_predicates": ["norad_cat_id", "creation_date", "epoch", "orderby", "limit"]
+    },
+    "SATCAT": {
+      "description": "Satellite catalog metadata. No orbital elements - catalog info only. 1/day limit.",
+      "loader": "st.satcat() - not yet in spacetrack_loader",
+      "formats": ["json", "xml", "csv", "html"],
+      "fields": [
+        {"name": "INTLDES", "type": "char(12)", "description": "International designator", "identifier": true},
+        {"name": "NORAD_CAT_ID", "type": "int", "description": "NORAD catalog number", "identifier": true},
+        {"name": "OBJECT_TYPE", "type": "varchar(12)", "description": "PAYLOAD, R/B, DEBRIS, etc."},
+        {"name": "SATNAME", "type": "char(25)", "description": "Satellite name", "identifier": true},
+        {"name": "COUNTRY", "type": "char(6)", "description": "Owner country code"},
+        {"name": "LAUNCH", "type": "date", "description": "Launch date"},
+        {"name": "SITE", "type": "char(5)", "description": "Launch site"},
+        {"name": "DECAY", "type": "date", "description": "Decay date"},
+        {"name": "PERIOD", "type": "decimal(12,2)", "description": "Orbital period"},
+        {"name": "INCLINATION", "type": "decimal(12,2)", "description": "Inclination"},
+        {"name": "APOGEE", "type": "bigint", "description": "Apogee (km)"},
+        {"name": "PERIGEE", "type": "bigint", "description": "Perigee (km)"},
+        {"name": "COMMENT", "type": "char(32)", "description": "Comment"},
+        {"name": "COMMENTCODE", "type": "tinyint", "description": "Comment code"},
+        {"name": "RCSVALUE", "type": "int", "description": "RCS value (0 since Aug 2014 - scaled only)"},
+        {"name": "RCS_SIZE", "type": "varchar(6)", "description": "SMALL, MEDIUM, LARGE"},
+        {"name": "FILE", "type": "smallint", "description": "File ID"},
+        {"name": "LAUNCH_YEAR", "type": "smallint", "description": "Launch year"},
+        {"name": "LAUNCH_NUM", "type": "smallint", "description": "Launch number"},
+        {"name": "LAUNCH_PIECE", "type": "varchar(3)", "description": "Launch piece identifier"},
+        {"name": "CURRENT", "type": "enum", "description": "Y/N - current in catalog"},
+        {"name": "OBJECT_NAME", "type": "char(25)", "description": "Object name", "identifier": true},
+        {"name": "OBJECT_ID", "type": "char(12)", "description": "Object ID", "identifier": true},
+        {"name": "OBJECT_NUMBER", "type": "int", "description": "Synonym for NORAD_CAT_ID", "identifier": true}
+      ]
+    },
+    "DECAY": {
+      "description": "Decay/reentry messages. Historical and prediction.",
+      "loader": "st.decay() - not yet in spacetrack_loader",
+      "formats": ["json", "xml", "csv", "html"],
+      "fields": [
+        {"name": "NORAD_CAT_ID", "type": "int", "description": "NORAD catalog number", "identifier": true},
+        {"name": "OBJECT_NUMBER", "type": "int", "description": "Object number", "identifier": true},
+        {"name": "OBJECT_NAME", "type": "char(25)", "description": "Object name", "identifier": true},
+        {"name": "INTLDES", "type": "char(12)", "description": "International designator", "identifier": true},
+        {"name": "OBJECT_ID", "type": "char(12)", "description": "Object ID", "identifier": true},
+        {"name": "RCS", "type": "int", "description": "Radar cross-section (0 - scaled only)"},
+        {"name": "RCS_SIZE", "type": "varchar(6)", "description": "SMALL, MEDIUM, LARGE"},
+        {"name": "COUNTRY", "type": "char(6)", "description": "Country code"},
+        {"name": "MSG_EPOCH", "type": "datetime", "description": "Message epoch"},
+        {"name": "DECAY_EPOCH", "type": "varchar(24)", "description": "Predicted/actual decay time"},
+        {"name": "SOURCE", "type": "varchar(9)", "description": "Message source"},
+        {"name": "MSG_TYPE", "type": "varchar(10)", "description": "Message type"},
+        {"name": "PRECEDENCE", "type": "bigint", "description": "Precedence"}
+      ]
+    }
+  },
+  "country_codes": {
+    "PRC": "People's Republic of China",
+    "USA": "United States",
+    "RUS": "Russia",
+    "CIS": "Commonwealth of Independent States",
+    "JPN": "Japan",
+    "ESA": "European Space Agency",
+    "FRA": "France",
+    "IND": "India",
+    "UNK": "Unknown"
+  },
+  "object_types": ["PAYLOAD", "R/B", "DEB", "UNK"],
+  "notes": [
+    "All timestamps are UTC.",
+    "RCS values are scaled (SMALL, MEDIUM, LARGE) since Aug 2014.",
+    "GP is the primary class for current orbital data; use decay_date=null-val, epoch=>now-30 for on-orbit propagable elements."
+  ]
+}
