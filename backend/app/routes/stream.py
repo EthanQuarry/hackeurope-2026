@@ -66,6 +66,11 @@ async def _analysis_generator(prompt: str | None = None):
     })
 
     orbital_summary = await asyncio.to_thread(format_orbital_summary, backend_sats)
+
+    # Prepend the user prompt so agents have additional context (adversary intel, questions, etc.)
+    if prompt:
+        orbital_summary = f"Operator prompt: {prompt}\n\n{orbital_summary}"
+
     await asyncio.sleep(0.2)
 
     yield _sse_line({

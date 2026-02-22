@@ -17,6 +17,8 @@ export const api = {
   commsStream: `${BASE}/comms/stream`,
   commsSend: `${BASE}/comms/send`,
   responseStream: `${BASE}/response/stream`,
+  adversaryResearchStream: `${BASE}/api/adversary/research/stream`,
+  adversaryChat: `${BASE}/api/adversary/chat`,
 } as const
 
 /** Typed fetch with AbortController support */

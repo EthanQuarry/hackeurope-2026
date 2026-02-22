@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-export type ActiveView = "overview" | "proximity" | "signal" | "anomaly" | "comms" | "satellite-detail"
+export type ActiveView = "overview" | "proximity" | "signal" | "anomaly" | "orbital" | "comms" | "satellite-detail" | "adversary-detail"
 export type Planet = "earth" | "moon" | "mars"
 
 interface UIState {
@@ -11,6 +11,7 @@ interface UIState {
   terminalOpen: boolean
   leftActiveTab: "threats" | "comms"
   rightActiveTab: "fleet" | "responses"
+  selectedAdversaryId: string | null
 
   setActiveView: (view: ActiveView) => void
   setActivePlanet: (planet: Planet) => void
@@ -19,6 +20,7 @@ interface UIState {
   toggleTerminal: () => void
   setLeftActiveTab: (tab: "threats" | "comms") => void
   setRightActiveTab: (tab: "fleet" | "responses") => void
+  openAdversaryDetail: (satelliteId: string) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -29,6 +31,7 @@ export const useUIStore = create<UIState>((set) => ({
   terminalOpen: false,
   leftActiveTab: "threats",
   rightActiveTab: "fleet",
+  selectedAdversaryId: null,
 
   setActiveView: (view) => set({ activeView: view }),
   setActivePlanet: (planet) => set({ activePlanet: planet }),
@@ -37,4 +40,5 @@ export const useUIStore = create<UIState>((set) => ({
   toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen })),
   setLeftActiveTab: (tab) => set({ leftActiveTab: tab }),
   setRightActiveTab: (tab) => set({ rightActiveTab: tab }),
+  openAdversaryDetail: (satelliteId) => set({ selectedAdversaryId: satelliteId, activeView: "adversary-detail" }),
 }))

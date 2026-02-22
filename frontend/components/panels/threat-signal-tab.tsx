@@ -1,8 +1,10 @@
 "use client"
 
+import { Target } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ThreatBadge } from "@/components/shared/threat-badge"
 import { cn } from "@/lib/utils"
+import { useUIStore } from "@/stores/ui-store"
 import type { SignalThreat } from "@/types"
 
 interface ThreatSignalTabProps {
@@ -21,6 +23,8 @@ function formatTCA(minutes: number): string {
 }
 
 export function ThreatSignalTab({ threats, selectedThreatId, onSelectThreat }: ThreatSignalTabProps) {
+  const openAdversaryDetail = useUIStore((s) => s.openAdversaryDetail)
+
   const sorted = [...threats].sort((a, b) => {
     const sev = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
     if (sev !== 0) return sev
@@ -88,16 +92,27 @@ export function ThreatSignalTab({ threats, selectedThreatId, onSelectThreat }: T
               </span>
             </div>
 
-            <div className="mt-2 flex items-center gap-1">
-              <div className="h-1 w-12 overflow-hidden rounded-full bg-border/40">
-                <div
-                  className="h-full rounded-full bg-primary/60"
-                  style={{ width: `${threat.confidence * 100}%` }}
-                />
+            <div className="mt-2 flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className="h-1 w-12 overflow-hidden rounded-full bg-border/40">
+                  <div
+                    className="h-full rounded-full bg-primary/60"
+                    style={{ width: `${threat.confidence * 100}%` }}
+                  />
+                </div>
+                <span className="font-mono text-[9px] text-muted-foreground">
+                  {(threat.confidence * 100).toFixed(0)}%
+                </span>
               </div>
-              <span className="font-mono text-[9px] text-muted-foreground">
-                {(threat.confidence * 100).toFixed(0)}%
-              </span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); openAdversaryDetail(threat.interceptorId) }}
+                className="flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 font-mono text-[8px] font-semibold uppercase tracking-wider text-red-400 transition-colors hover:bg-red-500/20"
+                title={`Investigate ${threat.interceptorName}`}
+              >
+                <Target className="h-2.5 w-2.5" />
+                Intel
+              </button>
             </div>
           </button>
         ))}

@@ -5,6 +5,7 @@ import { ChevronUp, Play, Square, Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { TerminalEntry } from "@/components/terminal/terminal-entry"
+import { useAdversaryStore } from "@/stores/adversary-store"
 import type { TerminalLogEntry } from "@/types"
 
 export interface AITerminalHandle {
@@ -77,6 +78,8 @@ function* mockAnalysisStream(): Generator<Record<string, unknown>> {
 
 export const AITerminal = forwardRef<AITerminalHandle, AITerminalProps>(
   function AITerminal({ isOpen, onToggle, className }, ref) {
+    const adversaryResearch = useAdversaryStore((s) => s.research)
+
     const [logs, setLogs] = useState<TerminalLogEntry[]>([
       {
         id: 0,
@@ -116,8 +119,20 @@ export const AITerminal = forwardRef<AITerminalHandle, AITerminalProps>(
 
         // Try real SSE endpoint first, fall back to mock
         try {
+          // Build prompt with adversary intelligence context
+          let enrichedPrompt = prompt ?? ""
+          const dossierSummaries = Object.entries(adversaryResearch)
+            .filter(([, r]) => r.report)
+            .map(([id, r]) => `[${id}] ${r.report!.slice(0, 500)}`)
+            .join("\n\n")
+
+          if (dossierSummaries) {
+            enrichedPrompt = (enrichedPrompt ? enrichedPrompt + "\n\n" : "") +
+              "Adversary intelligence context:\n" + dossierSummaries
+          }
+
           let url = "/api/backend/analysis/stream"
-          if (prompt) url += `?prompt=${encodeURIComponent(prompt)}`
+          if (enrichedPrompt) url += `?prompt=${encodeURIComponent(enrichedPrompt)}`
 
           const ctrl = new AbortController()
           const res = await fetch(url, { signal: ctrl.signal }).catch(() => null)
@@ -167,7 +182,7 @@ export const AITerminal = forwardRef<AITerminalHandle, AITerminalProps>(
           setRunning(false)
         }
       },
-      [running]
+      [running, adversaryResearch]
     )
 
     const stopPipeline = useCallback(() => {

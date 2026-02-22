@@ -4,20 +4,27 @@ import { ArrowUpRight, Brain, Lightbulb, ShieldAlert } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { THREAT_COLORS, type ThreatSeverity } from "@/lib/constants"
-import { MOCK_PROXIMITY_THREATS } from "@/lib/mock-data"
+import { MOCK_PROXIMITY_THREATS, MOCK_ANOMALY_THREATS } from "@/lib/mock-data"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useUIStore } from "@/stores/ui-store"
 
 interface MiniCardProps {
   name: string
   description: string
   severity: ThreatSeverity
+  foreignSatId?: string
 }
 
-function MiniCard({ name, description, severity }: MiniCardProps) {
+function MiniCard({ name, description, severity, foreignSatId }: MiniCardProps) {
   const colors = THREAT_COLORS[severity]
+  const openAdversaryDetail = useUIStore((s) => s.openAdversaryDetail)
 
   return (
-    <div className="group flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-3 transition-colors hover:bg-white/[0.06]">
+    <button
+      type="button"
+      onClick={() => foreignSatId && openAdversaryDetail(foreignSatId)}
+      className="group flex w-full items-start gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.06]"
+    >
       <span
         className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", colors.bg)}
         style={{ backgroundColor: colors.hex }}
@@ -29,7 +36,7 @@ function MiniCard({ name, description, severity }: MiniCardProps) {
         </p>
       </div>
       <ArrowUpRight className="mt-1 h-3.5 w-3.5 shrink-0 text-gray-500 transition-colors group-hover:text-gray-300" />
-    </div>
+    </button>
   )
 }
 
@@ -66,6 +73,7 @@ export function InsightsCard({ className }: { className?: string }) {
                   name={threat.foreignSatName}
                   description={`Approaching ${threat.targetAssetName} — ${threat.missDistanceKm} km miss distance, TCA T+${threat.tcaInMinutes} min`}
                   severity={threat.severity}
+                  foreignSatId={threat.foreignSatId}
                 />
               ))}
             </div>
@@ -79,7 +87,17 @@ export function InsightsCard({ className }: { className?: string }) {
                 Recommendations
               </h3>
             </div>
-            <p className="text-[11px] text-gray-500">No recommendations available.</p>
+            <div className="space-y-2">
+              {MOCK_ANOMALY_THREATS.map((threat) => (
+                <MiniCard
+                  key={threat.id}
+                  name={threat.satelliteName}
+                  description={threat.description}
+                  severity={threat.severity}
+                  foreignSatId={threat.satelliteId}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </ScrollArea>

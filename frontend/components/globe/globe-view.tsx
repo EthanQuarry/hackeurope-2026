@@ -15,6 +15,7 @@ import { ThreatIndicator } from "@/components/globe/threat-indicator";
 import { CollisionEffect } from "@/components/globe/collision-effect";
 import { Starfield } from "@/components/globe/starfield";
 import { CameraFocus } from "@/components/globe/camera-focus";
+import { CinematicCamera } from "@/components/globe/cinematic-camera";
 import { useFleetStore } from "@/stores/fleet-store";
 import { useThreatStore } from "@/stores/threat-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -325,6 +326,7 @@ const MemoScene = React.memo(function Scene({
       />
 
       <CameraFocus controlsRef={controlsRef} simTimeRef={simTimeRef} />
+      <CinematicCamera controlsRef={controlsRef} />
     </>
   );
 });
@@ -416,6 +418,11 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
     [proximityThreats, allSatellites, triggerResponse],
   );
 
+  const handlePointerMissed = useCallback(() => {
+    const view = useUIStore.getState().activeView
+    if (view !== "overview") setActiveView("overview")
+  }, [setActiveView])
+
   return (
     <div
       className={cn(
@@ -428,6 +435,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         gl={{ antialias: true, alpha: false }}
         style={{ background: "#000006" }}
         dpr={[1, 2]}
+        onPointerMissed={handlePointerMissed}
       >
         <MemoScene
           satellites={demoSatellites}

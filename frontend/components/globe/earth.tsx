@@ -130,16 +130,20 @@ function AtmosphereGlow() {
 /* ── Moon/Mars: simple textured sphere with basic atmosphere ── */
 
 function PlanetSphere({ texturePath, fallbackColor }: { texturePath: string; fallbackColor: string }) {
+  const matRef = useRef<THREE.MeshBasicMaterial>(null)
   const surfaceMap = useTexture(texturePath)
+
+  useEffect(() => {
+    if (!matRef.current) return
+    matRef.current.map = surfaceMap
+    matRef.current.color.set(surfaceMap ? "#ffffff" : fallbackColor)
+    matRef.current.needsUpdate = true
+  }, [surfaceMap, fallbackColor])
 
   return (
     <mesh>
       <sphereGeometry args={[1, 64, 64]} />
-      <meshBasicMaterial
-        map={surfaceMap ?? undefined}
-        color={surfaceMap ? "#ffffff" : fallbackColor}
-        toneMapped={false}
-      />
+      <meshBasicMaterial ref={matRef} color={fallbackColor} toneMapped={false} />
     </mesh>
   )
 }
