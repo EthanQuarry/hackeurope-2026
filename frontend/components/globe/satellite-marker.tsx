@@ -42,55 +42,51 @@ function catmull(
   return curve.getPoints(samples);
 }
 
-/** Render text to a canvas texture for use as a billboard sprite.
- *  Returns { texture, width, height } — dispose texture when done. */
+/** Render text to a high-DPI canvas texture for billboard sprite labels.
+ *  Bold fonts for readability, mipmaps for distance, drawn once. */
 function makeTextSprite(
-  lines: { text: string; color: string; fontSize: number }[],
+  lines: { text: string; color: string; fontSize: number; bold?: boolean }[],
 ): { texture: THREE.CanvasTexture; width: number; height: number } {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d")!;
-  const dpr = 2; // crisp on retina
-  const padding = 4;
+  const canvas = document.createElement("canvas")
+  const ctx = canvas.getContext("2d")!
+  const dpr = 3 // high DPR for crispness — only drawn once so cost is minimal
+  const padding = 8
 
   // Measure
-  let maxW = 0;
-  let totalH = padding;
-  const measured: {
-    text: string;
-    color: string;
-    fontSize: number;
-    w: number;
-  }[] = [];
+  let maxW = 0
+  let totalH = padding
+  const measured: { text: string; color: string; font: string; h: number }[] = []
   for (const line of lines) {
-    ctx.font = `${line.fontSize * dpr}px monospace`;
-    const m = ctx.measureText(line.text);
-    const w = m.width;
-    maxW = Math.max(maxW, w);
-    measured.push({ ...line, w });
-    totalH += line.fontSize * dpr + 2;
+    const font = `${line.bold ? "bold " : ""}${line.fontSize * dpr}px monospace`
+    ctx.font = font
+    maxW = Math.max(maxW, ctx.measureText(line.text).width)
+    const h = line.fontSize * dpr
+    measured.push({ text: line.text, color: line.color, font, h })
+    totalH += h + 4
   }
-  totalH += padding;
+  totalH += padding
 
-  canvas.width = Math.ceil(maxW + padding * 2);
-  canvas.height = Math.ceil(totalH);
+  canvas.width = Math.ceil(maxW + padding * 2)
+  canvas.height = Math.ceil(totalH)
 
   // Draw
-  let y = padding;
-  for (const line of measured) {
-    ctx.font = `${line.fontSize * dpr}px monospace`;
-    ctx.fillStyle = line.color;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText(line.text, canvas.width / 2, y);
-    y += line.fontSize * dpr + 2;
+  let y = padding
+  for (const m of measured) {
+    ctx.font = m.font
+    ctx.fillStyle = m.color
+    ctx.textAlign = "center"
+    ctx.textBaseline = "top"
+    ctx.fillText(m.text, canvas.width / 2, y)
+    y += m.h + 4
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.generateMipmaps = true
+  texture.minFilter = THREE.LinearMipmapLinearFilter
+  texture.magFilter = THREE.LinearFilter
+  texture.needsUpdate = true
 
-  return { texture, width: canvas.width / dpr, height: canvas.height / dpr };
+  return { texture, width: canvas.width / dpr, height: canvas.height / dpr }
 }
 
 const TRAIL_FRACTION = 0.2;
@@ -115,57 +111,60 @@ function SpriteLabel({
   const spriteRef = useRef<THREE.Sprite>(null);
 
   const { spriteMat, spriteScale } = useMemo(() => {
-    const lines: { text: string; color: string; fontSize: number }[] = [];
+    const lines: { text: string; color: string; fontSize: number; bold?: boolean }[] = []
 
     if (threatPercent != null) {
       lines.push({
         text: `${threatPercent}%`,
-        fontSize: 10,
+        fontSize: 11,
+        bold: true,
         color:
           status === "threatened"
-            ? "rgba(255,68,102,0.85)"
-            : "rgba(255,145,0,0.75)",
-      });
+            ? "rgba(255,68,102,0.9)"
+            : "rgba(255,145,0,0.8)",
+      })
     }
 
     lines.push({
-      text: name.length > 16 ? name.slice(0, 15) + "…" : name,
+      text: name.length > 18 ? name.slice(0, 17) + "…" : name,
       fontSize: 8,
-      color: "rgba(200,220,255,0.55)",
-    });
+      color: "rgba(200,220,255,0.6)",
+    })
 
-    const { texture, width, height } = makeTextSprite(lines);
+    const { texture, width, height } = makeTextSprite(lines)
 
     const mat = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
       depthWrite: false,
       sizeAttenuation: true,
-    });
+    })
 
-    // Scale sprite to reasonable world-space size
-    const aspect = width / Math.max(height, 1);
-    const h = size * 12;
-    const w = h * aspect;
+    const aspect = width / Math.max(height, 1)
+    const h = size * 16
+    const w = h * aspect
 
-    return { spriteMat: mat, spriteScale: new THREE.Vector3(w, h, 1) };
-  }, [name, threatPercent, status, size]);
+    return { spriteMat: mat, spriteScale: new THREE.Vector3(w, h, 1) }
+  }, [name, threatPercent, status, size])
 
   // Dispose texture on unmount
   useEffect(() => {
     return () => {
-      spriteMat.map?.dispose();
-      spriteMat.dispose();
-    };
-  }, [spriteMat]);
-
-  // Follow the satellite mesh position
-  useFrame(() => {
-    if (spriteRef.current && meshRef.current) {
-      spriteRef.current.position.copy(meshRef.current.position);
-      spriteRef.current.position.y += size * 8; // offset above
+      spriteMat.map?.dispose()
+      spriteMat.dispose()
     }
-  });
+  }, [spriteMat])
+
+  // Follow satellite — throttled to every 2nd frame for perf
+  const frameCount = useRef(0)
+  useFrame(() => {
+    frameCount.current++
+    if (frameCount.current % 2 !== 0) return // skip odd frames
+    if (spriteRef.current && meshRef.current) {
+      spriteRef.current.position.copy(meshRef.current.position)
+      spriteRef.current.position.y += size * 10
+    }
+  })
 
   return <sprite ref={spriteRef} material={spriteMat} scale={spriteScale} />;
 }
