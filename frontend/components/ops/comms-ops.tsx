@@ -26,6 +26,8 @@ import { useCommsStore } from "@/stores/comms-store"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useCommsStream } from "@/hooks/use-comms-stream"
 import { CommsTranscriptionView } from "@/components/ops/comms-transcription-view"
+import { ThreatResponseView } from "@/components/ops/threat-response-view"
+import { useResponseStore } from "@/stores/response-store"
 import { api } from "@/lib/api"
 import { MOCK_SATELLITES } from "@/lib/mock-data"
 import type { CommsChatMessage, CommsChatResponse, ParsedIntent, SatelliteData } from "@/types"
@@ -223,6 +225,8 @@ export function CommsOps() {
   const handleReject = useCallback(() => { setPendingIntent(null); setPendingText(null); setPhase("idle") }, [])
   const handleConfirm = useCallback(() => { if (!pendingText || !pendingIntent) return; setPhase("translating"); sendCommand(pendingText, pendingIntent.target_satellite_id) }, [pendingText, pendingIntent, sendCommand])
   const handleCancelConfirm = useCallback(() => setPhase("approve"), [])
+
+  const responseIsOpen = useResponseStore((s) => s.isOpen)
 
   const canBuilderSend = !!targetSat && !!cmdType && phase === "idle"
 
@@ -433,8 +437,8 @@ export function CommsOps() {
         </div>
       </div>
 
-      {/* ═══ RIGHT PANEL ═══ */}
-      <CommsTranscriptionView />
+      {/* ═══ RIGHT PANEL — swaps to Threat Response when active ═══ */}
+      {responseIsOpen ? <ThreatResponseView /> : <CommsTranscriptionView />}
     </div>
   )
 }

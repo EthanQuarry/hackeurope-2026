@@ -3,6 +3,7 @@
 import { useCallback, useRef } from "react"
 import { useResponseStore } from "@/stores/response-store"
 import { useThreatStore } from "@/stores/threat-store"
+import { useUIStore } from "@/stores/ui-store"
 import { api } from "@/lib/api"
 
 interface TriggerParams {
@@ -21,6 +22,7 @@ export function useResponseStream() {
   const abortRef = useRef<AbortController | null>(null)
   const store = useResponseStore()
   const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
+  const setActiveView = useUIStore((s) => s.setActiveView)
 
   const triggerResponse = useCallback(
     async (params: TriggerParams) => {
@@ -37,6 +39,9 @@ export function useResponseStream() {
           satelliteId: params.satelliteId,
         })
       }
+
+      // Open the command center (comms view)
+      setActiveView("comms")
 
       // Abort any existing stream
       abortRef.current?.abort()
@@ -109,7 +114,7 @@ export function useResponseStream() {
         store.setError(String(e))
       }
     },
-    [store, setFocusTarget],
+    [store, setFocusTarget, setActiveView],
   )
 
   const abort = useCallback(() => {
