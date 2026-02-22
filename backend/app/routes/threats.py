@@ -52,7 +52,7 @@ def _get_satellites() -> list[dict]:
     return _satellites_cache or _generate_fallback_satellites()
 
 
-THREAT_ACTOR_COUNTRIES = {"PRC", "RUS", "CIS", "NKOR", "IRAN"}
+THREAT_ACTOR_COUNTRIES = {"PRC", "RUS", "CIS", "PRK", "IRN", "NKOR", "IRAN"}
 
 FRIENDLY_FORCE_EXCLUDE_NORAD = {25544}  # ISS (international, never a threat actor)
 FRIENDLY_FORCE_EXCLUDE_NAMES = ("ISS",)
@@ -71,7 +71,8 @@ def _get_adversarial_and_allied(sats: list[dict]) -> tuple[list[dict], list[dict
         s for s in sats
         if s.get("country_code") in THREAT_ACTOR_COUNTRIES and not _is_friendly_force_excluded(s)
     ]
-    allied = [s for s in sats if s["status"] in ("allied", "friendly")]
+    adversarial_ids = {s["id"] for s in adversarial}
+    allied = [s for s in sats if s["status"] in ("allied", "friendly") and s["id"] not in adversarial_ids]
     return adversarial, allied
 
 

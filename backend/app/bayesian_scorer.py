@@ -21,7 +21,7 @@ THREAT_SIGMA = 1.2
 # Mutable priors — adjustable via /config/priors endpoint and WebSocket
 _prior_adversarial: float = 0.9
 _prior_benign: float = 0.00005
-ADVERSARIAL_COUNTRIES = {"PRC", "CIS", "RUS", "NKOR", "IRAN"}
+ADVERSARIAL_COUNTRIES = {"PRC", "CIS", "RUS", "PRK", "IRN", "NKOR", "IRAN"}
 SMALL_RCS_MULTIPLIER = 1.5
 
 

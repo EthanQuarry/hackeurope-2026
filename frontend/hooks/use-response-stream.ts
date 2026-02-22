@@ -16,6 +16,8 @@ interface TriggerParams {
   approachPattern?: string
   tcaMinutes?: number
   focusPosition?: { lat: number; lon: number; altKm: number }
+  /** When true, camera locks onto the target satellite. Default false. */
+  lockCamera?: boolean
 }
 
 export function useResponseStream() {
@@ -30,8 +32,8 @@ export function useResponseStream() {
       if (store.hasTriggered(params.satelliteId)) return
       store.markTriggered(params.satelliteId)
 
-      // Focus camera on the target satellite
-      if (params.focusPosition) {
+      // Focus camera on the target satellite (only when explicitly requested)
+      if (params.focusPosition && params.lockCamera) {
         setFocusTarget({
           lat: params.focusPosition.lat,
           lon: params.focusPosition.lon,
