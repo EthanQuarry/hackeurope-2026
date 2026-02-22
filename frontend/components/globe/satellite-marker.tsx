@@ -142,7 +142,7 @@ function SpriteLabel({
 
     lines.push({
       text: name.length > 18 ? name.slice(0, 17) + "…" : name,
-      fontSize: 5,
+      fontSize: 3.5,
       color: "rgba(200,220,255,0.6)",
     })
 

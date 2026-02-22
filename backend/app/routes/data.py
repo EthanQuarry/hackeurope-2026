@@ -132,14 +132,14 @@ def _build_usa245_satellite(idx: int) -> dict:
     if scenario.usa245_evading() and alt_offset > 0.5:
         ma_depart = 45.0
         ta_depart = math.radians(ma_depart)
-        ta_arrive = math.radians(ma_depart + 20)
+        ta_arrive = math.radians(ma_depart + 45)  # wide 45° arc for dramatic visual
         p0 = _orbit_xyz(base_alt, base_inc, base_raan, ta_depart)
         p2 = _orbit_xyz(alt_km, inc_deg, raan_deg, ta_arrive)
         mx = (p0[0] + p2[0]) / 2
         my = (p0[1] + p2[1]) / 2
         mz = (p0[2] + p2[2]) / 2
         m_len = math.sqrt(mx*mx + my*my + mz*mz) or 1
-        bulge = 0.06
+        bulge = 0.12  # large outward bulge for visible burn arc
         p1 = (mx + (mx / m_len) * bulge, my + (my / m_len) * bulge, mz + (mz / m_len) * bulge)
         arc_points = []
         for i in range(101):

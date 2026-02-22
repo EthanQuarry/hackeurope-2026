@@ -848,7 +848,7 @@ function ExecutionProgress() {
             MANOEUVRE EXECUTED
           </span>
           <p className="font-mono text-[10px] text-emerald-400/70 mt-0.5">
-            Orbit raise +15km and RAAN shift +4° initiated. Trajectory separating.
+            Orbit raise +50km, RAAN shift +30°, inclination shift +8° initiated. Trajectory separating.
           </p>
         </div>
       </div>

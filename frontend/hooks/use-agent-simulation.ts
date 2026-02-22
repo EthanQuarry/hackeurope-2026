@@ -290,9 +290,9 @@ export function useAgentSimulation() {
     const manoeuvre: AgentResponseOption = {
       tier: "manoeuvre",
       label: "Evasive Orbit Manoeuvre",
-      description: `Execute retrograde burn on ${params.satelliteName} — ${(1.5 + Math.random() * 3).toFixed(1)} m/s delta-V to raise orbit by 15km and shift RAAN by 4°. This moves ${params.satelliteName} off ${params.threatSatelliteName}'s approach vector, increasing separation to safe distance.`,
+      description: `Execute emergency burn on ${params.satelliteName} — ${(4.0 + Math.random() * 6).toFixed(1)} m/s delta-V to raise orbit by 50km, shift RAAN by 30°, and tilt inclination by 8°. This dramatically separates ${params.satelliteName} from ${params.threatSatelliteName}'s approach vector.`,
       severity: 1,
-      justification: `${params.satelliteName} must change trajectory to avoid ${params.threatSatelliteName}. ${approach} approach at ${missKm.toFixed(1)}km is within collision hazard threshold. Orbit raise + RAAN shift increases miss distance to ${(missKm + 200).toFixed(0)}km.`,
+      justification: `${params.satelliteName} must immediately change trajectory to avoid ${params.threatSatelliteName}. ${approach} approach at ${missKm.toFixed(1)}km is within collision hazard threshold. Combined orbit raise + 30° plane change creates unmistakable separation.`,
       confidence: 0.95,
       risks: [
         `Propellant expenditure reduces remaining delta-V budget by ~${randInt(5, 15)}%`,
