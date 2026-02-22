@@ -26,24 +26,24 @@ export function ThreatResponseOverlay() {
   if (!isOpen) return null
 
   return (
-    <div className="pointer-events-auto fixed bottom-6 right-6 z-50 w-[420px]">
-      <div className="relative overflow-hidden rounded-2xl border border-red-500/30 bg-black/90 shadow-[0_0_80px_rgba(255,0,0,0.15)] backdrop-blur-xl">
+    <div className="pointer-events-auto fixed inset-y-0 left-0 z-50 w-[33vw] max-w-[480px] min-w-[320px] flex flex-col">
+      <div className="relative flex flex-col flex-1 overflow-hidden border-r border-red-500/20 bg-black/85 shadow-[20px_0_60px_rgba(0,0,0,0.5)] backdrop-blur-xl">
 
         {/* Scanning line animation */}
         {isStreaming && (
-          <div className="absolute inset-x-0 top-0 h-[2px] overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-[1px] overflow-hidden">
             <div className="h-full w-1/3 animate-[scan_2s_linear_infinite] bg-gradient-to-r from-transparent via-red-500 to-transparent" />
           </div>
         )}
 
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-red-500/20 bg-red-500/5 px-5 py-3">
-          <div className={cn("h-2.5 w-2.5 rounded-full", isStreaming ? "bg-red-500 animate-pulse" : decision ? "bg-emerald-400" : "bg-red-500")}>
-            <div className={cn("h-full w-full rounded-full", isStreaming && "animate-ping bg-red-500/50")} />
+        <div className="flex items-center gap-3 border-b border-red-500/20 bg-red-500/5 px-4 py-3 shrink-0">
+          <div className={cn("h-2.5 w-2.5 rounded-full shrink-0", isStreaming ? "bg-red-500 animate-pulse" : decision ? "bg-emerald-400" : "bg-red-500")}>
+            {isStreaming && <div className="h-full w-full rounded-full animate-ping bg-red-500/40" />}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-red-400" />
+              <ShieldAlert className="h-3.5 w-3.5 text-red-400 shrink-0" />
               <span className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-red-400">
                 Threat Response Agent
               </span>
@@ -52,34 +52,34 @@ export function ThreatResponseOverlay() {
               {isStreaming ? "ANALYSING THREAT VECTOR..." : decision ? "ANALYSIS COMPLETE" : "INITIALISING..."}
             </p>
           </div>
-          <div className="text-right">
-            <div className="font-mono text-[10px] text-gray-500">{formatTime()}</div>
+          <div className="text-right shrink-0">
+            <div className="font-mono text-[9px] text-gray-500">{formatTime()}</div>
             <div className="font-mono text-lg font-bold tabular-nums text-red-400">{threatScore}%</div>
           </div>
-          <button onClick={close} className="ml-2 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-white/10 hover:text-gray-300">
-            <X className="h-4 w-4" />
+          <button onClick={close} className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-white/10 hover:text-gray-300 shrink-0">
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
 
         {/* Target info strip */}
-        <div className="flex items-center gap-4 border-b border-white/5 bg-white/[0.02] px-5 py-2">
+        <div className="flex items-center gap-3 border-b border-white/5 bg-white/[0.02] px-4 py-2 shrink-0">
           <div className="flex items-center gap-1.5">
-            <Crosshair className="h-3 w-3 text-blue-400" />
+            <Crosshair className="h-3 w-3 text-blue-400 shrink-0" />
             <span className="font-mono text-[10px] text-gray-400">TARGET</span>
             <span className="font-mono text-[11px] font-semibold text-blue-400">{satelliteName ?? "..."}</span>
           </div>
           <div className="h-3 w-px bg-white/10" />
           <div className="flex items-center gap-1.5">
-            <Zap className="h-3 w-3 text-red-400" />
+            <Zap className="h-3 w-3 text-red-400 shrink-0" />
             <span className="font-mono text-[10px] text-gray-400">THREAT</span>
             <span className="font-mono text-[11px] font-semibold text-red-400">{threatSatelliteName ?? "..."}</span>
           </div>
         </div>
 
-        {/* Reasoning stream */}
-        <div ref={scrollRef} className="max-h-[200px] min-h-[120px] overflow-y-auto px-5 py-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+        {/* Reasoning stream — fills available space */}
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
           {reasoningLog.length === 0 && isStreaming && (
-            <div className="flex items-center gap-2 py-8">
+            <div className="flex items-center gap-2 py-6">
               <Cpu className="h-4 w-4 animate-spin text-cyan-400" />
               <span className="font-mono text-xs text-cyan-400/70 animate-pulse">Connecting to agent pipeline...</span>
             </div>
@@ -106,9 +106,9 @@ export function ThreatResponseOverlay() {
 
         {/* Decision card */}
         {decision && (
-          <div className="border-t border-emerald-500/20 bg-emerald-500/5 px-5 py-4">
+          <div className="border-t border-emerald-500/20 bg-emerald-500/5 px-4 py-3 shrink-0">
             <div className="mb-2 flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
               <span className="font-mono text-xs font-bold uppercase tracking-[0.15em] text-emerald-400">
                 Recommended Action
               </span>
@@ -144,11 +144,11 @@ export function ThreatResponseOverlay() {
                     )}>
                       {i + 1}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <span className="font-mono text-[10px] font-semibold text-foreground">{opt.action}</span>
-                      <span className="ml-2 font-mono text-[9px] text-gray-500">{opt.description.slice(0, 60)}</span>
+                      <span className="ml-2 font-mono text-[9px] text-gray-500">{opt.description.slice(0, 80)}</span>
                     </div>
-                    <span className="font-mono text-[9px] tabular-nums text-gray-500">{(opt.confidence * 100).toFixed(0)}%</span>
+                    <span className="font-mono text-[9px] tabular-nums text-gray-500 shrink-0">{(opt.confidence * 100).toFixed(0)}%</span>
                   </div>
                 ))}
               </div>
@@ -158,18 +158,18 @@ export function ThreatResponseOverlay() {
 
         {/* Error */}
         {error && (
-          <div className="border-t border-red-500/20 bg-red-500/5 px-5 py-3">
+          <div className="border-t border-red-500/20 bg-red-500/5 px-4 py-2 shrink-0">
             <p className="font-mono text-xs text-red-400">{error}</p>
           </div>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-white/5 bg-white/[0.01] px-5 py-2">
+        <div className="flex items-center justify-between border-t border-white/5 bg-white/[0.01] px-4 py-2 shrink-0">
           <span className="font-mono text-[9px] text-gray-600">
             {isStreaming ? `${reasoningLog.length} steps processed` : decision ? "Analysis complete" : "Waiting..."}
           </span>
           {isStreaming && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5">
               <div className="h-1 w-1 rounded-full bg-red-400 animate-pulse" />
               <div className="h-1 w-1 rounded-full bg-red-400 animate-pulse [animation-delay:200ms]" />
               <div className="h-1 w-1 rounded-full bg-red-400 animate-pulse [animation-delay:400ms]" />

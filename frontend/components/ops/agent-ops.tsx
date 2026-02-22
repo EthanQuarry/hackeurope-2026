@@ -1096,7 +1096,7 @@ export function AgentOps() {
   /* ── STANDBY — no active session ── */
   if (!activeSession) {
     return (
-      <div className="mx-auto h-full w-full max-w-[1600px]">
+      <div className="mr-auto h-full w-full max-w-[480px]">
         <div
           data-ops-panel
           className="pointer-events-auto flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg font-mono"
