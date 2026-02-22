@@ -14,7 +14,6 @@ import { ProximityOps } from "@/components/ops/proximity-ops"
 import { SignalOps } from "@/components/ops/signal-ops"
 import { AnomalyOps } from "@/components/ops/anomaly-ops"
 import { CommsOps } from "@/components/ops/comms-ops"
-import { OrbitalOps } from "@/components/ops/orbital-ops"
 const SatelliteDetailPage = lazy(() =>
   import("@/components/satellite-detail-page").then((m) => ({
     default: m.SatelliteDetailPage,
@@ -33,10 +32,9 @@ import {
   MOCK_PROXIMITY_THREATS,
   MOCK_SIGNAL_THREATS,
   MOCK_ANOMALY_THREATS,
-  MOCK_ORBITAL_SIMILARITY_THREATS,
 } from "@/lib/mock-data"
 import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants"
-import type { SatelliteData, ThreatData, DebrisData, ProximityThreat, SignalThreat, AnomalyThreat, OrbitalSimilarityThreat } from "@/types"
+import type { SatelliteData, ThreatData, DebrisData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
 
 export function DashboardShell() {
   const activeView = useUIStore((s) => s.activeView)
@@ -65,12 +63,9 @@ export function DashboardShell() {
   const setProximityThreats = useThreatStore((s) => s.setProximityThreats)
   const setSignalThreats = useThreatStore((s) => s.setSignalThreats)
   const setAnomalyThreats = useThreatStore((s) => s.setAnomalyThreats)
-  const setOrbitalSimilarityThreats = useThreatStore((s) => s.setOrbitalSimilarityThreats)
-
   const storeProximity = useThreatStore((s) => s.proximityThreats)
   const storeSignal = useThreatStore((s) => s.signalThreats)
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
-  const storeOrbital = useThreatStore((s) => s.orbitalSimilarityThreats)
 
   // ── WebSocket: sole source for all threat data ──
   // Pushes complete threat arrays (general + SJ-26) every tick.
@@ -108,17 +103,10 @@ export function DashboardShell() {
     intervalMs: THREAT_REFRESH_MS,
     onData: setAnomalyThreats,
   })
-  usePolling<OrbitalSimilarityThreat[]>({
-    url: api.orbitalSimilarityThreats,
-    intervalMs: THREAT_REFRESH_MS,
-    onData: setOrbitalSimilarityThreats,
-  })
-
   // Use live data when available, fall back to mocks
   const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
   const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
   const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
-  const orbitalThreats = storeOrbital.length > 0 ? storeOrbital : MOCK_ORBITAL_SIMILARITY_THREATS
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -127,7 +115,7 @@ export function DashboardShell() {
 
       {/* Header overlay */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-6 pt-4">
-        <div className="pointer-events-auto mx-auto w-full max-w-[1600px]">
+        <div className="pointer-events-auto mx-auto w-full max-w-[1600px] overflow-x-auto">
           <DashboardHeader
             globalThreatLevel="NOMINAL"
             speed={speed}
@@ -139,7 +127,6 @@ export function DashboardShell() {
               proximity: proximityThreats.length,
               signal: signalThreats.length,
               anomaly: anomalyThreats.length,
-              orbital: orbitalThreats.length,
             }}
           />
         </div>
@@ -186,9 +173,6 @@ export function DashboardShell() {
               <AnomalyOps threats={anomalyThreats} />
             )}
             {activeView === "comms" && <CommsOps />}
-            {activeView === "orbital" && (
-              <OrbitalOps threats={orbitalThreats} />
-            )}
             {activeView === "satellite-detail" && (
               <Suspense
                 fallback={
