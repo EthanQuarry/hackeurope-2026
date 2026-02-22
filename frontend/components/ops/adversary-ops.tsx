@@ -207,7 +207,7 @@ export function AdversaryOps() {
 
   const chatScrollRef = useRef<HTMLDivElement>(null)
   const researchLogRef = useRef<HTMLDivElement>(null)
-  const researchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Derived from store
   const satResearch = storeResearch[selectedId]
@@ -228,9 +228,9 @@ export function AdversaryOps() {
     if (selectedAdversaryId) setSelectedId(selectedAdversaryId)
   }, [selectedAdversaryId])
 
-  // Cleanup interval on unmount
+  // Cleanup SSE connection on unmount
   useEffect(() => {
-    return () => { if (researchIntervalRef.current) clearInterval(researchIntervalRef.current) }
+    return () => { abortControllerRef.current?.abort() }
   }, [])
 
   const selected = DUMMY_ADVERSARIES.find((a) => a.id === selectedId) ?? DUMMY_ADVERSARIES[0]
@@ -240,52 +240,6 @@ export function AdversaryOps() {
     openAdversaryDetail(id)
   }, [openAdversaryDetail])
 
-  // Build the report content for a satellite (initial or follow-up)
-  const buildInitialReport = useCallback((sat: typeof DUMMY_ADVERSARIES[number]) => {
-    return (
-      `## Intelligence Dossier: ${sat.name}\n\n` +
-      `**NORAD ID:** ${sat.noradId}  \n` +
-      `**Operator:** ${sat.owner}  \n` +
-      `**Country:** ${sat.country}  \n` +
-      `**Orbit:** ${sat.orbitType} — ${sat.altitude_km} km  \n\n` +
-      `### Assessed Mission\n${sat.assessedMission}\n\n` +
-      `### Threat Assessment\n` +
-      `**Threat Score:** ${(sat.threatScore * 100).toFixed(0)}%  \n` +
-      `**Key Concerns:**\n` +
-      `- Demonstrated maneuvering capability with ${sat.recentEvents.filter(e => e.type === "maneuver").length} recent orbital adjustments\n` +
-      `- Behavioral pattern consistent with counter-space / inspection operations\n` +
-      `- Operated by ${sat.owner}, which has documented ASAT testing history\n\n` +
-      `### Behavioral History\n` +
-      `14 maneuvers detected over 12 months. Average maneuver interval: 26 days. ` +
-      `Delta-v budget estimated at 120-180 m/s remaining based on bus class assessment.\n\n` +
-      `### Program Context\n` +
-      `Part of a broader counter-space program. Related satellites include ` +
-      `multiple inspector/servicing-class vehicles deployed since 2019.\n\n` +
-      `### Recommended Monitoring\n` +
-      `- Maintain continuous tracking with 15-minute TLE updates\n` +
-      `- Alert on any maneuver reducing miss distance below 5 km to protected assets\n` +
-      `- Cross-reference with RF emission data for active sensor sweeps`
-    )
-  }, [])
-
-  const buildFollowUpReport = useCallback((sat: typeof DUMMY_ADVERSARIES[number], query: string) => {
-    const ts = new Date().toISOString().replace("T", " ").slice(0, 19) + "Z"
-    return (
-      `### Follow-up Research — ${ts}\n` +
-      `**Query:** ${query}\n\n` +
-      `Analysis of ${sat.name} regarding "${query}":\n\n` +
-      `Based on updated intelligence from Space-Track and open-source analysis, ${sat.name} ` +
-      `continues to exhibit behavior consistent with ${sat.assessedMission.split("—")[0].trim().toLowerCase()}. ` +
-      `Cross-referencing recent TLE data with historical maneuver patterns reveals ` +
-      `${sat.recentEvents.length} notable events in the current monitoring period.\n\n` +
-      `Key findings from follow-up analysis:\n` +
-      `- Orbital parameters remain within expected range for active ${sat.orbitType} operations\n` +
-      `- Maneuver cadence suggests ongoing operational tasking by ${sat.owner}\n` +
-      `- Threat score ${sat.threatScore > 0.7 ? "remains elevated" : "is stable"} at ${(sat.threatScore * 100).toFixed(0)}%\n` +
-      `- Recommend continued monitoring with emphasis on the queried aspect`
-    )
-  }, [])
-
   // Core research runner — used by both button and chat
   const runResearch = useCallback((isFollowUp: boolean, chatQuery?: string) => {
     if (researchRunning) return
@@ -294,49 +248,100 @@ export function AdversaryOps() {
 
     const sat = selected
     const satId = selectedId
-    const prefix = isFollowUp ? "Follow-up: " : ""
 
-    const steps = [
-      `${prefix}Querying Space-Track SATCAT for catalog metadata...`,
-      `${prefix}Found: ${sat.name} (NORAD ${sat.noradId}) — ${sat.country} payload`,
-      `${prefix}Fetching 12-month TLE history from Space-Track GP_History...`,
-      `${prefix}Detected 14 maneuvers over 12 months (avg interval: 26 days)`,
-      `${prefix}Searching Perplexity: ${chatQuery ?? "military significance of " + sat.name}...`,
-      `${prefix}Searching Perplexity: ${sat.owner} counter-space capabilities...`,
-      `${prefix}Searching Perplexity: recent ${sat.name} orbital activity...`,
-      `${prefix}Cross-referencing UCS Satellite Database for mission classification...`,
-      `${prefix}Analyzing maneuver patterns for threat correlation...`,
-      `${prefix}${isFollowUp ? "Appending follow-up analysis to dossier..." : "Generating intelligence dossier..."}`,
-    ]
+    // Abort any previous SSE connection
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
-    let i = 0
-    if (researchIntervalRef.current) clearInterval(researchIntervalRef.current)
+    // Build URL with query params
+    let url = `/api/backend/api/adversary/research/stream?norad_id=${sat.noradId}&name=${encodeURIComponent(sat.name)}`
+    if (chatQuery) {
+      url += `&query=${encodeURIComponent(chatQuery)}`
+    }
 
-    researchIntervalRef.current = setInterval(() => {
-      if (i < steps.length) {
-        appendLog(satId, steps[i])
-        i++
-      } else {
-        if (researchIntervalRef.current) clearInterval(researchIntervalRef.current)
-        researchIntervalRef.current = null
-        setResearchRunning(false)
-
-        if (isFollowUp) {
-          const followUp = buildFollowUpReport(sat, chatQuery ?? "general follow-up")
-          appendToReport(satId, followUp)
-        } else {
-          const report = buildInitialReport(sat)
-          // If there's already a report, append; otherwise set fresh
-          const existing = getResearch(satId).report
-          if (existing) {
-            appendToReport(satId, `\n---\n\n### Updated Analysis — ${new Date().toISOString().replace("T", " ").slice(0, 19)}Z\n\n` +
-              `Re-ran full deep research. Previous findings confirmed and expanded.`)
-          } else {
-            setReport(satId, report)
-          }
+    ;(async () => {
+      try {
+        const res = await fetch(url, { signal: controller.signal })
+        if (!res.ok || !res.body) {
+          appendLog(satId, `Error: HTTP ${res.status} — ${res.statusText}`)
+          setResearchRunning(false)
+          return
         }
 
-        // If this was triggered from chat, send a confirmation message
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() ?? ""
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue
+            try {
+              const event = JSON.parse(line.slice(6)) as Record<string, unknown>
+              const type = event.type as string
+
+              switch (type) {
+                case "scan":
+                case "context":
+                case "reasoning":
+                  appendLog(satId, String(event.text ?? ""))
+                  break
+                case "tool_call":
+                  appendLog(satId, `Calling ${(event.tools as string[])?.join(", ") ?? event.tool ?? "tool"}...`)
+                  break
+                case "tool_result":
+                  appendLog(satId, String(event.summary ?? "Result received"))
+                  break
+                case "intent":
+                  appendLog(satId, `Threat classification: ${event.classification ?? "unknown"}`)
+                  break
+                case "brief": {
+                  // Quick preliminary brief — show immediately
+                  const briefText = String(event.text ?? "")
+                  if (briefText) {
+                    setReport(satId, briefText)
+                    appendLog(satId, "Preliminary brief ready — full research continuing...")
+                  }
+                  break
+                }
+                case "dossier": {
+                  // Full dossier replaces the brief (plain text markdown)
+                  const dossierText = String(event.text ?? "")
+                  if (dossierText) {
+                    if (isFollowUp) {
+                      appendToReport(satId, `\n---\n\n${dossierText}`)
+                    } else {
+                      // Replace the brief with the full dossier
+                      setReport(satId, dossierText)
+                    }
+                  }
+                  break
+                }
+                case "error":
+                  appendLog(satId, `Error: ${event.message ?? "unknown"}`)
+                  break
+                case "complete":
+                  appendLog(satId, "Research complete.")
+                  break
+              }
+            } catch {
+              // skip malformed SSE lines
+            }
+          }
+        }
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          appendLog(satId, `Connection error: ${err}`)
+        }
+      } finally {
+        setResearchRunning(false)
         if (chatQuery) {
           appendChatMessage(satId, {
             role: "assistant",
@@ -344,8 +349,8 @@ export function AdversaryOps() {
           })
         }
       }
-    }, 800)
-  }, [researchRunning, selected, selectedId, clearLogs, appendLog, setReport, appendToReport, getResearch, buildInitialReport, buildFollowUpReport, appendChatMessage])
+    })()
+  }, [researchRunning, selected, selectedId, clearLogs, appendLog, setReport, appendToReport, getResearch, appendChatMessage])
 
   const handleRunResearch = useCallback(() => {
     runResearch(false)
@@ -370,23 +375,40 @@ export function AdversaryOps() {
       return
     }
 
-    // Normal chat response
+    // Real AI chat response
     setIsLoading(true)
-    setTimeout(() => {
-      const hasReport = !!getResearch(selectedId).report
-      let response: string
+    ;(async () => {
+      try {
+        const dossierContext = getResearch(selectedId).report ?? ""
+        const params = new URLSearchParams({
+          norad_id: String(selected.noradId),
+          name: selected.name,
+          prompt: msg,
+        })
+        const res = await fetch(`/api/backend/api/adversary/chat?${params.toString()}`, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: dossierContext,
+        })
 
-      if (hasReport) {
-        response = `Based on the intelligence dossier for ${selected.name}: this satellite has demonstrated ${selected.threatScore > 0.7 ? "significant" : "moderate"} counter-space capabilities. Its recent behavior pattern is consistent with ${selected.assessedMission.split("—")[0].trim().toLowerCase()}. ${
-          msg.toLowerCase().includes("threat") ? `The current threat score is ${(selected.threatScore * 100).toFixed(0)}%.` : ""
-        } If you want me to dig deeper on a specific aspect, just say "deep research" followed by your question.`
-      } else {
-        response = `I don't have a deep research dossier on ${selected.name} yet. I can tell you it's a ${selected.country} ${selected.orbitType} payload operated by ${selected.owner}. Say "run deep research" and I'll generate a full intelligence dossier.`
+        if (!res.ok) {
+          appendChatMessage(selectedId, {
+            role: "assistant",
+            content: `Error: server returned ${res.status}. Please try again.`,
+          })
+        } else {
+          const data = (await res.json()) as { response: string }
+          appendChatMessage(selectedId, { role: "assistant", content: data.response })
+        }
+      } catch (err) {
+        appendChatMessage(selectedId, {
+          role: "assistant",
+          content: `Connection error: ${err}. Is the backend running?`,
+        })
+      } finally {
+        setIsLoading(false)
       }
-
-      appendChatMessage(selectedId, { role: "assistant", content: response })
-      setIsLoading(false)
-    }, 1500)
+    })()
   }, [chatInput, isLoading, researchRunning, selected, selectedId, appendChatMessage, getResearch, runResearch])
 
   const handleChatKeyDown = useCallback((e: React.KeyboardEvent) => {

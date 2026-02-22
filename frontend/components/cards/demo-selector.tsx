@@ -85,7 +85,7 @@ export function DemoSelector({ className }: { className?: string }) {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 w-72 overflow-hidden rounded-xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl">
+        <div className="absolute left-full bottom-0 z-50 ml-2 w-72 overflow-hidden rounded-xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl">
           <div className="border-b border-white/5 px-3 py-2">
             <p className="font-mono text-[9px] uppercase tracking-wider text-gray-500">
               Scenario Demos

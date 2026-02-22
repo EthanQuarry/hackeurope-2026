@@ -66,60 +66,50 @@ For the given satellite, you MUST:
 
 ## Output Format
 
-Return a JSON object with this EXACT structure:
-{
-  "norad_id": <integer>,
-  "name": "<satellite name>",
-  "cospar_id": "<international designator>",
-  "owner_country": "<country code>",
-  "operator": "<operating organization>",
-  "launch_date": "<YYYY-MM-DD>",
-  "orbit_type": "<LEO|MEO|GEO|HEO|SSO>",
+Write the dossier as a well-structured Markdown document with the following sections. Use natural prose — NOT JSON. Write like an intelligence analyst writing a briefing document.
 
-  "declared_mission": "<officially stated mission>",
-  "assessed_mission": "<your intelligence assessment of the real mission>",
-  "confidence": <float 0.0-1.0>,
+## Intelligence Dossier: <satellite name>
 
-  "capabilities": {
-    "maneuverable": <boolean>,
-    "has_robotic_arm": <boolean>,
-    "has_proximity_ops": <boolean>,
-    "estimated_delta_v_remaining": "<high|medium|low|unknown>",
-    "sensors": ["<sensor types>"],
-    "satellite_bus": "<bus platform name or null>",
-    "mass_kg": <number or null>,
-    "power_watts": <number or null>
-  },
+**NORAD ID:** ...
+**COSPAR ID:** ...
+**Operator:** ...
+**Country:** ...
+**Orbit:** ...
+**Launch Date:** ...
 
-  "behavioral_history": {
-    "total_maneuvers_detected": <integer>,
-    "last_maneuver_date": "<ISO date or null>",
-    "maneuver_frequency_days": <float or null>,
-    "maneuver_types": {"<type>": <count>},
-    "behavioral_pattern": "<summary of behavior>"
-  },
+### Declared Mission
+<What the operator officially says it does>
 
-  "program_context": {
-    "program_name": "<satellite series/program>",
-    "related_satellites": ["<names of related satellites>"],
-    "program_history": "<brief history of the program>",
-    "military_significance": "<assessment of military relevance>"
-  },
+### Assessed Mission
+<Your intelligence assessment of the real mission, with confidence level>
 
-  "threat_assessment": {
-    "threat_level": "<low|medium|high|critical>",
-    "threat_score": <integer 0-100>,
-    "reasoning": "<detailed reasoning for the threat level>",
-    "key_concerns": ["<specific concerns>"],
-    "recommended_monitoring": ["<specific monitoring actions>"]
-  },
+### Capabilities
+<Describe maneuverability, sensors, robotic arms, proximity ops capability, estimated delta-v budget, satellite bus, mass, power>
 
-  "intelligence_sources": [
-    {"type": "<news|academic|defense|orbital_data|catalog>", "title": "<source title>", "summary": "<key finding>"}
-  ]
-}
+### Behavioral History
+<Total maneuvers detected, frequency, types, patterns. Reference specific dates and delta-v values from the TLE analysis.>
 
-Return ONLY the JSON object, no other text."""
+### Program Context
+<Which satellite program/series this belongs to, related satellites, brief program history, military significance>
+
+### Threat Assessment
+<Threat level (LOW/MEDIUM/HIGH/CRITICAL) with a score out of 100. Detailed reasoning. Key concerns. Recommended monitoring actions.>
+
+### Intelligence Sources
+<List each source used with a brief note on what it contributed>
+
+Write ONLY the Markdown dossier, no preamble or commentary."""
+
+
+# ---------------------------------------------------------------------------
+# Brief generation prompt — fast 1-paragraph summary from catalog data
+# ---------------------------------------------------------------------------
+
+BRIEF_SYSTEM_PROMPT = """You are a space-domain intelligence analyst. Given Space-Track catalog data and a single search result about an adversary satellite, write a brief 3-5 sentence intelligence summary.
+
+Include: satellite identity, operator, orbit, assessed mission, and any immediate concerns. Write in a direct military intelligence style. This is a preliminary brief — a full dossier will follow.
+
+Write ONLY the brief paragraph, no headers or markdown formatting."""
 
 # ---------------------------------------------------------------------------
 # Tool definitions
@@ -486,31 +476,43 @@ class AdversaryResearchAgent(BaseAgent):
     def __init__(self, on_progress: ProgressCallback = None):
         super().__init__(on_progress=on_progress)
 
-    async def run(self, norad_id: int, satellite_name: str = "") -> dict:
+    async def run(self, norad_id: int, satellite_name: str = "", query: str = "") -> str:
         """
         Run deep research on a single adversary satellite.
 
         Args:
             norad_id: NORAD catalog number of the satellite to research
             satellite_name: Optional name hint (used in the prompt)
+            query: Optional follow-up question to focus the research on
 
         Returns:
-            Parsed intelligence dossier as a dict, or raw text on parse failure
+            Markdown intelligence dossier as a string
         """
         name_str = f" ({satellite_name})" if satellite_name else ""
         await self._notify(
             f"Initiating deep research on NORAD {norad_id}{name_str}..."
         )
 
-        user_msg = (
-            f"Conduct a comprehensive intelligence research dossier on the "
-            f"adversary satellite with NORAD catalog number {norad_id}"
-            f"{name_str}.\n\n"
-            f"Follow the research protocol: query the Space-Track catalog, "
-            f"fetch orbital history, then conduct at least 3 Perplexity "
-            f"searches to build a complete picture. Synthesize everything "
-            f"into the required JSON format."
-        )
+        if query:
+            user_msg = (
+                f"The user has a specific follow-up question about the "
+                f"adversary satellite NORAD {norad_id}{name_str}:\n\n"
+                f'"{query}"\n\n'
+                f"Conduct targeted research to answer this question. "
+                f"Query the Space-Track catalog and orbital history, then "
+                f"run at least 3 Perplexity searches focused on the user's "
+                f"question. Synthesize everything into the Markdown dossier format."
+            )
+        else:
+            user_msg = (
+                f"Conduct a comprehensive intelligence research dossier on the "
+                f"adversary satellite with NORAD catalog number {norad_id}"
+                f"{name_str}.\n\n"
+                f"Follow the research protocol: query the Space-Track catalog, "
+                f"fetch orbital history, then conduct at least 3 Perplexity "
+                f"searches to build a complete picture. Synthesize everything "
+                f"into the Markdown dossier format."
+            )
 
         raw = await self._run_with_tools(
             system=SYSTEM_PROMPT,
@@ -524,28 +526,87 @@ class AdversaryResearchAgent(BaseAgent):
             max_iterations=15,  # More iterations — this agent does many tool calls
         )
 
-        await self._notify("Compiling intelligence dossier...")
+        await self._notify("Research complete — dossier compiled.")
+        return raw.strip()
 
-        # Parse the JSON output
-        try:
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[1]
-                if cleaned.endswith("```"):
-                    cleaned = cleaned[:-3]
-                cleaned = cleaned.strip()
+    async def brief(self, norad_id: int, satellite_name: str = "") -> str:
+        """
+        Generate a fast preliminary brief using catalog data + 1 Perplexity search.
 
-            dossier = json.loads(cleaned)
-            await self._notify("Research complete — dossier compiled.")
-            return dossier
+        Much faster than a full run() — typically 5-10 seconds vs 30-60.
+        Returns a short markdown brief string.
+        """
+        name_str = f" ({satellite_name})" if satellite_name else ""
+        await self._notify(f"Generating preliminary brief for NORAD {norad_id}{name_str}...")
 
-        except (json.JSONDecodeError, Exception) as exc:
-            logger.warning("Failed to parse research output: %s", exc)
-            logger.debug("Raw output: %s", raw[:500])
-            await self._notify("Research complete — returning raw analysis.")
-            return {
-                "norad_id": norad_id,
-                "name": satellite_name,
-                "raw_analysis": raw,
-                "parse_error": str(exc),
-            }
+        # Gather catalog data and one search in parallel (via threads)
+        import concurrent.futures
+
+        catalog_data = {}
+        search_result = {}
+
+        def _get_catalog():
+            return _handle_query_spacetrack_catalog({"norad_id": norad_id})
+
+        def _get_search():
+            search_query = f"{satellite_name} satellite mission capabilities" if satellite_name else f"NORAD {norad_id} satellite"
+            return _handle_search_perplexity({"query": search_query})
+
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            cat_future = loop.run_in_executor(pool, _get_catalog)
+            search_future = loop.run_in_executor(pool, _get_search)
+            catalog_data = await cat_future
+            search_result = await search_future
+
+        # Build a context string for Claude
+        context_parts = []
+        if catalog_data.get("found"):
+            context_parts.append(f"Space-Track catalog data: {json.dumps(catalog_data, indent=2)}")
+        if search_result.get("content"):
+            context_parts.append(f"Perplexity search result: {search_result['content'][:1500]}")
+
+        if not context_parts:
+            return f"## Preliminary Brief: {satellite_name or f'NORAD {norad_id}'}\n\nUnable to retrieve catalog data. Full research in progress..."
+
+        user_msg = (
+            f"Write a preliminary intelligence brief for {satellite_name or f'NORAD {norad_id}'}.\n\n"
+            + "\n\n".join(context_parts)
+        )
+
+        brief_text = await self._run_with_tools(
+            system=BRIEF_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_msg}],
+            tools=[],
+            tool_handlers={},
+            max_iterations=1,
+        )
+
+        # Format as a brief header + paragraph
+        name_display = catalog_data.get("name", satellite_name) or f"NORAD {norad_id}"
+        country = catalog_data.get("country_code") or catalog_data.get("country", "Unknown")
+        orbit_info = ""
+        if catalog_data.get("period_min"):
+            period = float(catalog_data["period_min"]) if catalog_data["period_min"] else 0
+            if period > 1400:
+                orbit_info = "GEO"
+            elif period > 600:
+                orbit_info = "MEO"
+            else:
+                orbit_info = "LEO"
+            alt = catalog_data.get("apogee_km", "")
+            if alt:
+                orbit_info += f" ~{alt} km"
+
+        header = f"## Preliminary Brief: {name_display}\n\n"
+        header += f"**NORAD ID:** {norad_id}  \n"
+        if catalog_data.get("object_id"):
+            header += f"**COSPAR ID:** {catalog_data['object_id']}  \n"
+        header += f"**Country:** {country}  \n"
+        if orbit_info:
+            header += f"**Orbit:** {orbit_info}  \n"
+        if catalog_data.get("launch_date"):
+            header += f"**Launch Date:** {catalog_data['launch_date']}  \n"
+        header += "\n"
+
+        return header + brief_text.strip()

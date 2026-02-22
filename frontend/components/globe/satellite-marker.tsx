@@ -200,6 +200,7 @@ export function SatelliteMarker({
   maneuverArc,
 }: SatelliteMarkerProps) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const hitboxRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const flagRingRef = useRef<THREE.Mesh>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -321,6 +322,10 @@ export function SatelliteMarker({
       glowRef.current.position.copy(meshRef.current.position);
     }
 
+    if (hitboxRef.current) {
+      hitboxRef.current.position.copy(meshRef.current.position);
+    }
+
     // Animate the Bayesian flag ring — pulse scale and opacity
     if (flagRingRef.current && isFlagged) {
       flagRingRef.current.position.copy(meshRef.current.position);
@@ -390,6 +395,18 @@ export function SatelliteMarker({
       }),
     [threeColor, selected, status],
   );
+  // Invisible hitbox — 8× the marker size for easier clicking
+  const hitboxGeo = useMemo(
+    () => new THREE.SphereGeometry(markerSize * 8, 8, 8),
+    [markerSize],
+  );
+  const hitboxMat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        visible: false,
+      }),
+    [],
+  );
   const flagGeo = useMemo(
     () => new THREE.SphereGeometry(markerSize, 16, 16),
     [markerSize],
@@ -448,6 +465,19 @@ export function SatelliteMarker({
           e.stopPropagation();
           onSelect?.(id);
         }}
+      />
+
+      {/* Invisible hitbox — much larger click target that follows the satellite */}
+      <mesh
+        ref={hitboxRef}
+        geometry={hitboxGeo}
+        material={hitboxMat}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect?.(id);
+        }}
+        onPointerOver={() => { document.body.style.cursor = "pointer" }}
+        onPointerOut={() => { document.body.style.cursor = "auto" }}
       />
 
       {/* Sprite label — pure GPU, no DOM overhead */}

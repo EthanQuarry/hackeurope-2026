@@ -5,25 +5,22 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
-import { cn } from "@/lib/utils";
-import { Earth } from "@/components/globe/earth";
-import { DebrisCloud } from "@/components/globe/debris-cloud";
-import { SatelliteMarker } from "@/components/globe/satellite-marker";
-import { HostileMarker } from "@/components/globe/hostile-marker";
-import { AnimationDriver } from "@/components/globe/animation-driver";
-import { ThreatIndicator } from "@/components/globe/threat-indicator";
-import { CollisionEffect } from "@/components/globe/collision-effect";
-import { Starfield } from "@/components/globe/starfield";
-import { CameraFocus } from "@/components/globe/camera-focus";
-import { useFleetStore } from "@/stores/fleet-store";
-import { useThreatStore } from "@/stores/threat-store";
-import { useUIStore } from "@/stores/ui-store";
-import { useGlobeStore } from "@/stores/globe-store";
-import {
-  generateInterceptTrajectory,
-  DEMO_SJ26_ID,
-  DEMO_USA245_ID,
-} from "@/lib/demo-trajectories";
+import { cn } from "@/lib/utils"
+import { Earth } from "@/components/globe/earth"
+import { DebrisCloud } from "@/components/globe/debris-cloud"
+import { SatelliteMarker } from "@/components/globe/satellite-marker"
+import { HostileMarker } from "@/components/globe/hostile-marker"
+import { AnimationDriver } from "@/components/globe/animation-driver"
+import { ThreatIndicator } from "@/components/globe/threat-indicator"
+import { CollisionEffect } from "@/components/globe/collision-effect"
+import { Starfield } from "@/components/globe/starfield"
+import { CameraFocus } from "@/components/globe/camera-focus"
+import { CinematicCamera } from "@/components/globe/cinematic-camera"
+import { useFleetStore } from "@/stores/fleet-store"
+import { useThreatStore } from "@/stores/threat-store"
+import { useUIStore } from "@/stores/ui-store"
+import { useGlobeStore } from "@/stores/globe-store"
+import { generateInterceptTrajectory, DEMO_SJ26_ID, DEMO_USA245_ID } from "@/lib/demo-trajectories"
 import {
   MOCK_SATELLITES,
   generateMockDebris,
@@ -324,6 +321,7 @@ const MemoScene = React.memo(function Scene({
       />
 
       <CameraFocus controlsRef={controlsRef} simTimeRef={simTimeRef} />
+      <CinematicCamera controlsRef={controlsRef} />
     </>
   );
 });

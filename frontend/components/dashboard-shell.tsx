@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useCallback, useState, lazy, Suspense } from "react"
-import { Brain, ChevronLeft, ChevronRight, GitBranch, Lightbulb, Satellite, Target } from "lucide-react"
+import { Brain, ChevronLeft, ChevronRight, GitBranch, Lightbulb, Satellite, Target, Video } from "lucide-react"
 import { api } from "@/lib/api"
 
 import { GlobeView } from "@/components/globe/globe-view"
@@ -167,102 +167,131 @@ export function DashboardShell() {
         className={`absolute inset-0 z-10 px-6 pt-24 pb-6 pointer-events-none`}
         onClick={activeView !== "overview" ? handleOpsBackdropClick : undefined}
       >
-        {/* Persistent sidebar — always visible */}
+        {/* Persistent sidebar — single container, always visible */}
         <div
           data-ops-panel
-          className="pointer-events-auto absolute left-6 top-24 bottom-24 z-30 flex"
+          className={cn(
+            "pointer-events-auto absolute left-6 top-24 bottom-24 z-30 flex flex-col rounded-2xl border border-white/10 bg-card/60 backdrop-blur-xl overflow-hidden transition-all duration-300 ease-in-out",
+            activeView === "overview" && !leftPanelCollapsed ? "w-[280px]" : "w-[48px]"
+          )}
         >
-          {/* Icon strip */}
-          <div
-            className={cn(
-              "flex w-[48px] flex-col items-center gap-1 border border-white/10 bg-card/60 py-3 backdrop-blur-xl",
-              activeView === "overview" && !leftPanelCollapsed
-                ? "rounded-l-2xl border-r-0"
-                : "rounded-2xl"
-            )}
-          >
-            {SIDEBAR_TABS.map((tab) => {
-              const Icon = tab.icon
-              const isActive = activeView === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    if (tab.id === "overview") {
-                      setActiveView("overview")
-                      if (leftPanelCollapsed) toggleLeftPanel()
-                    } else {
-                      setActiveView(tab.id)
-                    }
-                  }}
-                  className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
-                    isActive
-                      ? tab.id === "adversary-detail"
-                        ? "bg-red-500/10 text-red-400"
-                        : "bg-white/[0.10] text-foreground"
-                      : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
-                  )}
-                  title={tab.label}
-                >
-                  <Icon className="h-4 w-4" />
-                </button>
-              )
-            })}
-
-            {/* Collapse/expand toggle (overview only) */}
-            {activeView === "overview" && (
-              <button
-                type="button"
-                onClick={toggleLeftPanel}
-                className="mt-auto flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
-                aria-label={leftPanelCollapsed ? "Expand panel" : "Collapse panel"}
-              >
-                {leftPanelCollapsed ? (
-                  <ChevronRight className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                )}
-              </button>
-            )}
-          </div>
-
-          {/* Expanded content panel (overview + expanded only) */}
-          {activeView === "overview" && !leftPanelCollapsed && (
-            <div className="flex w-[232px] flex-col rounded-r-2xl border border-l-0 border-white/10 bg-card/60 backdrop-blur-xl overflow-hidden">
-              {/* Header */}
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5">
+          {activeView === "overview" && !leftPanelCollapsed ? (
+            /* ── Expanded: header + icon gutter / content side-by-side ── */
+            <>
+              {/* Header bar */}
+              <div className="flex shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2">
                 <Brain className="h-4 w-4 shrink-0 text-cyan-400" />
-                <span className="truncate text-[11px] font-semibold uppercase tracking-wider text-gray-300">
+                <span className="truncate flex-1 text-[11px] font-semibold uppercase tracking-wider text-gray-300">
                   Intel Panel
                 </span>
+                <button
+                  type="button"
+                  onClick={toggleLeftPanel}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                  aria-label="Collapse panel"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
               </div>
-              {/* Search + demo */}
-              <div className="shrink-0 px-3 pt-2 pb-1 overflow-hidden">
-                <div className="flex items-center gap-2 min-w-0">
-                  <SatelliteSearch className="min-w-0 flex-1" />
-                  <DemoSelector className="shrink-0" />
+
+              {/* Body: icon gutter + content */}
+              <div className="flex min-h-0 flex-1">
+                {/* Icon gutter */}
+                <div className="flex w-[48px] shrink-0 flex-col items-center gap-1 border-r border-white/5 py-3">
+                  {SIDEBAR_TABS.map((tab) => {
+                    const Icon = tab.icon
+                    const isActive = activeView === tab.id
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveView(tab.id)}
+                        className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                          isActive
+                            ? tab.id === "adversary-detail"
+                              ? "bg-red-500/10 text-red-400"
+                              : "bg-white/[0.10] text-foreground"
+                            : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
+                        )}
+                        title={tab.label}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Content column */}
+                <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                  <div className="shrink-0 px-3 pt-2 pb-1 overflow-hidden">
+                    <SatelliteSearch className="min-w-0" />
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <InsightsCard className="h-full w-full rounded-none border-0 bg-transparent shadow-none backdrop-blur-none" />
+                  </div>
+                  {/* Adversary Tracker link */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveView("adversary-detail")}
+                    className="mx-3 mb-3 flex items-center gap-2.5 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-left transition-all hover:bg-red-500/10 hover:border-red-500/30"
+                  >
+                    <Target className="h-4 w-4 shrink-0 text-red-400" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold text-foreground">Adversary Tracker</p>
+                      <p className="text-[9px] text-muted-foreground">5 threats monitored</p>
+                    </div>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                  </button>
                 </div>
               </div>
-              {/* Insights */}
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <InsightsCard className="h-full w-full rounded-none border-0 bg-transparent shadow-none backdrop-blur-none" />
+            </>
+          ) : (
+            /* ── Collapsed: just icon strip ── */
+            <>
+              <div className="flex flex-1 flex-col items-center justify-center gap-1 py-3">
+                {SIDEBAR_TABS.map((tab) => {
+                  const Icon = tab.icon
+                  const isActive = activeView === tab.id
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        if (tab.id === "overview") {
+                          setActiveView("overview")
+                          if (leftPanelCollapsed) toggleLeftPanel()
+                        } else {
+                          setActiveView(tab.id)
+                        }
+                      }}
+                      className={cn(
+                        "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                        isActive
+                          ? tab.id === "adversary-detail"
+                            ? "bg-red-500/10 text-red-400"
+                            : "bg-white/[0.10] text-foreground"
+                          : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
+                      )}
+                      title={tab.label}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </button>
+                  )
+                })}
               </div>
-              {/* Adversary Tracker link */}
-              <button
-                type="button"
-                onClick={() => setActiveView("adversary-detail")}
-                className="mx-3 mb-3 flex items-center gap-2.5 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-left transition-all hover:bg-red-500/10 hover:border-red-500/30"
-              >
-                <Target className="h-4 w-4 shrink-0 text-red-400" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold text-foreground">Adversary Tracker</p>
-                  <p className="text-[9px] text-muted-foreground">5 threats monitored</p>
-                </div>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
-              </button>
-            </div>
+              {/* Expand toggle — only in overview */}
+              {activeView === "overview" && (
+                <button
+                  type="button"
+                  onClick={toggleLeftPanel}
+                  className="mx-auto mb-3 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                  aria-label="Expand panel"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -305,6 +334,24 @@ export function DashboardShell() {
             {activeView === "adversary-detail" && <AdversaryOps />}
           </div>
         )}
+      </div>
+
+      {/* Bottom-left: Cinematic flyover + Demo selector */}
+      <div className="pointer-events-none absolute bottom-0 left-0 z-20 flex items-center gap-2 p-6">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveView("overview")
+            useGlobeStore.getState().setCinematicActive(true)
+          }}
+          className="pointer-events-auto group flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-card/60 text-muted-foreground backdrop-blur-xl transition-all hover:scale-105 hover:border-white/20 hover:bg-card/80 hover:text-foreground"
+          title="Cinematic flyover"
+        >
+          <Video className="h-4 w-4 transition-transform group-hover:scale-110" />
+        </button>
+        <div className="pointer-events-auto">
+          <DemoSelector />
+        </div>
       </div>
     </main>
   );

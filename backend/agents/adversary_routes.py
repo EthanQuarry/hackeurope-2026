@@ -11,7 +11,7 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Body, Query, Request
 from fastapi.responses import StreamingResponse
 
 from agents.adversary_research_agent import AdversaryResearchAgent
@@ -121,6 +121,7 @@ async def adversary_research_stream(
     request: Request,
     norad_id: int = Query(..., description="NORAD catalog number of the satellite to research"),
     name: str = Query(default="", description="Optional satellite name hint"),
+    query: str = Query(default="", description="Optional follow-up research question"),
 ):
     """SSE endpoint that runs the adversary research agent and streams progress + results."""
 
@@ -132,43 +133,68 @@ async def adversary_research_stream(
 
         try:
             # Initial scan event
+            prefix = f'Follow-up: "{query}" — ' if query else ""
             yield _sse_line({
                 "type": "scan",
-                "text": f"Initiating deep research on NORAD {norad_id}" + (f" ({name})" if name else ""),
+                "text": f"{prefix}Initiating research on NORAD {norad_id}" + (f" ({name})" if name else ""),
             })
             await asyncio.sleep(0.1)
 
+            # ── Phase 1: Quick brief (catalog + 1 search + quick Claude) ──
             yield _sse_line({
                 "type": "context",
                 "agent": "adversary-research",
-                "text": "Querying Space-Track catalog and orbital history, searching Perplexity for OSINT...",
+                "text": "Generating preliminary brief from Space-Track catalog...",
             })
 
-            # Create and run the agent
-            agent = AdversaryResearchAgent(on_progress=on_progress)
+            brief_agent = AdversaryResearchAgent(on_progress=on_progress)
+            try:
+                brief_text = await brief_agent.brief(norad_id=norad_id, satellite_name=name)
 
-            # Run agent in background, periodically flush progress
-            task = asyncio.create_task(agent.run(norad_id=norad_id, satellite_name=name))
-
-            while not task.done():
-                # Flush any accumulated progress
+                # Flush brief-phase progress
                 while progress_events:
                     text = progress_events.pop(0)
-
-                    # Detect tool calls in progress text
                     if text.startswith("[Tool:"):
                         tool_name = text.split("]")[0].replace("[Tool: ", "")
-                        yield _sse_line({
-                            "type": "tool_call",
-                            "agent": "adversary-research",
-                            "tools": [tool_name],
-                        })
+                        yield _sse_line({"type": "tool_call", "agent": "adversary-research", "tools": [tool_name]})
                     else:
-                        yield _sse_line({
-                            "type": "reasoning",
-                            "agent": "adversary-research",
-                            "text": text,
-                        })
+                        yield _sse_line({"type": "reasoning", "agent": "adversary-research", "text": text})
+
+                # Emit the brief immediately so the frontend has something to show
+                yield _sse_line({
+                    "type": "brief",
+                    "agent": "adversary-research",
+                    "text": brief_text,
+                })
+            except Exception as exc:
+                logger.warning("Brief generation failed, continuing to full research: %s", exc)
+                yield _sse_line({
+                    "type": "reasoning",
+                    "agent": "adversary-research",
+                    "text": f"Brief unavailable — proceeding to full research...",
+                })
+
+            if await request.is_disconnected():
+                return
+
+            # ── Phase 2: Full deep research ──
+            yield _sse_line({
+                "type": "context",
+                "agent": "adversary-research",
+                "text": "Starting full deep research — querying orbital history, running OSINT searches...",
+            })
+
+            agent = AdversaryResearchAgent(on_progress=on_progress)
+            task = asyncio.create_task(agent.run(norad_id=norad_id, satellite_name=name, query=query))
+
+            while not task.done():
+                while progress_events:
+                    text = progress_events.pop(0)
+                    if text.startswith("[Tool:"):
+                        tool_name = text.split("]")[0].replace("[Tool: ", "")
+                        yield _sse_line({"type": "tool_call", "agent": "adversary-research", "tools": [tool_name]})
+                    else:
+                        yield _sse_line({"type": "reasoning", "agent": "adversary-research", "text": text})
 
                 if await request.is_disconnected():
                     task.cancel()
@@ -176,71 +202,23 @@ async def adversary_research_stream(
 
                 await asyncio.sleep(0.2)
 
-            # Get result
-            dossier = task.result()
+            # Get full dossier (now a markdown string)
+            dossier_text = task.result()
 
             # Flush remaining progress
             while progress_events:
                 text = progress_events.pop(0)
                 if text.startswith("[Tool:"):
                     tool_name = text.split("]")[0].replace("[Tool: ", "")
-                    yield _sse_line({
-                        "type": "tool_call",
-                        "agent": "adversary-research",
-                        "tools": [tool_name],
-                    })
+                    yield _sse_line({"type": "tool_call", "agent": "adversary-research", "tools": [tool_name]})
                 else:
-                    yield _sse_line({
-                        "type": "reasoning",
-                        "agent": "adversary-research",
-                        "text": text,
-                    })
+                    yield _sse_line({"type": "reasoning", "agent": "adversary-research", "text": text})
 
-            # Emit the dossier as tool_result events
-            if isinstance(dossier, dict) and "raw_analysis" not in dossier:
-                # Successfully parsed dossier
-                # Emit key findings as individual events
-                if dossier.get("assessed_mission"):
-                    yield _sse_line({
-                        "type": "tool_result",
-                        "agent": "adversary-research",
-                        "tool": "mission_assessment",
-                        "summary": f"Assessed mission: {dossier['assessed_mission']} (confidence: {dossier.get('confidence', 0):.0%})",
-                    })
-                    await asyncio.sleep(0.1)
-
-                bh = dossier.get("behavioral_history", {})
-                if bh.get("total_maneuvers_detected"):
-                    yield _sse_line({
-                        "type": "tool_result",
-                        "agent": "adversary-research",
-                        "tool": "maneuver_analysis",
-                        "summary": f"{bh['total_maneuvers_detected']} maneuvers detected. {bh.get('behavioral_pattern', '')}",
-                    })
-                    await asyncio.sleep(0.1)
-
-                ta = dossier.get("threat_assessment", {})
-                if ta.get("threat_level"):
-                    yield _sse_line({
-                        "type": "intent",
-                        "classification": f"Threat level: {ta['threat_level'].upper()} (score: {ta.get('threat_score', 0)}/100)",
-                        "confidence": ta.get("threat_score", 0) / 100.0,
-                    })
-                    await asyncio.sleep(0.1)
-
-                    if ta.get("reasoning"):
-                        yield _sse_line({
-                            "type": "reasoning",
-                            "agent": "adversary-research",
-                            "text": ta["reasoning"],
-                        })
-                        await asyncio.sleep(0.1)
-
-            # Emit full dossier
+            # Emit the full dossier as plain text
             yield _sse_line({
                 "type": "dossier",
                 "agent": "adversary-research",
-                "data": dossier,
+                "text": dossier_text,
             })
 
             yield _sse_line({"type": "complete"})
@@ -272,7 +250,55 @@ async def adversary_research(
     norad_id: int = Query(..., description="NORAD catalog number"),
     name: str = Query(default="", description="Optional satellite name"),
 ):
-    """Run adversary research and return the full dossier as JSON."""
+    """Run adversary research and return the full dossier as text."""
     agent = AdversaryResearchAgent()
     dossier = await agent.run(norad_id=norad_id, satellite_name=name)
-    return dossier
+    return {"dossier": dossier}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/adversary/chat — AI chat about an adversary satellite
+# ---------------------------------------------------------------------------
+
+CHAT_SYSTEM_PROMPT = """You are a senior space-domain intelligence analyst. You answer questions about adversary satellites concisely and authoritatively.
+
+If the user has provided an existing intelligence dossier as context, use it to inform your answers. Reference specific data points from the dossier when relevant.
+
+If the question asks about something not covered in the dossier, say so and provide your best assessment based on general knowledge of the satellite program or operator.
+
+Keep responses focused and under 300 words. Use military/intelligence terminology where appropriate."""
+
+
+@router.post("/chat")
+async def adversary_chat(
+    norad_id: int = Query(..., description="NORAD catalog number"),
+    name: str = Query(default="", description="Satellite name"),
+    prompt: str = Query(..., description="User's question"),
+    dossier_context: str = Body(default="", media_type="text/plain"),
+):
+    """Answer a question about an adversary satellite using Claude, with optional dossier context."""
+    from app.agents.base_agent import _get_client, MODEL_ID, MAX_TOKENS
+
+    user_content = f"Satellite: {name} (NORAD {norad_id})\n\n"
+    if dossier_context:
+        user_content += f"Existing intelligence dossier:\n{dossier_context}\n\n"
+    user_content += f"Question: {prompt}"
+
+    try:
+        client = _get_client()
+        response = await asyncio.to_thread(
+            client.messages.create,
+            model=MODEL_ID,
+            max_tokens=MAX_TOKENS,
+            system=CHAT_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_content}],
+        )
+
+        text = "".join(
+            block.text for block in response.content if block.type == "text"
+        )
+        return {"response": text}
+
+    except Exception as exc:
+        logger.exception("Adversary chat failed")
+        return {"response": f"Error: {exc}"}
