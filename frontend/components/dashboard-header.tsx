@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Play, Pause, Shield, Crosshair, Radio, AlertTriangle, LayoutGrid, ChevronDown, Globe, Satellite } from "lucide-react"
+import { Play, Pause, Shield, Crosshair, Radio, AlertTriangle, LayoutGrid, ChevronDown, Globe } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { SPEED_PRESETS, PLANET_CONFIG } from "@/lib/constants"
@@ -23,7 +23,6 @@ const NAV_TABS: { id: ActiveView; label: string; icon: typeof LayoutGrid }[] = [
   { id: "proximity", label: "PROXIMITY", icon: Crosshair },
   { id: "signal", label: "SIGNAL", icon: Radio },
   { id: "anomaly", label: "ANOMALY", icon: AlertTriangle },
-  { id: "comms", label: "COMMS", icon: Satellite },
 ]
 
 function formatSimTime(ms: number): string {

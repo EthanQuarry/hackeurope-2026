@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   Target,
   Video,
+  Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -37,6 +38,7 @@ import { OrbitalOps } from "@/components/ops/orbital-ops";
 import { AdversaryOps } from "@/components/ops/adversary-ops";
 import { FleetRiskOps } from "@/components/ops/fleet-risk-ops";
 import { AgentOps } from "@/components/ops/agent-ops";
+import { TrackedSatellitesBar } from "@/components/tracked-satellites-bar";
 import { useFleetRiskAccumulator } from "@/hooks/use-fleet-risk-accumulator";
 import { useAgentTrigger } from "@/hooks/use-agent-trigger";
 import { useAgentOpsStore } from "@/stores/agent-ops-store";
@@ -119,6 +121,8 @@ export function DashboardShell() {
   useAgentTrigger();
 
   const agentPending = useAgentOpsStore((s) => s.pendingThreat);
+  const fullAutonomy = useAgentOpsStore((s) => s.fullAutonomy);
+  const setFullAutonomy = useAgentOpsStore((s) => s.setFullAutonomy);
 
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -491,21 +495,53 @@ export function DashboardShell() {
         )}
       </div>
 
-      {/* Bottom-left: Cinematic flyover + Demo selector */}
-      <div className="pointer-events-none absolute bottom-0 left-0 z-20 flex items-center gap-2 p-6">
-        <button
-          type="button"
-          onClick={() => {
-            setActiveView("overview");
-            useGlobeStore.getState().setCinematicActive(true);
-          }}
-          className="pointer-events-auto group flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-card/60 text-muted-foreground backdrop-blur-xl transition-all hover:scale-105 hover:border-white/20 hover:bg-card/80 hover:text-foreground"
-          title="Cinematic flyover"
-        >
-          <Video className="h-4 w-4 transition-transform group-hover:scale-110" />
-        </button>
-        <div className="pointer-events-auto">
-          <DemoSelector />
+      {/* Bottom bar: Tracked satellites + controls */}
+      <div className="pointer-events-none absolute bottom-0 inset-x-0 z-20 flex items-end gap-3 px-6 pb-4">
+        {/* Left: Cinematic flyover + Demo selector */}
+        <div className="pointer-events-none flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveView("overview");
+              useGlobeStore.getState().setCinematicActive(true);
+            }}
+            className="pointer-events-auto group flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-card/60 text-muted-foreground backdrop-blur-xl transition-all hover:scale-105 hover:border-white/20 hover:bg-card/80 hover:text-foreground"
+            title="Cinematic flyover"
+          >
+            <Video className="h-4 w-4 transition-transform group-hover:scale-110" />
+          </button>
+          <div className="pointer-events-auto">
+            <DemoSelector />
+          </div>
+          {/* Full Autonomy toggle */}
+          <button
+            type="button"
+            onClick={() => setFullAutonomy(!fullAutonomy)}
+            className={cn(
+              "pointer-events-auto group flex items-center gap-2 rounded-xl border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider backdrop-blur-xl transition-all",
+              fullAutonomy
+                ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-300 shadow-lg shadow-cyan-500/10 hover:bg-cyan-500/20"
+                : "border-white/10 bg-card/60 text-gray-500 hover:border-white/20 hover:bg-card/80 hover:text-gray-300",
+            )}
+            title={fullAutonomy ? "Full autonomy enabled — agent will auto-execute" : "Enable full autonomy"}
+          >
+            <Zap className={cn("h-3.5 w-3.5 transition-colors", fullAutonomy && "text-cyan-400 animate-pulse")} />
+            <span>AUTO</span>
+            <div className={cn(
+              "relative h-4 w-8 rounded-full transition-colors",
+              fullAutonomy ? "bg-cyan-500/40" : "bg-white/10",
+            )}>
+              <div className={cn(
+                "absolute top-0.5 h-3 w-3 rounded-full transition-all",
+                fullAutonomy ? "left-4 bg-cyan-400 shadow-lg shadow-cyan-400/50" : "left-0.5 bg-gray-500",
+              )} />
+            </div>
+          </button>
+        </div>
+
+        {/* Centre: Tracked satellites bar */}
+        <div className="min-w-0 flex-1">
+          <TrackedSatellitesBar />
         </div>
       </div>
     </main>

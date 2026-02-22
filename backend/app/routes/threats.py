@@ -466,7 +466,7 @@ async def get_orbital_similarity_threats():
             div, posterior = score_orbital_similarity(
                 foreign["altitude_km"], foreign["inclination_deg"],
                 target["altitude_km"], target["inclination_deg"],
-                "CIS",
+                foreign.get("country_code", "UNK"),
             )
 
             if div > 0.8:
@@ -493,6 +493,8 @@ async def get_orbital_similarity_threats():
 
             ft = foreign["trajectory"][0] if foreign["trajectory"] else None
 
+            tt = target["trajectory"][0] if target["trajectory"] else None
+
             threats.append({
                 "id": f"osim-{len(threats) + 1}",
                 "foreignSatId": foreign["id"],
@@ -509,6 +511,18 @@ async def get_orbital_similarity_threats():
                     {"lat": ft["lat"], "lon": ft["lon"], "altKm": foreign["altitude_km"]}
                     if ft else {"lat": 0.0, "lon": 0.0, "altKm": foreign["altitude_km"]}
                 ),
+                "foreignOrbit": {
+                    "altitudeKm": round(foreign["altitude_km"], 1),
+                    "inclinationDeg": round(foreign["inclination_deg"], 2),
+                    "periodMin": round(foreign.get("period_min", 0), 1),
+                    "velocityKms": round(foreign.get("velocity_kms", 0), 2),
+                },
+                "targetOrbit": {
+                    "altitudeKm": round(target["altitude_km"], 1),
+                    "inclinationDeg": round(target["inclination_deg"], 2),
+                    "periodMin": round(target.get("period_min", 0), 1),
+                    "velocityKms": round(target.get("velocity_kms", 0), 2),
+                },
             })
 
     severity_order = {"threatened": 0, "watched": 1, "nominal": 2}
