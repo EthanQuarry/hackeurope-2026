@@ -1117,7 +1117,7 @@ export function AgentOps() {
   const rs = riskStyle(activeSession.threatLevel)
 
   return (
-    <div className="mx-auto h-full w-full max-w-[1600px]">
+    <div className="mr-auto h-full w-full max-w-[480px]">
       <div
         data-ops-panel
         className="pointer-events-auto relative flex h-full flex-col overflow-hidden rounded-xl border border-red-500/20 bg-card/90 shadow-lg shadow-red-500/5 backdrop-blur-xl font-mono"

@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react"
 import { useFleetRiskStore } from "@/stores/fleet-risk-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { useFleetStore } from "@/stores/fleet-store"
-import { useGlobeStore } from "@/stores/globe-store"
 import { useAgentOpsStore } from "@/stores/agent-ops-store"
 import { DEMO_USA245_ID } from "@/lib/demo-trajectories"
 import type {
@@ -61,11 +60,9 @@ export function useAgentTrigger(): void {
     if (activeSession || pendingThreat) return
     if (satellites.length === 0) return
 
-    const activeDemo = useGlobeStore.getState().activeDemo
-
     for (const sat of satellites) {
-      // During malicious manoeuvre demo, only USA-245 can trigger the agent
-      if (activeDemo === "malicious-manoeuvre" && sat.id !== DEMO_USA245_ID) continue
+      // Only USA-245 can trigger the autonomous agent panel
+      if (sat.id !== DEMO_USA245_ID) continue
 
       const timeline = timelines[sat.id]
       if (!timeline || timeline.snapshots.length === 0) continue
