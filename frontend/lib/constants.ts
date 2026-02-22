@@ -18,13 +18,22 @@ export const DISPLAY_DEBRIS_LIMIT = 2500
 /** Bayesian posterior threshold above which a satellite is visually flagged */
 export const PROXIMITY_FLAG_THRESHOLD = 0.3
 
-/** Threat severity colors — tech/military palette */
+/** Proximity reference thresholds (km) — for display context */
+export const PROXIMITY_THREAT_KM = 50
+export const PROXIMITY_NOMINAL_KM = 200
+
+/** Signal interception reference (0–1) — threat >40%, nominal <10% */
+export const SIGNAL_THREAT_PCT = 0.4
+export const SIGNAL_NOMINAL_PCT = 0.1
+
+/** Threat severity colors — friendly=green, watched=blue, threatened=orange+pulse, threat=red */
 export const THREAT_COLORS = {
-  allied: { text: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40", hex: "#4488ff" },
-  nominal: { text: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40", hex: "#00e5ff" },
-  watched: { text: "text-amber-300", bg: "bg-amber-500/15", border: "border-amber-500/40", hex: "#ff9100" },
-  threatened: { text: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", hex: "#ff1744" },
+  allied: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
+  nominal: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
   friendly: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
+  watched: { text: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40", hex: "#4488ff" },
+  threatened: { text: "text-amber-400", bg: "bg-amber-500/15", border: "border-amber-500/40", hex: "#ff9100" },
+  threat: { text: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", hex: "#ff1744" },
 } as const
 
 export type ThreatSeverity = keyof typeof THREAT_COLORS

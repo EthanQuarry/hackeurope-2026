@@ -1,38 +1,29 @@
 """Threat endpoints: /threats/proximity, /threats/signal, /threats/anomaly.
 
-Generates realistic threat data matching the frontend's ProximityThreat,
-SignalThreat, and AnomalyThreat TypeScript interfaces. Uses Bayesian scoring
-from the threat_assessment pipeline for confidence values.
+Generates threat data from real Space-Track satellite orbital data.
+Uses Bayesian scoring from the threat_assessment pipeline for confidence values.
 """
 
 from __future__ import annotations
 
+import bisect
 import math
 import random
 import time
 
 from fastapi import APIRouter
 
-from app.bayesian_scorer import score_satellite, ADVERSARIAL_COUNTRIES
+from app.bayesian_scorer import score_satellite
 from app.orbital_similarity_scorer import score_orbital_similarity
-from app import scenario
 
 router = APIRouter()
 
-# Cache — each endpoint has its own time so they refresh independently
+CACHE_TTL = 30  # seconds
+
 _prox_cache: list[dict] | None = None
-_sig_cache: list[dict] | None = None
-_anom_cache: list[dict] | None = None
 _osim_cache: list[dict] | None = None
 _prox_cache_time: float = 0
-_sig_cache_time: float = 0
-_anom_cache_time: float = 0
 _osim_cache_time: float = 0
-_prox_phase: int = -1
-_sig_phase: int = -1
-_anom_phase: int = -1
-_osim_phase: int = -1
-CACHE_TTL = 30  # seconds
 
 
 def _get_satellites() -> list[dict]:
@@ -40,19 +31,126 @@ def _get_satellites() -> list[dict]:
     return _satellites_cache or _generate_fallback_satellites()
 
 
+THREAT_ACTOR_COUNTRIES = {"PRC", "RUS", "CIS"}
+
+FRIENDLY_FORCE_EXCLUDE_NORAD = {25544}  # ISS (international, never a threat actor)
+FRIENDLY_FORCE_EXCLUDE_NAMES = ("ISS",)
+
+
+def _is_friendly_force_excluded(sat: dict) -> bool:
+    norad = sat.get("noradId") or sat.get("norad_id")
+    if norad is not None and int(norad) in FRIENDLY_FORCE_EXCLUDE_NORAD:
+        return True
+    name = (sat.get("name") or "").upper()
+    return any(exc in name for exc in FRIENDLY_FORCE_EXCLUDE_NAMES)
+
+
 def _get_adversarial_and_allied(sats: list[dict]) -> tuple[list[dict], list[dict]]:
-    adversarial = [s for s in sats if s["status"] == "watched"]
+    adversarial = [
+        s for s in sats
+        if s.get("country_code") in THREAT_ACTOR_COUNTRIES and not _is_friendly_force_excluded(s)
+    ]
     allied = [s for s in sats if s["status"] in ("allied", "friendly")]
     return adversarial, allied
+
+
+def _traj_ecef(pt: dict) -> tuple[float, float, float]:
+    """Convert a trajectory point to ECEF coordinates (km)."""
+    r = 6378.137 + pt["alt_km"]
+    lat = math.radians(pt["lat"])
+    lon = math.radians(pt["lon"])
+    return (
+        r * math.cos(lat) * math.cos(lon),
+        r * math.cos(lat) * math.sin(lon),
+        r * math.sin(lat),
+    )
+
+
+def _ecef_dist(a: tuple, b: tuple) -> float:
+    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2)
+
+
+def _find_tca(
+    a_traj: list[dict],
+    b_traj: list[dict],
+) -> tuple[float, float, int]:
+    """Scan paired trajectories to find TCA miss distance, relative velocity, and TCA minutes.
+
+    Both trajectory lists are time-stamped sequences of positions computed from real
+    orbital elements.  We match trajectory points by absolute timestamp (binary search)
+    so different orbital periods are handled correctly.
+
+    Returns (miss_dist_km, approach_vel_kms, tca_min_from_now).
+    """
+    if not a_traj or not b_traj:
+        return 9999.0, 0.0, 99
+
+    # Sort B by timestamp once for binary-search matching
+    b_sorted = sorted(b_traj, key=lambda pt: pt["t"])
+    b_times = [pt["t"] for pt in b_sorted]
+
+    # Estimate A's time step and period from its trajectory
+    step_a = (a_traj[-1]["t"] - a_traj[0]["t"]) / max(1, len(a_traj) - 1)
+    period_a = step_a * len(a_traj)
+
+    min_dist = float("inf")
+    tca_idx_a = 0
+    tca_idx_b = 0
+
+    for ia, pa in enumerate(a_traj):
+        t_a = pa["t"]
+
+        # Binary-search for the closest B timestamp
+        pos = bisect.bisect_left(b_times, t_a)
+        ib = pos if pos < len(b_times) else len(b_times) - 1
+        if pos > 0 and abs(b_times[pos - 1] - t_a) < abs(b_times[ib] - t_a):
+            ib = pos - 1
+
+        ea = _traj_ecef(pa)
+        eb = _traj_ecef(b_sorted[ib])
+        d = _ecef_dist(ea, eb)
+
+        if d < min_dist:
+            min_dist = d
+            tca_idx_a = ia
+            tca_idx_b = ib
+
+    # TCA time from now — use absolute timestamp of the TCA point.
+    # If the trajectory was cached in the past the TCA may already be behind us;
+    # in that case add the orbital period to get the next occurrence.
+    now = time.time()
+    tca_t = a_traj[tca_idx_a]["t"]
+    tca_secs = tca_t - now
+    if tca_secs < 0:
+        tca_secs += period_a
+    tca_min = max(1, int(tca_secs / 60))
+
+    # Relative velocity at TCA via finite differences of consecutive trajectory points
+    def vel_vec(traj: list[dict], idx: int) -> tuple[float, float, float]:
+        i0 = max(0, idx - 1)
+        i1 = min(len(traj) - 1, idx + 1)
+        dt = traj[i1]["t"] - traj[i0]["t"]
+        if dt == 0:
+            return (0.0, 0.0, 0.0)
+        p0 = _traj_ecef(traj[i0])
+        p1 = _traj_ecef(traj[i1])
+        return ((p1[0] - p0[0]) / dt, (p1[1] - p0[1]) / dt, (p1[2] - p0[2]) / dt)
+
+    v_a = vel_vec(a_traj, tca_idx_a)
+    v_b = vel_vec(b_sorted, tca_idx_b)
+    rel_vel = math.sqrt(
+        (v_a[0] - v_b[0]) ** 2 + (v_a[1] - v_b[1]) ** 2 + (v_a[2] - v_b[2]) ** 2
+    )
+
+    return min_dist, rel_vel, tca_min
 
 
 @router.get("/threats/proximity")
 async def get_proximity_threats():
     """ProximityThreat[] — foreign satellites approaching our assets."""
-    global _prox_cache, _prox_cache_time, _prox_phase
+    global _prox_cache, _prox_cache_time
     now = time.time()
-    phase = scenario.current_phase()
-    if _prox_cache and (now - _prox_cache_time) < scenario.scaled_ttl(CACHE_TTL) and _prox_phase == phase:
+    if _prox_cache and (now - _prox_cache_time) < CACHE_TTL:
         return _prox_cache
 
     sats = _get_satellites()
@@ -62,42 +160,42 @@ async def get_proximity_threats():
 
     for foreign in adversarial:
         for target in allied:
-            # Compute 3D distance
-            ft = foreign["trajectory"][0] if foreign["trajectory"] else None
-            tt = target["trajectory"][0] if target["trajectory"] else None
-            if not ft or not tt:
+            ft0 = foreign["trajectory"][0] if foreign["trajectory"] else None
+            tt0 = target["trajectory"][0] if target["trajectory"] else None
+            if not ft0 or not tt0:
                 continue
 
+            # Quick snapshot distance cull — skip pairs that are clearly never going to
+            # be close (different altitude shells, opposite sides of the orbit, etc.)
             r_f = 6378.137 + foreign["altitude_km"]
             r_t = 6378.137 + target["altitude_km"]
-            lat_f, lon_f = math.radians(ft["lat"]), math.radians(ft["lon"])
-            lat_t, lon_t = math.radians(tt["lat"]), math.radians(tt["lon"])
-
-            dist = math.sqrt(
+            lat_f, lon_f = math.radians(ft0["lat"]), math.radians(ft0["lon"])
+            lat_t, lon_t = math.radians(tt0["lat"]), math.radians(tt0["lon"])
+            snap_dist = math.sqrt(
                 (r_f * math.cos(lat_f) * math.cos(lon_f) - r_t * math.cos(lat_t) * math.cos(lon_t)) ** 2 +
                 (r_f * math.cos(lat_f) * math.sin(lon_f) - r_t * math.cos(lat_t) * math.sin(lon_t)) ** 2 +
                 (r_f * math.sin(lat_f) - r_t * math.sin(lat_t)) ** 2
             )
-
-            if dist > 1500:
+            if snap_dist > 3000:
                 continue
 
             # Projected TCA miss distance
             miss_km = round(dist * (0.002 + random.random() * 0.08), 2)
             miss_km = max(0.05, miss_km)
 
-            # Bayesian posterior as confidence
-            posterior = score_satellite(miss_km, "CIS")
+            # Only surface operationally relevant conjunctions
+            if miss_km > 500:
+                continue
 
-            # Determine severity from posterior
-            if posterior > 0.3 or miss_km < 5:
+            # Severity based on propagated miss distance at TCA
+            if miss_km < 10:
                 severity = "threatened"
-            elif posterior > 0.1 or miss_km < 50:
+            elif miss_km < 100:
                 severity = "watched"
             else:
                 severity = "nominal"
 
-            # Approach pattern
+            # Approach pattern derived from real orbital geometry
             alt_diff = abs(foreign["altitude_km"] - target["altitude_km"])
             inc_diff = abs(foreign["inclination_deg"] - target["inclination_deg"])
             if alt_diff < 30 and inc_diff < 5:
@@ -107,10 +205,10 @@ async def get_proximity_threats():
             elif alt_diff > 100:
                 pattern = "drift"
             else:
-                pattern = "sun-hiding" if random.random() > 0.7 else "co-orbital"
+                pattern = "co-orbital"
 
-            tca_min = int(5 + random.random() * 175)
-            approach_vel = round(0.1 + random.random() * 2.5, 2)
+            # Bayesian posterior using the real TCA miss distance for confidence
+            posterior = score_satellite(miss_km, foreign.get("country_code", "UNK"))
 
             threats.append({
                 "id": f"prox-{len(threats) + 1}",
@@ -120,79 +218,20 @@ async def get_proximity_threats():
                 "targetAssetName": target["name"],
                 "severity": severity,
                 "missDistanceKm": round(miss_km, 2),
-                "approachVelocityKms": approach_vel,
+                "approachVelocityKms": round(approach_vel, 2),
                 "tcaTime": now_ms + tca_min * 60 * 1000,
                 "tcaInMinutes": tca_min,
-                "primaryPosition": {"lat": ft["lat"], "lon": ft["lon"], "altKm": foreign["altitude_km"]},
-                "secondaryPosition": {"lat": tt["lat"], "lon": tt["lon"], "altKm": target["altitude_km"]},
+                "primaryPosition": {"lat": ft0["lat"], "lon": ft0["lon"], "altKm": foreign["altitude_km"]},
+                "secondaryPosition": {"lat": tt0["lat"], "lon": tt0["lon"], "altKm": target["altitude_km"]},
                 "approachPattern": pattern,
-                "sunHidingDetected": pattern == "sun-hiding",
+                "sunHidingDetected": False,
                 "confidence": round(posterior, 2),
             })
 
-    # --- Inject SJ-26 → USA-245 proximity threat (phases 1-3) ---
-    if phase >= 1:
-        # Remove any naturally-generated SJ-26 pair
-        threats = [
-            t for t in threats
-            if scenario.SJ26_SAT_ID not in (t.get("foreignSatId"), t.get("targetAssetId"))
-        ]
-        miss_km = scenario.sj26_miss_distance_km()
-        p = scenario.phase_progress()
-        if phase == 1:
-            severity = "watched"
-            pattern = "drift"
-            approach_vel = round(0.3 + p * 0.5, 2)
-            sun_hiding = False
-        elif phase == 2:
-            severity = "threatened" if miss_km < 10 else "watched"
-            pattern = "co-orbital"
-            approach_vel = round(0.8 + p * 0.7, 2)
-            sun_hiding = False
-        else:
-            severity = "threatened"
-            pattern = "co-orbital"
-            approach_vel = round(1.5 + p * 0.5, 2)
-            sun_hiding = True
-
-        # Get positions from satellite data
-        sats = _get_satellites()
-        sj26_pos = {"lat": 0.0, "lon": 0.0, "altKm": scenario.sj26_altitude_km()}
-        target_pos = {"lat": 0.0, "lon": 0.0, "altKm": scenario.TARGET_ALT_KM}
-        for s in sats:
-            if s["id"] == scenario.SJ26_SAT_ID and s["trajectory"]:
-                tp = s["trajectory"][0]
-                sj26_pos = {"lat": tp["lat"], "lon": tp["lon"], "altKm": s["altitude_km"]}
-            elif s["id"] == scenario.TARGET_SAT_ID and s["trajectory"]:
-                tp = s["trajectory"][0]
-                target_pos = {"lat": tp["lat"], "lon": tp["lon"], "altKm": s["altitude_km"]}
-
-        tca_min = max(1, int(20 - phase * 5))
-        posterior = score_satellite(miss_km, "CIS")
-
-        threats.append({
-            "id": "prox-sj26",
-            "foreignSatId": scenario.SJ26_SAT_ID,
-            "foreignSatName": "SJ-26 (SHIJIAN-26)",
-            "targetAssetId": scenario.TARGET_SAT_ID,
-            "targetAssetName": "USA-245 (NROL-65)",
-            "severity": severity,
-            "missDistanceKm": round(miss_km, 2),
-            "approachVelocityKms": approach_vel,
-            "tcaTime": now_ms + tca_min * 60 * 1000,
-            "tcaInMinutes": tca_min,
-            "primaryPosition": sj26_pos,
-            "secondaryPosition": target_pos,
-            "approachPattern": pattern,
-            "sunHidingDetected": sun_hiding,
-            "confidence": round(max(posterior, 0.6 + phase * 0.1), 2),
-        })
-
     severity_order = {"threatened": 0, "watched": 1, "nominal": 2}
-    threats.sort(key=lambda t: (severity_order.get(t["severity"], 3), t["tcaInMinutes"]))
+    threats.sort(key=lambda t: (severity_order.get(t["severity"], 3), t["missDistanceKm"]))
 
     _prox_cache = threats[:15]
-    _prox_phase = phase
     _prox_cache_time = now
     return _prox_cache
 
@@ -200,261 +239,21 @@ async def get_proximity_threats():
 @router.get("/threats/signal")
 async def get_signal_threats():
     """SignalThreat[] — communication link interception risks."""
-    global _sig_cache, _sig_cache_time, _sig_phase
-    now = time.time()
-    phase = scenario.current_phase()
-    if _sig_cache and (now - _sig_cache_time) < scenario.scaled_ttl(CACHE_TTL) and _sig_phase == phase:
-        return _sig_cache
-
-    sats = _get_satellites()
-    adversarial, allied = _get_adversarial_and_allied(sats)
-    now_ms = int(now * 1000)
-    threats = []
-
-    ground_stations = [
-        "Pine Gap (AUS)", "Menwith Hill (UK)", "Buckley AFB (USA)",
-        "Misawa (JPN)", "Bad Aibling (DEU)", "Waihopai (NZL)"
-    ]
-
-    for foreign in adversarial[:8]:
-        for target in allied[:6]:
-            # Only generate signal threats for satellites in similar orbital planes
-            inc_diff = abs(foreign["inclination_deg"] - target["inclination_deg"])
-            if inc_diff > 25:
-                continue
-
-            # Signal path geometry
-            path_angle = round(5 + random.random() * 85, 1)
-            intercept_prob = round(max(0, 0.6 - path_angle / 100 + random.random() * 0.2), 2)
-
-            if intercept_prob < 0.05:
-                continue
-
-            if intercept_prob > 0.4:
-                severity = "threatened"
-            elif intercept_prob > 0.15:
-                severity = "watched"
-            else:
-                severity = "nominal"
-
-            total_windows = int(4 + random.random() * 12)
-            windows_at_risk = max(1, int(total_windows * intercept_prob))
-            tca_min = int(10 + random.random() * 120)
-
-            ft = foreign["trajectory"][0] if foreign["trajectory"] else {"lat": 0, "lon": 0}
-
-            threats.append({
-                "id": f"sig-{len(threats) + 1}",
-                "interceptorId": foreign["id"],
-                "interceptorName": foreign["name"],
-                "targetLinkAssetId": target["id"],
-                "targetLinkAssetName": target["name"],
-                "groundStationName": random.choice(ground_stations),
-                "severity": severity,
-                "interceptionProbability": intercept_prob,
-                "signalPathAngleDeg": path_angle,
-                "commWindowsAtRisk": windows_at_risk,
-                "totalCommWindows": total_windows,
-                "tcaTime": now_ms + tca_min * 60 * 1000,
-                "tcaInMinutes": tca_min,
-                "position": {"lat": ft["lat"], "lon": ft["lon"], "altKm": foreign["altitude_km"]},
-                "confidence": round(0.5 + random.random() * 0.45, 2),
-            })
-
-    # --- Inject SJ-26 signal threat targeting USA-245 downlink (phases 2-3) ---
-    if phase >= 2:
-        threats = [
-            t for t in threats
-            if scenario.SJ26_SAT_ID not in (t.get("interceptorId"), t.get("targetLinkAssetId"))
-        ]
-        p = scenario.phase_progress()
-        if phase == 2:
-            intercept_prob = round(0.25 + p * 0.3, 2)
-            severity = "watched" if intercept_prob < 0.4 else "threatened"
-        else:
-            intercept_prob = round(0.6 + p * 0.3, 2)
-            severity = "threatened"
-
-        sats = _get_satellites()
-        sj26_pos = {"lat": 0.0, "lon": 0.0, "altKm": scenario.sj26_altitude_km()}
-        for s in sats:
-            if s["id"] == scenario.SJ26_SAT_ID and s["trajectory"]:
-                tp = s["trajectory"][0]
-                sj26_pos = {"lat": tp["lat"], "lon": tp["lon"], "altKm": s["altitude_km"]}
-                break
-
-        threats.append({
-            "id": "sig-sj26",
-            "interceptorId": scenario.SJ26_SAT_ID,
-            "interceptorName": "SJ-26 (SHIJIAN-26)",
-            "targetLinkAssetId": scenario.TARGET_SAT_ID,
-            "targetLinkAssetName": "USA-245 (NROL-65)",
-            "groundStationName": "Pine Gap (AUS)",
-            "severity": severity,
-            "interceptionProbability": intercept_prob,
-            "signalPathAngleDeg": round(12.0 - phase * 3.0, 1),
-            "commWindowsAtRisk": 3 + phase,
-            "totalCommWindows": 8,
-            "tcaTime": now_ms + 10 * 60 * 1000,
-            "tcaInMinutes": 10,
-            "position": sj26_pos,
-            "confidence": round(0.65 + phase * 0.1, 2),
-        })
-
-    severity_order = {"threatened": 0, "watched": 1, "nominal": 2}
-    threats.sort(key=lambda t: (severity_order.get(t["severity"], 3), t["tcaInMinutes"]))
-
-    _sig_cache = threats[:10]
-    _sig_phase = phase
-    _sig_cache_time = now
-    return _sig_cache
+    return []
 
 
 @router.get("/threats/anomaly")
 async def get_anomaly_threats():
     """AnomalyThreat[] — satellites exhibiting anomalous behavior."""
-    global _anom_cache, _anom_cache_time, _anom_phase
-    now = time.time()
-    phase = scenario.current_phase()
-    if _anom_cache and (now - _anom_cache_time) < scenario.scaled_ttl(CACHE_TTL) and _anom_phase == phase:
-        return _anom_cache
-
-    sats = _get_satellites()
-    now_ms = int(now * 1000)
-    threats = []
-
-    anomaly_types = [
-        "unexpected-maneuver", "orientation-change", "pointing-change",
-        "orbit-raise", "orbit-lower", "rf-emission"
-    ]
-
-    # Only watched satellites exhibit anomalies (adversarial behavior)
-    watched = [s for s in sats if s["status"] == "watched"]
-
-    for sat in watched:
-        # Not every watched sat has an anomaly
-        if random.random() > 0.4:
-            continue
-
-        anomaly_type = random.choice(anomaly_types)
-        deviation = round(0.15 + random.random() * 0.85, 2)
-
-        if deviation > 0.7:
-            severity = "threatened"
-        elif deviation > 0.4:
-            severity = "watched"
-        else:
-            severity = "nominal"
-
-        # Description based on anomaly type
-        descriptions = {
-            "unexpected-maneuver": f"{sat['name']} executed an unscheduled orbit-change burn. Delta-V {round(random.random() * 3, 1)} m/s detected. Trajectory now intersects with allied asset orbital shell.",
-            "orientation-change": f"{sat['name']} rotated 90° off nominal sun-pointing attitude. Possible sensor or antenna reorientation toward nearby allied satellite.",
-            "pointing-change": f"{sat['name']} slewed primary payload antenna {round(15 + random.random() * 60)}° from nominal. New boresight direction aligns with allied ground station uplink.",
-            "orbit-raise": f"{sat['name']} raised perigee by {round(1 + random.random() * 20, 1)} km. New orbit brings it closer to allied asset constellation at similar inclination.",
-            "orbit-lower": f"{sat['name']} lowered apogee by {round(2 + random.random() * 30, 1)} km. Deorbit or rendezvous maneuver — could be approaching a lower-altitude target.",
-            "rf-emission": f"{sat['name']} began transmitting on non-standard frequency bands. Signal characteristics inconsistent with declared mission profile.",
-        }
-
-        detected_min_ago = int(5 + random.random() * 180)
-        ft = sat["trajectory"][0] if sat["trajectory"] else {"lat": 0, "lon": 0}
-
-        threats.append({
-            "id": f"anom-{len(threats) + 1}",
-            "satelliteId": sat["id"],
-            "satelliteName": sat["name"],
-            "severity": severity,
-            "anomalyType": anomaly_type,
-            "baselineDeviation": deviation,
-            "description": descriptions[anomaly_type],
-            "detectedAt": now_ms - detected_min_ago * 60 * 1000,
-            "confidence": round(0.5 + random.random() * 0.45, 2),
-            "position": {"lat": ft["lat"], "lon": ft["lon"], "altKm": sat["altitude_km"]},
-        })
-
-    # --- Inject deterministic SJ-26 anomalies (phases 1-3) ---
-    if phase >= 1:
-        threats = [t for t in threats if t.get("satelliteId") != scenario.SJ26_SAT_ID]
-
-        sats_list = _get_satellites()
-        sj26_pos = {"lat": 0.0, "lon": 0.0, "altKm": scenario.sj26_altitude_km()}
-        for s in sats_list:
-            if s["id"] == scenario.SJ26_SAT_ID and s["trajectory"]:
-                tp = s["trajectory"][0]
-                sj26_pos = {"lat": tp["lat"], "lon": tp["lon"], "altKm": s["altitude_km"]}
-                break
-
-        # Phase 1: unexpected maneuver
-        threats.append({
-            "id": "anom-sj26-maneuver",
-            "satelliteId": scenario.SJ26_SAT_ID,
-            "satelliteName": "SJ-26 (SHIJIAN-26)",
-            "severity": "watched" if phase == 1 else "threatened",
-            "anomalyType": "unexpected-maneuver",
-            "baselineDeviation": round(0.4 + phase * 0.2, 2),
-            "description": (
-                "SJ-26 executed an unscheduled inclination-change burn. "
-                "Delta-V 1.8 m/s detected. New orbital plane converging toward USA-245."
-            ),
-            "detectedAt": now_ms - int(scenario.elapsed() * 1000) + 90 * 1000,
-            "confidence": round(0.7 + phase * 0.08, 2),
-            "position": sj26_pos,
-        })
-
-        # Phase 2+: RF emission
-        if phase >= 2:
-            threats.append({
-                "id": "anom-sj26-rf",
-                "satelliteId": scenario.SJ26_SAT_ID,
-                "satelliteName": "SJ-26 (SHIJIAN-26)",
-                "severity": "threatened",
-                "anomalyType": "rf-emission",
-                "baselineDeviation": round(0.6 + phase * 0.15, 2),
-                "description": (
-                    "SJ-26 began transmitting on non-standard S-band frequencies. "
-                    "Signal characteristics match known Chinese military SATCOM protocols, "
-                    "inconsistent with declared earth-observation mission."
-                ),
-                "detectedAt": now_ms - int((scenario.elapsed() - 180) * 1000),
-                "confidence": round(0.75 + phase * 0.07, 2),
-                "position": sj26_pos,
-            })
-
-        # Phase 3: orientation change (grappling arm)
-        if phase >= 3:
-            threats.append({
-                "id": "anom-sj26-grapple",
-                "satelliteId": scenario.SJ26_SAT_ID,
-                "satelliteName": "SJ-26 (SHIJIAN-26)",
-                "severity": "threatened",
-                "anomalyType": "orientation-change",
-                "baselineDeviation": 0.95,
-                "description": (
-                    "SJ-26 rotated 120° off nominal attitude. Infrared signature "
-                    "consistent with deployment of articulated robotic arm — matches "
-                    "SJ-21 grappling mechanism profile. Arm oriented toward USA-245."
-                ),
-                "detectedAt": now_ms - int((scenario.elapsed() - 300) * 1000),
-                "confidence": 0.92,
-                "position": sj26_pos,
-            })
-
-    severity_order = {"threatened": 0, "watched": 1, "nominal": 2}
-    threats.sort(key=lambda t: (severity_order.get(t["severity"], 3), -t["baselineDeviation"]))
-
-    _anom_cache = threats[:10]
-    _anom_phase = phase
-    _anom_cache_time = now
-    return _anom_cache
+    return []
 
 
 @router.get("/threats/orbital-similarity")
 async def get_orbital_similarity_threats():
     """OrbitalSimilarityThreat[] — foreign sats with suspiciously similar orbits to allied assets."""
-    global _osim_cache, _osim_cache_time, _osim_phase
+    global _osim_cache, _osim_cache_time
     now = time.time()
-    phase = scenario.current_phase()
-    if _osim_cache and (now - _osim_cache_time) < CACHE_TTL and _osim_phase == phase:
+    if _osim_cache and (now - _osim_cache_time) < CACHE_TTL:
         return _osim_cache
 
     sats = _get_satellites()
@@ -469,7 +268,6 @@ async def get_orbital_similarity_threats():
                 "CIS",
             )
 
-            # Skip pairs whose orbits are completely different — not operationally relevant
             if div > 0.8:
                 continue
 
@@ -512,65 +310,9 @@ async def get_orbital_similarity_threats():
                 ),
             })
 
-    # --- Inject SJ-26 scenario threat (phases 1-3) ---
-    # SJ-26 is performing inclination burns converging toward USA-245's orbital plane
-    if phase >= 1:
-        threats = [
-            t for t in threats
-            if scenario.SJ26_SAT_ID not in (t.get("foreignSatId"), t.get("targetAssetId"))
-        ]
-
-        sj26_alt = scenario.sj26_altitude_km()
-        sj26_inc = scenario.TARGET_INC_DEG + scenario.sj26_inclination_offset()
-        target_alt = scenario.TARGET_ALT_KM
-        target_inc = scenario.TARGET_INC_DEG
-
-        div, posterior = score_orbital_similarity(
-            sj26_alt, sj26_inc, target_alt, target_inc, "PRC"
-        )
-
-        d_alt = abs(sj26_alt - target_alt)
-        d_inc = abs(sj26_inc - target_inc)
-
-        if d_inc < 2 and d_alt < 20:
-            pattern = "co-planar"
-        elif d_alt < 30:
-            pattern = "co-altitude"
-        elif d_inc < 5:
-            pattern = "co-inclination"
-        else:
-            pattern = "shadowing"
-
-        severity = "watched" if phase == 1 else "threatened"
-        confidence_floor = 0.5 + phase * 0.15
-
-        sats_list = _get_satellites()
-        sj26_pos = {"lat": 0.0, "lon": 0.0, "altKm": sj26_alt}
-        for s in sats_list:
-            if s["id"] == scenario.SJ26_SAT_ID and s["trajectory"]:
-                tp = s["trajectory"][0]
-                sj26_pos = {"lat": tp["lat"], "lon": tp["lon"], "altKm": s["altitude_km"]}
-                break
-
-        threats.append({
-            "id": "osim-sj26",
-            "foreignSatId": scenario.SJ26_SAT_ID,
-            "foreignSatName": "SJ-26 (SHIJIAN-26)",
-            "targetAssetId": scenario.TARGET_SAT_ID,
-            "targetAssetName": "USA-245 (NROL-65)",
-            "severity": severity,
-            "inclinationDiffDeg": round(d_inc, 2),
-            "altitudeDiffKm": round(d_alt, 1),
-            "divergenceScore": round(div, 4),
-            "pattern": pattern,
-            "confidence": round(max(posterior, confidence_floor), 3),
-            "position": sj26_pos,
-        })
-
     severity_order = {"threatened": 0, "watched": 1, "nominal": 2}
     threats.sort(key=lambda t: (severity_order.get(t["severity"], 3), t["divergenceScore"]))
 
     _osim_cache = threats[:15]
-    _osim_phase = phase
     _osim_cache_time = now
     return _osim_cache

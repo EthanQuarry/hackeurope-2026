@@ -8,29 +8,23 @@ interface StatusDotProps {
 }
 
 const dotColorMap: Record<ThreatSeverity, string> = {
-  allied: "bg-blue-400",
-  nominal: "bg-cyan-400",
-  watched: "bg-amber-400",
-  threatened: "bg-red-400",
+  allied: "bg-emerald-400",
+  nominal: "bg-emerald-400",
   friendly: "bg-emerald-400",
-}
-
-const pulseColorMap: Record<ThreatSeverity, string> = {
-  allied: "bg-blue-400/50",
-  nominal: "bg-cyan-400/50",
-  watched: "bg-amber-400/50",
-  threatened: "bg-red-400/50",
-  friendly: "bg-emerald-400/50",
+  watched: "bg-blue-400",
+  threatened: "bg-amber-400",
+  threat: "bg-red-400",
 }
 
 export function StatusDot({ status, className, pulse = true }: StatusDotProps) {
+  const shouldPulse = pulse && status === "threatened"
   return (
     <span className={cn("relative inline-flex h-2 w-2", className)}>
-      {pulse && (
+      {shouldPulse && (
         <span
           className={cn(
             "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
-            pulseColorMap[status]
+            "bg-amber-400/50"
           )}
         />
       )}

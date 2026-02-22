@@ -21,11 +21,12 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { THREAT_COLORS } from "@/lib/constants"
+import { THREAT_COLORS, PROXIMITY_THREAT_KM, PROXIMITY_NOMINAL_KM, SIGNAL_THREAT_PCT, SIGNAL_NOMINAL_PCT } from "@/lib/constants"
 import { MOCK_SATELLITES } from "@/lib/mock-data"
 import { useUIStore } from "@/stores/ui-store"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
+import { useSatellitesWithDerivedStatus } from "@/hooks/use-derived-status"
 import { useCommsStore } from "@/stores/comms-store"
 import { useCommsStream } from "@/hooks/use-comms-stream"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -145,6 +146,18 @@ function formatDistance(km: number): string {
   return `${km.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} km`
 }
 
+type ThreatGroup = {
+  id: string
+  name: string
+  severity: "threat" | "threatened" | "watched" | "nominal"
+  threats: Array<{
+    type: "proximity" | "orbital" | "signal" | "anomaly"
+    data: ProximityThreat | OrbitalSimilarityThreat | SignalThreat | AnomalyThreat
+  }>
+}
+
+const SEVERITY_ORDER = { threat: 0, threatened: 1, watched: 2, nominal: 3 } as const
+
 function buildSatelliteContext(
   satellite: SatelliteData,
   threats: { proximity: ProximityThreat[]; signal: SignalThreat[]; anomaly: AnomalyThreat[]; orbital: OrbitalSimilarityThreat[] },
@@ -155,7 +168,9 @@ function buildSatelliteContext(
   ctx += ` Status: ${satellite.status}.`
   const total = threats.proximity.length + threats.signal.length + threats.anomaly.length + threats.orbital.length
   if (total > 0) {
-    ctx += ` Active threats (${total}):`
+    ctx += satellite.status === "threat"
+      ? ` Satellites threatened by this asset (${total}):`
+      : ` Active threats (${total}):`
     for (const pt of threats.proximity) {
       ctx += ` Proximity — ${pt.foreignSatName}, miss ${pt.missDistanceKm.toFixed(1)}km, TCA ${pt.tcaInMinutes}min, ${pt.approachPattern}.`
     }
@@ -206,6 +221,29 @@ function CmdRow({ label, value, alert }: { label: string; value: string; alert?:
     <div className="flex items-start justify-between gap-2">
       <span className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground shrink-0">{label}</span>
       <span className={cn("font-mono text-[8px] text-right", alert ? "text-amber-400 font-semibold" : "text-foreground")}>{value}</span>
+    </div>
+  )
+}
+
+function ThreatDetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/70">{label}</span>
+      <span className="font-mono text-[9px] tabular-nums text-foreground/80">{value}</span>
+    </div>
+  )
+}
+
+function ThreatConfidenceBar({ value }: { value: number }) {
+  const pct = Math.round(value * 100)
+  const color = pct >= 70 ? "#ff1744" : pct >= 40 ? "#ff9100" : "#4488ff"
+  return (
+    <div className="flex items-center gap-2 mt-1.5">
+      <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/70 shrink-0">Confidence</span>
+      <div className="flex-1 h-1 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="font-mono text-[9px] tabular-nums text-muted-foreground/70 w-7 text-right">{pct}%</span>
     </div>
   )
 }
@@ -262,116 +300,18 @@ function TranscriptionStages() {
   )
 }
 
-/* ── Threat Cards ── */
-
-function ProximityThreatCard({ threat }: { threat: ProximityThreat }) {
-  return (
-    <div className="rounded-md border border-border/30 bg-secondary/10 px-3 py-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-          <span className="font-mono text-[10px] font-medium text-foreground">{threat.foreignSatName}</span>
-        </div>
-        <ThreatBadge severity={threat.severity} />
-      </div>
-      <div className="mt-1.5 flex items-center gap-3">
-        <span className={cn("font-mono text-[9px] tabular-nums", threat.missDistanceKm < 5 ? "font-semibold text-red-400" : "text-muted-foreground")}>
-          {formatDistance(threat.missDistanceKm)}
-        </span>
-        <span className="font-mono text-[9px] tabular-nums text-muted-foreground">{formatTCA(threat.tcaInMinutes)}</span>
-        <span className="font-mono text-[8px] uppercase text-muted-foreground">{threat.approachPattern}</span>
-        {threat.sunHidingDetected && (
-          <span className="rounded bg-red-500/20 px-1 py-0.5 font-mono text-[8px] font-bold uppercase text-red-400">SUN-HIDE</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function SignalThreatCard({ threat }: { threat: SignalThreat }) {
-  return (
-    <div className="rounded-md border border-border/30 bg-secondary/10 px-3 py-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Radio className="h-3 w-3 text-muted-foreground" />
-          <span className="font-mono text-[10px] font-medium text-foreground">{threat.interceptorName}</span>
-        </div>
-        <ThreatBadge severity={threat.severity} />
-      </div>
-      <div className="mt-1.5 flex items-center gap-3">
-        <span className={cn("font-mono text-[9px] tabular-nums", threat.interceptionProbability > 0.5 ? "font-semibold text-red-400" : "text-muted-foreground")}>
-          {(threat.interceptionProbability * 100).toFixed(0)}% intercept
-        </span>
-        <span className="font-mono text-[9px] tabular-nums text-muted-foreground">{threat.commWindowsAtRisk}/{threat.totalCommWindows} windows</span>
-        <span className="font-mono text-[9px] text-muted-foreground">{threat.groundStationName}</span>
-      </div>
-    </div>
-  )
-}
-
-function AnomalyThreatCard({ threat }: { threat: AnomalyThreat }) {
-  return (
-    <div className="rounded-md border border-border/30 bg-secondary/10 px-3 py-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity className="h-3 w-3 text-muted-foreground" />
-          <span className="font-mono text-[10px] font-medium text-foreground">{threat.satelliteName}</span>
-        </div>
-        <ThreatBadge severity={threat.severity} />
-      </div>
-      <div className="mt-1.5 flex items-center gap-2">
-        <span className="rounded bg-secondary/50 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase text-muted-foreground">{threat.anomalyType.replace(/-/g, " ")}</span>
-        <span className="font-mono text-[9px] tabular-nums text-muted-foreground">{(threat.baselineDeviation * 100).toFixed(0)}% deviation</span>
-      </div>
-    </div>
-  )
-}
-
-function OrbitalSimilarityThreatCard({ threat }: { threat: OrbitalSimilarityThreat }) {
-  return (
-    <div className="rounded-md border border-border/30 bg-secondary/10 px-3 py-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Orbit className="h-3 w-3 text-muted-foreground" />
-          <span className="font-mono text-[10px] font-medium text-foreground">{threat.foreignSatName}</span>
-        </div>
-        <ThreatBadge severity={threat.severity} />
-      </div>
-      <div className="mt-1.5 flex items-center gap-3">
-        <span className={cn("font-mono text-[9px] tabular-nums", threat.divergenceScore < 0.05 ? "font-semibold text-red-400" : "text-muted-foreground")}>
-          Δ{threat.divergenceScore.toFixed(3)}
-        </span>
-        <span className="font-mono text-[9px] tabular-nums text-muted-foreground">
-          inc ±{threat.inclinationDiffDeg.toFixed(1)}°
-        </span>
-        <span className="font-mono text-[9px] tabular-nums text-muted-foreground">
-          alt ±{threat.altitudeDiffKm.toFixed(0)}km
-        </span>
-        <span className={cn(
-          "rounded px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase",
-          threat.pattern === "co-planar" ? "bg-red-500/20 text-red-400" : "bg-secondary/50 text-muted-foreground",
-        )}>
-          {threat.pattern}
-        </span>
-      </div>
-      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/5">
-        <div className="h-full rounded-full bg-primary/50 transition-all" style={{ width: `${threat.confidence * 100}%` }} />
-      </div>
-    </div>
-  )
-}
-
 /* ═══════════════════════════════════════════════════════
    Main Component — 3-column mission hub
    ═══════════════════════════════════════════════════════ */
 
 export function SatelliteDetailPage() {
   const setActiveView = useUIStore((s) => s.setActiveView)
+  const selectSatellite = useFleetStore((s) => s.selectSatellite)
+  const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
 
   /* ── Fleet ── */
   const selectedId = useFleetStore((s) => s.selectedSatelliteId)
-  const storeSats = useFleetStore((s) => s.satellites)
-  const satellites = storeSats.length > 0 ? storeSats : MOCK_SATELLITES
+  const satellites = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
   const satellite = satellites.find((s) => s.id === selectedId)
 
   /* ── Threats filtered for this satellite ── */
@@ -385,7 +325,7 @@ export function SatelliteDetailPage() {
     [allProximity, selectedId],
   )
   const signalThreats = useMemo(
-    () => allSignal.filter((t) => t.targetLinkAssetId === selectedId),
+    () => allSignal.filter((t) => t.targetLinkAssetId === selectedId || t.interceptorId === selectedId),
     [allSignal, selectedId],
   )
   const anomalyThreats = useMemo(
@@ -396,7 +336,94 @@ export function SatelliteDetailPage() {
     () => allOrbitalSimilarity.filter((t) => t.targetAssetId === selectedId || t.foreignSatId === selectedId),
     [allOrbitalSimilarity, selectedId],
   )
-  const totalThreats = proximityThreats.length + signalThreats.length + anomalyThreats.length + orbitalSimilarityThreats.length
+  const isThreatActor = satellite?.status === "threat"
+  const totalThreats = isThreatActor
+    ? proximityThreats.filter((t) => t.foreignSatId === selectedId).length +
+      signalThreats.filter((t) => t.interceptorId === selectedId).length +
+      orbitalSimilarityThreats.filter((t) => t.foreignSatId === selectedId).length
+    : proximityThreats.length + signalThreats.length + anomalyThreats.length + orbitalSimilarityThreats.length
+
+  const THREAT_ACTOR_COUNTRIES = new Set(["PRC", "RUS", "CIS"])
+  const threatGroups = useMemo(() => {
+    const map = new Map<string, ThreatGroup>()
+    const add = (
+      id: string,
+      name: string,
+      severity: string,
+      type: ThreatGroup["threats"][0]["type"],
+      data: ProximityThreat | OrbitalSimilarityThreat | SignalThreat | AnomalyThreat,
+    ) => {
+      let sev = severity
+      if (sev === "watched") {
+        const cp = satellites.find((s) => s.id === id)
+        if (!cp || !THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")) {
+          sev = "threatened"
+        }
+      }
+      if (sev === "nominal" && id !== "__self") {
+        const cp = satellites.find((s) => s.id === id)
+        if (cp && THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")) {
+          sev = "threat"
+        }
+      }
+      const existing = map.get(id)
+      const entry = { type, data }
+      if (existing) {
+        existing.threats.push(entry)
+        const s = sev as keyof typeof SEVERITY_ORDER
+        const exSev = existing.severity as keyof typeof SEVERITY_ORDER
+        if (SEVERITY_ORDER[s] < SEVERITY_ORDER[exSev]) {
+          existing.severity = sev as ThreatGroup["severity"]
+        }
+      } else {
+        map.set(id, { id, name, severity: sev as ThreatGroup["severity"], threats: [entry] })
+      }
+    }
+    for (const t of proximityThreats) {
+      const cpId = t.foreignSatId === selectedId ? t.targetAssetId : t.foreignSatId
+      const cpName = t.foreignSatId === selectedId ? t.targetAssetName : t.foreignSatName
+      const counterpartyIsActor = t.targetAssetId === selectedId
+      const cp = satellites.find((s) => s.id === cpId)
+      const sev = isThreatActor
+        ? "threatened"
+        : counterpartyIsActor && cp && THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")
+          ? "threat"
+          : t.severity
+      add(cpId, cpName, sev, "proximity", t)
+    }
+    for (const t of orbitalSimilarityThreats) {
+      const cpId = t.foreignSatId === selectedId ? t.targetAssetId : t.foreignSatId
+      const cpName = t.foreignSatId === selectedId ? t.targetAssetName : t.foreignSatName
+      const counterpartyIsActor = t.targetAssetId === selectedId
+      const cp = satellites.find((s) => s.id === cpId)
+      const sev = isThreatActor
+        ? "threatened"
+        : counterpartyIsActor && cp && THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")
+          ? "threat"
+          : t.severity
+      add(cpId, cpName, sev, "orbital", t)
+    }
+    for (const t of signalThreats) {
+      const cpId = t.interceptorId === selectedId ? t.targetLinkAssetId : t.interceptorId
+      const cpName = t.interceptorId === selectedId ? t.targetLinkAssetName : t.interceptorName
+      const counterpartyIsActor = t.targetLinkAssetId === selectedId
+      const cp = satellites.find((s) => s.id === cpId)
+      const sev = isThreatActor
+        ? "threatened"
+        : counterpartyIsActor && cp && THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")
+          ? "threat"
+          : t.severity
+      add(cpId, cpName, sev, "signal", t)
+    }
+    if (!isThreatActor) {
+      for (const t of anomalyThreats) {
+        add("__self", "This satellite", "threatened", "anomaly", t)
+      }
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => SEVERITY_ORDER[a.severity as keyof typeof SEVERITY_ORDER] - SEVERITY_ORDER[b.severity as keyof typeof SEVERITY_ORDER],
+    )
+  }, [proximityThreats, orbitalSimilarityThreats, signalThreats, anomalyThreats, selectedId, isThreatActor, satellites])
 
   /* ── Comms ── */
   const { sendCommand } = useCommsStream()
@@ -545,7 +572,7 @@ export function SatelliteDetailPage() {
   const lastPoint = satellite.trajectory[satellite.trajectory.length - 1]
 
   return (
-    <div className="grid h-full w-full grid-cols-[20rem_1fr_20rem] gap-3">
+    <div className="grid h-full w-full grid-cols-[18rem_18rem_1fr_20rem] gap-3">
 
       {/* ═══ COLUMN 1 — Satellite Data ═══ */}
       <div data-ops-panel className="pointer-events-auto flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
@@ -627,108 +654,191 @@ export function SatelliteDetailPage() {
             </div>
           </div>
 
-          {/* Orbital Proximity */}
-          <div className="border-b border-border/40 px-4 py-3">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground">Orbital Proximity</span>
-              <span className={cn(
-                "rounded-sm px-1.5 py-0.5 font-mono text-[9px] font-bold tabular-nums",
-                orbitalSimilarityThreats.length > 0 ? "bg-amber-500/15 text-amber-400" : "bg-secondary/30 text-muted-foreground",
-              )}>
-                {orbitalSimilarityThreats.length}
-              </span>
-            </div>
-            {orbitalSimilarityThreats.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-3 text-center">
-                <Orbit className="mb-1.5 h-4 w-4 text-muted-foreground/30" />
-                <p className="font-mono text-[10px] text-muted-foreground/60">No co-orbital matches detected</p>
+        </ScrollArea>
+      </div>
+
+      {/* ═══ COLUMN 2 — Threats ═══ */}
+      <div data-ops-panel className="pointer-events-auto flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
+
+        {/* Header */}
+        <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-foreground flex-1">
+            {satellite.status === "threat" ? "Satellites Threatened" : "Active Threats"}
+          </span>
+          <span className={cn(
+            "rounded-sm px-1.5 py-0.5 font-mono text-[9px] font-bold tabular-nums",
+            totalThreats > 0 ? "bg-red-500/15 text-red-400" : "bg-secondary/30 text-muted-foreground",
+          )}>
+            {totalThreats}
+          </span>
+        </div>
+
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="px-4 py-3">
+            <p className="font-mono text-[8px] text-muted-foreground/70 mb-2">
+              Reference: threat &lt;{PROXIMITY_THREAT_KM} km · nominal &gt;{PROXIMITY_NOMINAL_KM} km
+            </p>
+            {totalThreats === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <AlertTriangle className="mb-2 h-4 w-4 text-muted-foreground/30" />
+                <p className="font-mono text-[10px] text-muted-foreground/60">
+                  {satellite.status === "threat" ? "No satellites threatened" : "No active threats"}
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
-                {orbitalSimilarityThreats.map((t) => (
-                  <div key={t.id} className="rounded-md border border-border/30 bg-secondary/10 px-3 py-2">
+                {threatGroups.map((group) => {
+                  const targetSat = satellites.find((s) => s.id === group.id)
+                  const handleSelectGroup = () => {
+                    if (group.id === "__self") return
+                    selectSatellite(group.id)
+                    const p = targetSat?.trajectory?.[0]
+                    if (p) setFocusTarget({ lat: p.lat, lon: p.lon, altKm: p.alt_km, satelliteId: group.id })
+                  }
+                  return (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={handleSelectGroup}
+                    disabled={group.id === "__self"}
+                    className={cn(
+                      "w-full rounded-md border border-border/30 bg-secondary/10 px-3 py-2 text-left transition-colors",
+                      group.id !== "__self" && "hover:border-border/60 hover:bg-secondary/20 cursor-pointer",
+                      group.id === "__self" && "cursor-default"
+                    )}
+                  >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Orbit className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-mono text-[10px] font-medium text-foreground">{t.foreignSatName}</span>
-                      </div>
-                      <ThreatBadge severity={t.severity} />
+                      <span className="font-mono text-[10px] font-medium text-foreground">{group.name}</span>
+                      <ThreatBadge severity={group.severity} />
                     </div>
-                    {/* Divergence bar */}
-                    <div className="mt-2 mb-1">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="font-mono text-[8px] text-muted-foreground">Divergence</span>
-                        <span className={cn("font-mono text-[9px] tabular-nums font-semibold", t.divergenceScore < 0.05 ? "text-red-400" : t.divergenceScore < 0.15 ? "text-amber-400" : "text-muted-foreground")}>
-                          {t.divergenceScore.toFixed(3)}
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
-                        <div
-                          className={cn("h-full rounded-full transition-all", t.divergenceScore < 0.05 ? "bg-red-500/70" : t.divergenceScore < 0.15 ? "bg-amber-500/70" : "bg-primary/40")}
-                          style={{ width: `${Math.max(5, 100 - t.divergenceScore * 200)}%` }}
-                        />
-                      </div>
+                    <div className="mt-2 space-y-3">
+                      {group.threats.map((entry, i) => {
+                        if (entry.type === "proximity") {
+                          const t = entry.data as ProximityThreat
+                          const patternLabel = t.approachPattern.replace(/-/g, " ")
+                          const miss = formatDistance(t.missDistanceKm)
+                          const tca = formatTCA(t.tcaInMinutes)
+                          const vel = `${t.approachVelocityKms.toFixed(1)} km/s`
+                          const target = t.targetAssetName
+                          const patternExplanations: Record<string, string> = {
+                            "co-orbital": `Tracking in the same orbital plane as ${target} at ${miss} separation. Co-orbital positioning is a known precursor to rendezvous, inspection, or grappling operations — it requires deliberate delta-V to establish and maintain.`,
+                            "drift": `Executing a passive drift approach toward ${target}. An altitude differential causes slow, continuous separation closure without thruster burns — making it difficult to classify as intentional. Closest pass ${tca} at ${miss}.`,
+                            "direct": `On a crossing trajectory with ${target} at ${vel} relative velocity. High relative velocity on a converging geometry is consistent with an intercept profile rather than a surveillance or shadowing posture.`,
+                            "sun-hiding": `Approaching ${target} from the solar direction (${miss} at ${tca}). Sun-hiding is a deliberate evasion technique — passive electro-optical sensors cannot image targets inbound from the sun direction, masking the approach until very close range.`,
+                          }
+                          const summary = patternExplanations[t.approachPattern] ?? `Conducting ${patternLabel} approach toward ${target} — closest pass ${tca} at ${miss}.`
+                          const severityCoda = t.severity === "threatened"
+                            ? ` Miss distance of ${miss} is within collision-hazard and close-inspection threshold.`
+                            : t.severity === "watched"
+                            ? " Continued monitoring required — within proximity operations range."
+                            : ""
+                          return (
+                            <div key={i} className="space-y-1.5 border-t border-border/20 pt-2 first:border-t-0 first:pt-0">
+                              <div className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/60">Proximity</div>
+                              <p className="font-mono text-[9px] text-foreground/70 leading-relaxed">{summary}{severityCoda}{t.sunHidingDetected && t.approachPattern !== "sun-hiding" && " Sun-hiding manoeuvre also detected."}</p>
+                              <div className="space-y-1 mt-1">
+                                <ThreatDetailRow label="Miss dist" value={formatDistance(t.missDistanceKm)} />
+                                <ThreatDetailRow label="TCA" value={formatTCA(t.tcaInMinutes)} />
+                                <ThreatDetailRow label="Approach vel" value={`${t.approachVelocityKms.toFixed(3)} km/s`} />
+                                <ThreatDetailRow label="Pattern" value={patternLabel} />
+                              </div>
+                              <ThreatConfidenceBar value={t.confidence} />
+                            </div>
+                          )
+                        }
+                        if (entry.type === "orbital") {
+                          const t = entry.data as OrbitalSimilarityThreat
+                          const patternLabel = t.pattern.replace(/-/g, " ")
+                          const target = t.targetAssetName
+                          const orbPatternExplanations: Record<string, string> = {
+                            "co-planar": `Orbital planes are nearly co-planar with ${target} (Δi ${t.inclinationDiffDeg.toFixed(1)}°, Δalt ${t.altitudeDiffKm.toFixed(0)} km). Achieving plane alignment requires significant delta-V investment — this is deliberate positioning, not coincidence.`,
+                            "co-altitude": `Matching altitude shell of ${target} (Δalt ${t.altitudeDiffKm.toFixed(0)} km) without full plane alignment. Station-keeping at the same altitude while drifting in RAAN is a common precursor to a future rendezvous window.`,
+                            "co-inclination": `Inclination closely matches ${target} (Δi ${t.inclinationDiffDeg.toFixed(1)}°). With matching inclination, natural RAAN drift over weeks will periodically bring the orbital planes into conjunction without further burns.`,
+                            "shadowing": `Orbital parameters closely mirror ${target} across both altitude (Δ${t.altitudeDiffKm.toFixed(0)} km) and inclination (Δ${t.inclinationDiffDeg.toFixed(1)}°). Divergence score ${t.divergenceScore.toFixed(3)} — the degree of similarity is inconsistent with an independent mission profile.`,
+                          }
+                          const summary = orbPatternExplanations[t.pattern] ?? `Orbital plane match consistent with ${patternLabel} shadowing of ${target}. Divergence score ${t.divergenceScore.toFixed(3)}.`
+                          return (
+                            <div key={i} className="space-y-1.5 border-t border-border/20 pt-2 first:border-t-0 first:pt-0">
+                              <div className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/60">Orbital Similarity</div>
+                              <p className="font-mono text-[9px] text-foreground/70 leading-relaxed">{summary}</p>
+                              <div className="space-y-1 mt-1">
+                                <ThreatDetailRow label="Divergence" value={t.divergenceScore.toFixed(4)} />
+                                <ThreatDetailRow label="Inclination Δ" value={`±${t.inclinationDiffDeg.toFixed(1)}°`} />
+                                <ThreatDetailRow label="Altitude Δ" value={`±${t.altitudeDiffKm.toFixed(0)} km`} />
+                                <ThreatDetailRow label="Pattern" value={patternLabel} />
+                              </div>
+                              <ThreatConfidenceBar value={t.confidence} />
+                            </div>
+                          )
+                        }
+                        if (entry.type === "signal") {
+                          const t = entry.data as SignalThreat
+                          const pct = (t.interceptionProbability * 100).toFixed(0)
+                          const riskLevel = t.interceptionProbability > 0.4 ? "high" : t.interceptionProbability > 0.15 ? "moderate" : "low"
+                          const summary = `In geometry to intercept ${t.commWindowsAtRisk} of ${t.totalCommWindows} uplink/downlink windows between ${t.targetLinkAssetName} and ${t.groundStationName}. Signal path angle ${t.signalPathAngleDeg.toFixed(1)}° gives a ${riskLevel} intercept probability (${pct}%). At this angle the satellite can passively collect command and telemetry without active jamming.`
+                          return (
+                            <div key={i} className="space-y-1.5 border-t border-border/20 pt-2 first:border-t-0 first:pt-0">
+                              <div className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/60">Signal Interception</div>
+                              <p className="font-mono text-[9px] text-foreground/70 leading-relaxed">{summary}</p>
+                              <div className="space-y-1 mt-1">
+                                <ThreatDetailRow label="Intercept prob" value={`${pct}%`} />
+                                <ThreatDetailRow label="Windows at risk" value={`${t.commWindowsAtRisk} / ${t.totalCommWindows}`} />
+                                <ThreatDetailRow label="Ground station" value={t.groundStationName} />
+                                <ThreatDetailRow label="Path angle" value={`${t.signalPathAngleDeg.toFixed(1)}°`} />
+                              </div>
+                              <ThreatConfidenceBar value={t.confidence} />
+                            </div>
+                          )
+                        }
+                        const t = entry.data as AnomalyThreat
+                        const typeLabel = t.anomalyType.replace(/-/g, " ")
+                        const detectedAgo = Math.round((Date.now() - t.detectedAt) / 60000)
+                        return (
+                          <div key={i} className="space-y-1.5 border-t border-border/20 pt-2 first:border-t-0 first:pt-0">
+                            <div className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/60">Anomalous Behavior</div>
+                            <p className="font-mono text-[9px] text-foreground/70 leading-relaxed">{t.description}</p>
+                            <div className="space-y-1 mt-1">
+                              <ThreatDetailRow label="Type" value={typeLabel} />
+                              <ThreatDetailRow label="Deviation" value={`${(t.baselineDeviation * 100).toFixed(0)}% from baseline`} />
+                              <ThreatDetailRow label="Detected" value={`${detectedAgo}m ago`} />
+                            </div>
+                            <ThreatConfidenceBar value={t.confidence} />
+                          </div>
+                        )
+                      })}
                     </div>
-                    {/* Orbital deltas */}
-                    <div className="mt-1.5 grid grid-cols-2 gap-x-3">
-                      <div>
-                        <span className="font-mono text-[8px] text-muted-foreground">Inclination Δ</span>
-                        <div className="font-mono text-[10px] tabular-nums text-foreground">±{t.inclinationDiffDeg.toFixed(2)}°</div>
-                      </div>
-                      <div>
-                        <span className="font-mono text-[8px] text-muted-foreground">Altitude Δ</span>
-                        <div className="font-mono text-[10px] tabular-nums text-foreground">±{t.altitudeDiffKm.toFixed(1)} km</div>
-                      </div>
-                    </div>
-                    {/* Pattern + confidence */}
-                    <div className="mt-1.5 flex items-center justify-between">
-                      <span className={cn(
-                        "rounded px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase",
-                        t.pattern === "co-planar" ? "bg-red-500/20 text-red-400" :
-                        t.pattern === "co-altitude" ? "bg-amber-500/20 text-amber-400" :
-                        "bg-secondary/50 text-muted-foreground",
-                      )}>
-                        {t.pattern}
-                      </span>
-                      <span className="font-mono text-[9px] tabular-nums text-muted-foreground">
-                        {(t.confidence * 100).toFixed(0)}% confidence
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  </button>
+                  )
+                })}
               </div>
             )}
-          </div>
-
-          {/* Active Threats */}
-          <div className="px-4 py-3">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground">Active Threats</span>
-              <span className={cn(
-                "rounded-sm px-1.5 py-0.5 font-mono text-[9px] font-bold tabular-nums",
-                totalThreats > 0 ? "bg-red-500/15 text-red-400" : "bg-secondary/30 text-muted-foreground",
-              )}>
-                {totalThreats}
-              </span>
-            </div>
-            {totalThreats === 0 ? (
-              <div className="flex flex-col items-center justify-center py-4 text-center">
-                <AlertTriangle className="mb-2 h-4 w-4 text-muted-foreground/30" />
-                <p className="font-mono text-[10px] text-muted-foreground/60">No active threats</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {proximityThreats.map((t) => <ProximityThreatCard key={t.id} threat={t} />)}
-                {orbitalSimilarityThreats.map((t) => <OrbitalSimilarityThreatCard key={t.id} threat={t} />)}
-                {signalThreats.map((t) => <SignalThreatCard key={t.id} threat={t} />)}
-                {anomalyThreats.map((t) => <AnomalyThreatCard key={t.id} threat={t} />)}
+            {isThreatActor && anomalyThreats.length > 0 && (
+              <div className="mt-3 border-t border-border/30 pt-3">
+                <div className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground mb-2">Anomalous Behavior</div>
+                <div className="space-y-3">
+                  {anomalyThreats.map((t, i) => {
+                    const typeLabel = t.anomalyType.replace(/-/g, " ")
+                    const detectedAgo = Math.round((Date.now() - t.detectedAt) / 60000)
+                    return (
+                      <div key={i} className="space-y-1.5">
+                        <p className="font-mono text-[9px] text-foreground/70 leading-relaxed">{t.description}</p>
+                        <div className="space-y-1">
+                          <ThreatDetailRow label="Type" value={typeLabel} />
+                          <ThreatDetailRow label="Deviation" value={`${(t.baselineDeviation * 100).toFixed(0)}% from baseline`} />
+                          <ThreatDetailRow label="Detected" value={`${detectedAgo}m ago`} />
+                        </div>
+                        <ThreatConfidenceBar value={t.confidence} />
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
         </ScrollArea>
       </div>
 
-      {/* ═══ COLUMN 2 — Command Centre ═══ */}
+      {/* ═══ COLUMN 3 — Command Centre ═══ */}
       <div data-ops-panel className="pointer-events-auto flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
 
         {/* Header */}
@@ -939,7 +1049,7 @@ export function SatelliteDetailPage() {
         </div>
       </div>
 
-      {/* ═══ COLUMN 3 — AI Assistant ═══ */}
+      {/* ═══ COLUMN 4 — AI Assistant ═══ */}
       <div data-ops-panel className="pointer-events-auto flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
 
         {/* Header */}

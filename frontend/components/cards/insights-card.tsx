@@ -4,7 +4,7 @@ import { ArrowUpRight, Brain, Lightbulb, ShieldAlert } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { THREAT_COLORS, type ThreatSeverity } from "@/lib/constants"
-import { MOCK_PROXIMITY_THREATS, MOCK_ANOMALY_THREATS } from "@/lib/mock-data"
+import { MOCK_PROXIMITY_THREATS } from "@/lib/mock-data"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface MiniCardProps {
@@ -79,16 +79,7 @@ export function InsightsCard({ className }: { className?: string }) {
                 Recommendations
               </h3>
             </div>
-            <div className="space-y-2">
-              {MOCK_ANOMALY_THREATS.map((threat) => (
-                <MiniCard
-                  key={threat.id}
-                  name={threat.satelliteName}
-                  description={threat.description}
-                  severity={threat.severity}
-                />
-              ))}
-            </div>
+            <p className="text-[11px] text-gray-500">No recommendations available.</p>
           </div>
         </div>
       </ScrollArea>

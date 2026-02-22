@@ -1,47 +1,34 @@
-"use client";
+"use client"
 
-import { useEffect, useMemo, useCallback, lazy, Suspense } from "react";
-import { api } from "@/lib/api";
+import { useMemo, useCallback } from "react"
 
-import { GlobeView } from "@/components/globe/globe-view";
-import { DashboardHeader } from "@/components/dashboard-header";
-import { InsightsCard } from "@/components/cards/insights-card";
-import { SatelliteCard } from "@/components/cards/satellite-card";
-import { AiChatBar } from "@/components/cards/ai-chat-bar";
-import { StatsCards } from "@/components/cards/stats-cards";
-import { SatelliteSearch } from "@/components/cards/satellite-search";
-import { DemoSelector } from "@/components/cards/demo-selector";
-import { ProximityOps } from "@/components/ops/proximity-ops";
-import { SignalOps } from "@/components/ops/signal-ops";
-import { AnomalyOps } from "@/components/ops/anomaly-ops";
-import { CommsOps } from "@/components/ops/comms-ops";
-const SatelliteDetailPage = lazy(() =>
-  import("@/components/satellite-detail-page").then((m) => ({
-    default: m.SatelliteDetailPage,
-  })),
-);
-import { useUIStore } from "@/stores/ui-store";
-import { useGlobeStore } from "@/stores/globe-store";
-import { useFleetStore } from "@/stores/fleet-store";
-import { useThreatStore } from "@/stores/threat-store";
-import { usePolling } from "@/hooks/use-polling";
-import { useScenarioSocket } from "@/hooks/use-scenario-socket";
+import { GlobeView } from "@/components/globe/globe-view"
+import { DashboardHeader } from "@/components/dashboard-header"
+import { InsightsCard } from "@/components/cards/insights-card"
+import { SatelliteCard } from "@/components/cards/satellite-card"
+import { AiChatBar } from "@/components/cards/ai-chat-bar"
+import { StatsCards } from "@/components/cards/stats-cards"
+import { SatelliteSearch } from "@/components/cards/satellite-search"
+import { ProximityOps } from "@/components/ops/proximity-ops"
+import { SignalOps } from "@/components/ops/signal-ops"
+import { AnomalyOps } from "@/components/ops/anomaly-ops"
+import { CommsOps } from "@/components/ops/comms-ops"
+import { OrbitalOps } from "@/components/ops/orbital-ops"
+import { SatelliteDetailPage } from "@/components/satellite-detail-page"
+import { useUIStore } from "@/stores/ui-store"
+import { useGlobeStore } from "@/stores/globe-store"
+import { useFleetStore } from "@/stores/fleet-store"
+import { useThreatStore } from "@/stores/threat-store"
+import { usePolling } from "@/hooks/use-polling"
+import { api } from "@/lib/api"
 import {
   MOCK_THREATS,
   MOCK_SATELLITES,
   MOCK_PROXIMITY_THREATS,
-  MOCK_SIGNAL_THREATS,
-  MOCK_ANOMALY_THREATS,
-} from "@/lib/mock-data";
-import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants";
-import type {
-  SatelliteData,
-  ThreatData,
-  DebrisData,
-  ProximityThreat,
-  SignalThreat,
-  AnomalyThreat,
-} from "@/types";
+  MOCK_ORBITAL_SIMILARITY_THREATS,
+} from "@/lib/mock-data"
+import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants"
+import type { SatelliteData, ThreatData, DebrisData, ProximityThreat, SignalThreat, AnomalyThreat, OrbitalSimilarityThreat } from "@/types"
 
 export function DashboardShell() {
   // Reset SJ-26 scenario on page load/refresh
@@ -81,20 +68,20 @@ export function DashboardShell() {
   const storeSignal = useThreatStore((s) => s.signalThreats);
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats);
 
-  // ── WebSocket: sole source for all threat data ──
-  // Pushes complete threat arrays (general + SJ-26) every tick.
-  // Tick rate scales with sim speed. No REST polling for threats.
-  useScenarioSocket();
-
-  // ── REST polling: satellites + debris only (large payloads, infrequent) ──
-  const orbitInterval = Math.max(1000, Math.round(10_000 / speed));
-  const debrisInterval = Math.max(2000, Math.round(DEBRIS_REFRESH_MS / speed));
+  // ── REST polling ──
+  const orbitInterval = Math.max(1000, Math.round(10_000 / speed))
+  const debrisInterval = Math.max(2000, Math.round(DEBRIS_REFRESH_MS / speed))
 
   usePolling<SatelliteData[]>({
-    url: `${api.satellites}?speed=${speed}`,
+    url: api.satellites,
     intervalMs: orbitInterval,
     onData: setSatellites,
-  });
+  })
+  usePolling<ThreatData[]>({
+    url: api.threats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setThreats,
+  })
   usePolling<DebrisData[]>({
     url: api.debris,
     intervalMs: debrisInterval,
@@ -118,12 +105,10 @@ export function DashboardShell() {
     onData: setAnomalyThreats,
   });
   // Use live data when available, fall back to mocks
-  const proximityThreats =
-    storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS;
-  const signalThreats =
-    storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS;
-  const anomalyThreats =
-    storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS;
+  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
+  const signalThreats = storeSignal
+  const anomalyThreats = storeAnomaly
+  const orbitalThreats = storeOrbital.length > 0 ? storeOrbital : MOCK_ORBITAL_SIMILARITY_THREATS
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
