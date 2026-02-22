@@ -352,14 +352,10 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const storeSatellites = useFleetStore((s) => s.satellites);
 
-  // Filter out allied satellites except scenario-critical ones (USA-245)
+  // Show all satellites — no filtering by status
   const allSatellites =
     storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES;
-  const satellites = useMemo(
-    () =>
-      allSatellites.filter((s) => s.status !== "allied" || s.id === "sat-6"),
-    [allSatellites],
-  );
+  const satellites = allSatellites;
   const activeDemo = useGlobeStore((s) => s.activeDemo);
 
   // Compute modified satellite list and the set of demo satellite IDs together
