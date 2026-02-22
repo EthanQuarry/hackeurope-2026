@@ -363,7 +363,17 @@ export function DashboardShell() {
             {activeView === "anomaly" && (
               <AnomalyOps threats={anomalyThreats} />
             )}
-            {activeView === "comms" && <CommsOps />}
+            {activeView === "comms" && (
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    Loading…
+                  </div>
+                }
+              >
+                <SatelliteDetailPage />
+              </Suspense>
+            )}
             {activeView === "satellite-detail" && (
               <Suspense
                 fallback={

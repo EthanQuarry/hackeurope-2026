@@ -6,7 +6,6 @@ import {
   Zap,
   CheckCircle2,
   AlertTriangle,
-  Database,
   Shield,
   Eye,
   Radio,
@@ -22,6 +21,18 @@ import {
   Search,
   Globe,
   Gauge,
+  Fuel,
+  Satellite,
+  BatteryCharging,
+  Signal,
+  Users,
+  Siren,
+  BarChart3,
+  Clock,
+  Flame,
+  ShieldAlert,
+  ArrowUpDown,
+  Radar,
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
@@ -34,58 +45,72 @@ import type {
   AgentThinkingLine,
   AgentResponseOption,
   AgentResponseTier,
-  AgentSession,
 } from "@/types"
 
-/* ── Phase descriptions — clear one-sentence title per step ── */
+/* ================================================================
+   Phase metadata — icon, title, subtitle for each pipeline step
+   ================================================================ */
 
-const STEP_DESCRIPTIONS: Record<AgentFlowStepId, { title: string; subtitle: string; icon: typeof AlertTriangle }> = {
+const STEP_META: Record<
+  AgentFlowStepId,
+  { title: string; subtitle: string; icon: typeof AlertTriangle; phaseNum: number }
+> = {
   "threshold-breach": {
+    phaseNum: 1,
     title: "Threat Threshold Breached",
     subtitle: "A satellite has crossed the risk threshold — identifying the threat source.",
     icon: AlertTriangle,
   },
   "deep-research-target": {
+    phaseNum: 2,
     title: "Researching Our Asset",
     subtitle: "Querying orbital status, health, and manoeuvre capability of the target satellite.",
     icon: Search,
   },
   "deep-research-threat": {
+    phaseNum: 3,
     title: "Researching the Threat",
     subtitle: "Investigating the foreign satellite's origin, behaviour, and capabilities.",
     icon: Target,
   },
   "geopolitical-analysis": {
+    phaseNum: 4,
     title: "Geopolitical Context",
     subtitle: "Assessing diplomatic relations, military activity, and regional intelligence.",
     icon: Globe,
   },
   "threat-assessment": {
+    phaseNum: 5,
     title: "Threat to US Intelligence",
     subtitle: "Computing the probability and severity of harm to national security assets.",
     icon: Gauge,
   },
   "response-selection": {
+    phaseNum: 6,
     title: "Selecting a Response",
     subtitle: "Evaluating four response protocols and recommending the safest effective action.",
     icon: Shield,
   },
 }
 
-/* ── Risk styling ─────────────────────────────────────── */
+/* ================================================================
+   Risk / status color palettes
+   ================================================================ */
 
-const RISK_COLORS: Record<string, { text: string; bg: string; border: string; glow: string }> = {
-  critical: { text: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", glow: "shadow-red-500/20" },
-  high: { text: "text-orange-400", bg: "bg-orange-500/15", border: "border-orange-500/40", glow: "shadow-orange-500/20" },
-  medium: { text: "text-yellow-400", bg: "bg-yellow-500/15", border: "border-yellow-500/40", glow: "shadow-yellow-500/20" },
-  low: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", glow: "shadow-emerald-500/20" },
+const RISK_COLORS: Record<string, { text: string; bg: string; border: string }> = {
+  critical: { text: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40" },
+  high: { text: "text-orange-400", bg: "bg-orange-500/15", border: "border-orange-500/40" },
+  medium: { text: "text-yellow-400", bg: "bg-yellow-500/15", border: "border-yellow-500/40" },
+  low: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40" },
 }
 
 function riskStyle(level: string) {
   return RISK_COLORS[level] ?? RISK_COLORS.medium
 }
 
-/* ── Scan lines ───────────────────────────────────────── */
+/* ================================================================
+   Scan lines background effect
+   ================================================================ */
 
 function ScanLines() {
   return (
@@ -101,26 +126,28 @@ function ScanLines() {
   )
 }
 
-/* ── Threat score HUD (larger for demo) ───────────────── */
+/* ================================================================
+   Threat score HUD ring (compact for header)
+   ================================================================ */
 
 function ThreatScoreHUD({ score }: { score: number }) {
   const pct = Math.min(100, Math.round(score * 100))
-  const circumference = 2 * Math.PI * 52
+  const circumference = 2 * Math.PI * 18
   const offset = circumference - (pct / 100) * circumference
 
   return (
     <div className="relative flex items-center justify-center">
-      <svg width="128" height="128" viewBox="0 0 128 128" className="drop-shadow-lg">
-        <circle cx="64" cy="64" r="52" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+      <svg width="48" height="48" viewBox="0 0 48 48">
+        <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
         <circle
-          cx="64" cy="64" r="52" fill="none"
-          stroke="url(#agentThreatGradient)" strokeWidth="5" strokeLinecap="round"
+          cx="24" cy="24" r="18" fill="none"
+          stroke="url(#agentHudGrad)" strokeWidth="3" strokeLinecap="round"
           strokeDasharray={circumference} strokeDashoffset={offset}
           className="transition-all duration-1000 ease-out"
-          transform="rotate(-90 64 64)"
+          transform="rotate(-90 24 24)"
         />
         <defs>
-          <linearGradient id="agentThreatGradient" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id="agentHudGrad" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#f59e0b" />
             <stop offset="50%" stopColor="#ef4444" />
             <stop offset="100%" stopColor="#dc2626" />
@@ -128,16 +155,15 @@ function ThreatScoreHUD({ score }: { score: number }) {
         </defs>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-4xl font-black tabular-nums text-red-400 drop-shadow-lg">
-          {pct}
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-red-400/60">THREAT %</span>
+        <span className="font-mono text-sm font-black tabular-nums text-red-400">{pct}</span>
       </div>
     </div>
   )
 }
 
-/* ── Confidence bar (larger) ──────────────────────────── */
+/* ================================================================
+   Confidence bar — visual fill + percentage
+   ================================================================ */
 
 function ConfidenceBar({ value, color = "cyan" }: { value: number; color?: string }) {
   const colorMap: Record<string, string> = {
@@ -150,81 +176,21 @@ function ConfidenceBar({ value, color = "cyan" }: { value: number; color?: strin
   const gradient = colorMap[color] ?? colorMap.cyan
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="h-2 flex-1 rounded-full bg-white/5 overflow-hidden">
+    <div className="flex items-center gap-2 w-full">
+      <div className="h-1.5 flex-1 rounded-full bg-white/5 overflow-hidden">
         <div
           className={cn("h-full rounded-full bg-gradient-to-r transition-all duration-700", gradient)}
           style={{ width: `${Math.round(value * 100)}%` }}
         />
       </div>
-      <span className="font-mono text-sm tabular-nums font-bold text-gray-300">{Math.round(value * 100)}%</span>
+      <span className="font-mono text-xs tabular-nums font-bold text-gray-400">{Math.round(value * 100)}%</span>
     </div>
   )
 }
 
-/* ── Step status icon (larger) ────────────────────────── */
-
-function StepStatusIcon({ status }: { status: AgentStepStatus }) {
-  switch (status) {
-    case "pending":
-      return (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-600/50 bg-gray-800/50">
-          <div className="h-2 w-2 rounded-full bg-gray-600" />
-        </div>
-      )
-    case "active":
-      return (
-        <div className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-cyan-500/60 bg-cyan-500/10">
-          <div className="h-3 w-3 rounded-full bg-cyan-400 animate-pulse" />
-          <div className="absolute inset-0 rounded-full border-2 border-cyan-400/30 animate-ping" />
-        </div>
-      )
-    case "complete":
-      return (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-500/10">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-        </div>
-      )
-    case "error":
-      return (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-red-500/60 bg-red-500/10">
-          <X className="h-4 w-4 text-red-400" />
-        </div>
-      )
-  }
-}
-
-/* ── Thinking line icon ───────────────────────────────── */
-
-function ThinkingLineIcon({ type }: { type: AgentThinkingLine["type"] }) {
-  const iconClass = "h-4 w-4 shrink-0"
-  switch (type) {
-    case "reasoning":
-      return <Brain className={cn(iconClass, "text-gray-400")} />
-    case "tool":
-      return <Zap className={cn(iconClass, "text-amber-400")} />
-    case "result":
-      return <CheckCircle2 className={cn(iconClass, "text-emerald-400")} />
-    case "warning":
-      return <AlertTriangle className={cn(iconClass, "text-red-400")} />
-    case "data":
-    default:
-      return <Database className={cn(iconClass, "text-cyan-400")} />
-  }
-}
-
-function thinkingLineColor(type: AgentThinkingLine["type"]): string {
-  switch (type) {
-    case "reasoning": return "text-gray-300"
-    case "tool": return "text-amber-300"
-    case "result": return "text-emerald-300"
-    case "warning": return "text-red-300"
-    case "data":
-    default: return "text-cyan-300"
-  }
-}
-
-/* ── Elapsed time ─────────────────────────────────────── */
+/* ================================================================
+   Elapsed time formatter
+   ================================================================ */
 
 function formatElapsed(startedAt: number | null, completedAt: number | null): string {
   if (!startedAt) return "--"
@@ -236,216 +202,291 @@ function formatElapsed(startedAt: number | null, completedAt: number | null): st
   return `${m}m ${s}s`
 }
 
-/* ── Response theme ───────────────────────────────────── */
+/* ================================================================
+   Data Card — a compact card showing icon + label + value
+   ================================================================ */
+
+type CardStatus = "good" | "warning" | "critical" | "neutral"
+
+interface DataCardProps {
+  icon: React.ReactNode
+  label: string
+  value: string
+  status?: CardStatus
+}
+
+const STATUS_STYLES: Record<CardStatus, { border: string; text: string; valueBg: string }> = {
+  good: { border: "border-emerald-500/30", text: "text-emerald-400", valueBg: "bg-emerald-500/10" },
+  warning: { border: "border-yellow-500/30", text: "text-yellow-400", valueBg: "bg-yellow-500/10" },
+  critical: { border: "border-red-500/30", text: "text-red-400", valueBg: "bg-red-500/10" },
+  neutral: { border: "border-white/10", text: "text-gray-300", valueBg: "bg-white/5" },
+}
+
+const DataCard = memo(function DataCard({ icon, label, value, status = "neutral" }: DataCardProps) {
+  const s = STATUS_STYLES[status]
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center gap-1.5 rounded-lg border px-4 py-3 min-w-[100px] max-w-[140px]",
+        s.border,
+        s.valueBg,
+      )}
+    >
+      <div className={cn("shrink-0", s.text)}>{icon}</div>
+      <span className="font-mono text-[10px] uppercase tracking-wider text-gray-500">{label}</span>
+      <span className={cn("font-mono text-sm font-bold tabular-nums", s.text)}>{value}</span>
+    </div>
+  )
+})
+
+/* ================================================================
+   Data card extraction — parse thinking lines into cards per phase
+   ================================================================ */
+
+function numericStatus(val: number, goodAbove: number, warnAbove: number): CardStatus {
+  if (val >= goodAbove) return "good"
+  if (val >= warnAbove) return "warning"
+  return "critical"
+}
+
+function extractNumber(lines: AgentThinkingLine[], pattern: RegExp): string | null {
+  for (const line of lines) {
+    const m = line.text.match(pattern)
+    if (m) return m[1]
+  }
+  return null
+}
+
+function extractText(lines: AgentThinkingLine[], pattern: RegExp): string | null {
+  for (const line of lines) {
+    const m = line.text.match(pattern)
+    if (m) return m[1]
+  }
+  return null
+}
+
+const iconClass = "h-5 w-5"
+
+function extractPhaseCards(step: AgentFlowStep, triggerRisk: number): DataCardProps[] {
+  const lines = step.thinkingLines
+  const cards: DataCardProps[] = []
+
+  switch (step.id) {
+    case "threshold-breach": {
+      const riskPct = extractNumber(lines, /risk level:\s*([\d.]+)%/i)
+      const cause = extractText(lines, /Trigger cause:\s*(.+)/i) ?? "Proximity"
+      const actor = extractText(lines, /threat actor:\s*([^\s(]+)/i) ?? "UNKNOWN"
+      const rVal = riskPct ? parseFloat(riskPct) : triggerRisk * 100
+      cards.push({
+        icon: <Target className={iconClass} />,
+        label: "Risk",
+        value: `${Math.round(rVal)}%`,
+        status: rVal > 75 ? "critical" : rVal > 50 ? "warning" : "good",
+      })
+      cards.push({
+        icon: <Radar className={iconClass} />,
+        label: "Cause",
+        value: cause.length > 14 ? cause.slice(0, 12) + ".." : cause,
+        status: "neutral",
+      })
+      cards.push({
+        icon: <Satellite className={iconClass} />,
+        label: "Actor",
+        value: actor.length > 14 ? actor.slice(0, 12) + ".." : actor,
+        status: "critical",
+      })
+      break
+    }
+
+    case "deep-research-target": {
+      const power = extractNumber(lines, /Power subsystem:\s*(\d+)%/i)
+      const comms = extractNumber(lines, /Comms:\s*(\d+)%/i)
+      const fuel = extractNumber(lines, /Propellant:\s*(\d+)%/i)
+      const mission = extractText(lines, /Mission status:\s*(\w+)/i) ?? "ACTIVE"
+      const deltaV = extractNumber(lines, /Available delta-V:\s*([\d.]+)/i)
+
+      if (power) {
+        const v = parseInt(power)
+        cards.push({ icon: <BatteryCharging className={iconClass} />, label: "Power", value: `${v}%`, status: numericStatus(v, 80, 50) })
+      }
+      if (comms) {
+        const v = parseInt(comms)
+        cards.push({ icon: <Signal className={iconClass} />, label: "Comms", value: `${v}%`, status: numericStatus(v, 80, 50) })
+      }
+      if (fuel) {
+        const v = parseInt(fuel)
+        cards.push({ icon: <Fuel className={iconClass} />, label: "Fuel", value: `${v}%`, status: numericStatus(v, 60, 30) })
+      }
+      cards.push({
+        icon: <Satellite className={iconClass} />,
+        label: "Mission",
+        value: mission.toUpperCase(),
+        status: mission.toUpperCase() === "ACTIVE" ? "good" : "warning",
+      })
+      if (deltaV) {
+        const v = parseFloat(deltaV)
+        cards.push({ icon: <Flame className={iconClass} />, label: "Delta-V", value: `${v} m/s`, status: v > 40 ? "good" : v > 20 ? "warning" : "critical" })
+      }
+      break
+    }
+
+    case "deep-research-threat": {
+      const operator = extractText(lines, /Operator:\s*(.+?)(?:\s*—|$)/i)
+      const approach = extractText(lines, /classified as "([^"]+)"/i) ?? extractText(lines, /Approach pattern.*?(\w+[-\w]*)/i)
+      const tca = extractNumber(lines, /TCA in (\d+) minutes/i)
+      const ew = extractText(lines, /EW capability assessment:\s*(\w+)/i)
+      const asat = extractNumber(lines, /Match confidence:\s*(\d+)%/i)
+
+      if (operator) {
+        const short = operator.length > 14 ? operator.split(" ").slice(0, 2).join(" ") : operator
+        cards.push({ icon: <Users className={iconClass} />, label: "Operator", value: short, status: "critical" })
+      }
+      if (approach) {
+        cards.push({ icon: <ArrowUpDown className={iconClass} />, label: "Approach", value: approach, status: "warning" })
+      }
+      if (tca) {
+        const v = parseInt(tca)
+        cards.push({ icon: <Clock className={iconClass} />, label: "TCA", value: `${v} min`, status: v < 30 ? "critical" : v < 60 ? "warning" : "neutral" })
+      }
+      if (ew) {
+        cards.push({ icon: <Zap className={iconClass} />, label: "EW Cap.", value: ew, status: ew === "HIGH" ? "critical" : "warning" })
+      }
+      if (asat) {
+        const v = parseInt(asat)
+        cards.push({ icon: <ShieldAlert className={iconClass} />, label: "ASAT Match", value: `${v}%`, status: v > 80 ? "critical" : v > 60 ? "warning" : "neutral" })
+      }
+      break
+    }
+
+    case "geopolitical-analysis": {
+      const diplo = extractText(lines, /Diplomatic relations:\s*(\w+)/i)
+      const exercises = extractNumber(lines, /(\d+) active military exercises/i)
+      const defcon = extractText(lines, /readiness:\s*(\w+(?:\s*\([^)]*\))?)/i)
+      const allied = extractNumber(lines, /(\d+) allied space assets/i)
+
+      if (diplo) {
+        cards.push({ icon: <Globe className={iconClass} />, label: "Diplomacy", value: diplo, status: diplo === "STRAINED" ? "critical" : "warning" })
+      }
+      if (exercises) {
+        const v = parseInt(exercises)
+        cards.push({ icon: <Siren className={iconClass} />, label: "Mil. Activity", value: `${v} exercises`, status: v > 2 ? "critical" : "warning" })
+      }
+      if (defcon) {
+        const isEnhanced = defcon.includes("ENHANCED") || defcon.includes("2")
+        cards.push({ icon: <ShieldAlert className={iconClass} />, label: "SPACECOM", value: isEnhanced ? "LEVEL 2" : "LEVEL 3", status: isEnhanced ? "critical" : "warning" })
+      }
+      if (allied) {
+        const v = parseInt(allied)
+        cards.push({ icon: <Users className={iconClass} />, label: "Allied Assets", value: `${v} nearby`, status: v > 4 ? "good" : "warning" })
+      }
+      break
+    }
+
+    case "threat-assessment": {
+      const bayesian = extractText(lines, /Posterior:\s*([\d.]+)/i)
+      const intent = extractNumber(lines, /Intent score:\s*(\d+)/i)
+      const impact = extractText(lines, /Impact if asset compromised:\s*(\w+)/i)
+      const urgency = extractText(lines, /Urgency:\s*(\w+)/i)
+
+      if (bayesian) {
+        const v = parseFloat(bayesian)
+        const pct = Math.round(v * 100)
+        cards.push({ icon: <BarChart3 className={iconClass} />, label: "Bayesian Prob", value: `${pct}%`, status: v > 0.75 ? "critical" : v > 0.5 ? "warning" : "neutral" })
+      }
+      if (intent) {
+        const v = parseInt(intent)
+        cards.push({ icon: <Target className={iconClass} />, label: "Intent Score", value: `${v}/100`, status: v > 70 ? "critical" : v > 40 ? "warning" : "neutral" })
+      }
+      if (impact) {
+        cards.push({ icon: <Skull className={iconClass} />, label: "Impact", value: impact, status: impact === "SEVERE" ? "critical" : "warning" })
+      }
+      if (urgency) {
+        cards.push({ icon: <Clock className={iconClass} />, label: "Urgency", value: urgency, status: urgency === "IMMEDIATE" ? "critical" : urgency === "HIGH" ? "warning" : "neutral" })
+      }
+      break
+    }
+
+    default:
+      break
+  }
+
+  return cards
+}
+
+/* ================================================================
+   Response card themes
+   ================================================================ */
 
 interface ResponseTheme {
   label: string
+  shortDesc: string
   icon: React.ReactNode
   border: string
   bg: string
   text: string
   glow: string
   barColor: string
+  sevColor: string
 }
 
 function getResponseTheme(tier: AgentResponseTier): ResponseTheme {
-  const iconSize = "h-6 w-6"
+  const sz = "h-7 w-7"
   switch (tier) {
     case "manoeuvre":
-      return { label: "MANOEUVRE", icon: <Move className={cn(iconSize, "text-cyan-400")} />, border: "border-cyan-500/40", bg: "bg-cyan-500/5", text: "text-cyan-300", glow: "shadow-cyan-500/20", barColor: "cyan" }
+      return {
+        label: "MANOEUVRE",
+        shortDesc: "Defensive orbit adjustment to increase separation distance.",
+        icon: <Move className={cn(sz, "text-cyan-400")} />,
+        border: "border-cyan-500/40",
+        bg: "bg-cyan-500/5",
+        text: "text-cyan-300",
+        glow: "shadow-cyan-500/20",
+        barColor: "cyan",
+        sevColor: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
+      }
     case "sarcastic-manoeuvre":
-      return { label: "SARCASTIC MANOEUVRE", icon: <Eye className={cn(iconSize, "text-amber-400")} />, border: "border-amber-500/40", bg: "bg-amber-500/5", text: "text-amber-300", glow: "shadow-amber-500/20", barColor: "amber" }
+      return {
+        label: "SARCASTIC",
+        shortDesc: "Mirror the adversary's movements to signal awareness.",
+        icon: <Eye className={cn(sz, "text-amber-400")} />,
+        border: "border-amber-500/40",
+        bg: "bg-amber-500/5",
+        text: "text-amber-300",
+        glow: "shadow-amber-500/20",
+        barColor: "amber",
+        sevColor: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+      }
     case "decoy":
-      return { label: "DECOY", icon: <Radio className={cn(iconSize, "text-orange-400")} />, border: "border-orange-500/40", bg: "bg-orange-500/5", text: "text-orange-300", glow: "shadow-orange-500/20", barColor: "orange" }
+      return {
+        label: "DECOY",
+        shortDesc: "Deploy decoys and reposition under cover of false targets.",
+        icon: <Radio className={cn(sz, "text-orange-400")} />,
+        border: "border-orange-500/40",
+        bg: "bg-orange-500/5",
+        text: "text-orange-300",
+        glow: "shadow-orange-500/20",
+        barColor: "orange",
+        sevColor: "bg-orange-500/20 text-orange-300 border-orange-500/30",
+      }
     case "destroy":
     default:
-      return { label: "DESTROY", icon: <Skull className={cn(iconSize, "text-red-400")} />, border: "border-red-500/50", bg: "bg-red-500/8", text: "text-red-300", glow: "shadow-red-500/30", barColor: "red" }
+      return {
+        label: "DESTROY",
+        shortDesc: "Kinetic neutralization. Extreme measure requiring NCA authorization.",
+        icon: <Skull className={cn(sz, "text-red-400")} />,
+        border: "border-red-500/50",
+        bg: "bg-red-500/8",
+        text: "text-red-300",
+        glow: "shadow-red-500/30",
+        barColor: "red",
+        sevColor: "bg-red-500/20 text-red-300 border-red-500/30",
+      }
   }
 }
 
-/* ── Flowchart step card (larger, with subtitle) ──────── */
-
-const FlowchartStep = memo(function FlowchartStep({
-  step,
-  isLast,
-  isSelected,
-  onSelect,
-}: {
-  step: AgentFlowStep
-  isLast: boolean
-  isSelected: boolean
-  onSelect: () => void
-}) {
-  const desc = STEP_DESCRIPTIONS[step.id]
-  const StepIcon = desc.icon
-
-  return (
-    <div className="flex flex-col items-center">
-      <button
-        onClick={onSelect}
-        className={cn(
-          "group relative w-full rounded-xl border px-4 py-3.5 text-left transition-all duration-200",
-          step.status === "active" && "border-cyan-500/50 bg-cyan-500/[0.06] shadow-lg shadow-cyan-500/10",
-          step.status === "complete" && "border-emerald-500/20 bg-emerald-500/[0.03]",
-          step.status === "error" && "border-red-500/30 bg-red-500/[0.05]",
-          step.status === "pending" && "border-white/[0.06] bg-white/[0.015]",
-          isSelected && step.status !== "active" && "ring-1 ring-cyan-500/30",
-          "hover:bg-white/[0.04]",
-        )}
-      >
-        {/* Left accent bar */}
-        <div
-          className={cn(
-            "absolute left-0 top-3 bottom-3 w-[3px] rounded-full transition-all",
-            step.status === "active" && "bg-cyan-400",
-            step.status === "complete" && "bg-emerald-400",
-            step.status === "error" && "bg-red-400",
-            step.status === "pending" && "bg-gray-700",
-          )}
-        />
-
-        <div className="flex items-start gap-3 pl-2">
-          <div className="mt-0.5">
-            <StepStatusIcon status={step.status} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <StepIcon className={cn(
-                "h-4 w-4 shrink-0",
-                step.status === "active" ? "text-cyan-400" :
-                step.status === "complete" ? "text-emerald-400" :
-                "text-gray-500",
-              )} />
-              <span
-                className={cn(
-                  "font-mono text-sm font-bold uppercase tracking-wide leading-tight",
-                  step.status === "active" && "text-cyan-200",
-                  step.status === "complete" && "text-emerald-200",
-                  step.status === "error" && "text-red-300",
-                  step.status === "pending" && "text-gray-500",
-                )}
-              >
-                {desc.title}
-              </span>
-            </div>
-            <p className={cn(
-              "font-mono text-xs mt-1 leading-relaxed",
-              step.status === "active" ? "text-cyan-400/70" :
-              step.status === "complete" ? "text-gray-400" :
-              "text-gray-600",
-            )}>
-              {desc.subtitle}
-            </p>
-          </div>
-          {step.startedAt && (
-            <span className="font-mono text-xs tabular-nums text-gray-500 shrink-0 mt-1">
-              {formatElapsed(step.startedAt, step.completedAt)}
-            </span>
-          )}
-        </div>
-      </button>
-
-      {/* Connecting line */}
-      {!isLast && (
-        <div className="flex flex-col items-center py-1">
-          <div
-            className={cn(
-              "w-px h-6",
-              step.status === "complete" || step.status === "active"
-                ? "bg-gradient-to-b from-cyan-500/40 to-cyan-500/10"
-                : "border-l border-dashed border-gray-700",
-            )}
-          />
-          <ChevronDown
-            className={cn(
-              "h-3 w-3 -mt-0.5",
-              step.status === "complete" || step.status === "active"
-                ? "text-cyan-500/40"
-                : "text-gray-700",
-            )}
-          />
-        </div>
-      )}
-    </div>
-  )
-})
-
-/* ── Step detail panel (larger text) ──────────────────── */
-
-const StepDetail = memo(function StepDetail({
-  step,
-  isSessionActive,
-}: {
-  step: AgentFlowStep
-  isSessionActive: boolean
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const desc = STEP_DESCRIPTIONS[step.id]
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [step.thinkingLines])
-
-  const isStepActive = step.status === "active"
-
-  return (
-    <div className="flex h-full flex-col rounded-xl border border-white/[0.06] bg-black/30 overflow-hidden">
-      {/* Detail header */}
-      <div className="flex items-center gap-3 border-b border-white/[0.06] px-5 py-3 shrink-0">
-        <Activity className="h-5 w-5 text-cyan-400/60" />
-        <div className="flex-1 min-w-0">
-          <span className="font-mono text-sm font-bold uppercase tracking-wide text-gray-200">
-            {desc.title}
-          </span>
-        </div>
-        {step.startedAt && (
-          <span className="font-mono text-sm tabular-nums text-gray-500">
-            {formatElapsed(step.startedAt, step.completedAt)}
-          </span>
-        )}
-        {isStepActive && (
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="font-mono text-xs uppercase tracking-wider text-cyan-400">PROCESSING</span>
-          </div>
-        )}
-      </div>
-
-      {/* Thinking lines */}
-      <div
-        ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto px-5 py-3 font-mono text-sm leading-[1.8] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10"
-      >
-        {step.thinkingLines.length === 0 && step.status === "pending" && (
-          <div className="flex items-center justify-center h-full text-gray-600">
-            <span className="font-mono text-base">Waiting for activation...</span>
-          </div>
-        )}
-        {step.thinkingLines.length === 0 && isStepActive && (
-          <div className="text-gray-500 animate-pulse text-base">Initializing...</div>
-        )}
-        {step.thinkingLines.map((line) => (
-          <div key={line.id} className="mb-1 flex items-start gap-2.5">
-            <span className="select-none text-gray-700 tabular-nums w-6 text-right shrink-0 text-xs mt-0.5">
-              {String(line.id).padStart(2, "0")}
-            </span>
-            <ThinkingLineIcon type={line.type} />
-            <span className={cn("break-words", thinkingLineColor(line.type))}>
-              {line.text}
-            </span>
-          </div>
-        ))}
-        {isStepActive && isSessionActive && (
-          <span className="inline-block h-4 w-1.5 animate-pulse bg-cyan-400 ml-9 mt-1" />
-        )}
-      </div>
-    </div>
-  )
-})
-
-/* ── Response option card (larger) ────────────────────── */
+/* ================================================================
+   Response Card — visual, compact, one-sentence description max
+   ================================================================ */
 
 const ResponseCard = memo(function ResponseCard({
   option,
@@ -459,11 +500,10 @@ const ResponseCard = memo(function ResponseCard({
   return (
     <div
       className={cn(
-        "relative rounded-xl border p-4 transition-all duration-300",
+        "relative flex flex-col items-center gap-2 rounded-xl border p-4 transition-all duration-300 min-w-[140px] flex-1",
         option.recommended
-          ? cn(theme.border, theme.bg, "shadow-lg", theme.glow, "ring-1 ring-cyan-500/20")
+          ? cn(theme.border, theme.bg, "shadow-lg", theme.glow, "ring-1 ring-cyan-500/30")
           : "border-white/[0.06] bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.04]",
-        option.tier === "destroy" && "hover:shadow-red-500/10",
       )}
       style={{
         animationDelay: `${index * 100}ms`,
@@ -471,59 +511,406 @@ const ResponseCard = memo(function ResponseCard({
       }}
     >
       {option.recommended && (
-        <div className="absolute -top-2.5 right-3 flex items-center gap-1 rounded-md bg-cyan-500 px-2 py-0.5">
+        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-md bg-cyan-500 px-2 py-0.5 whitespace-nowrap">
           <Star className="h-3 w-3 text-black" />
-          <span className="font-mono text-[9px] font-black uppercase tracking-wider text-black">RECOMMENDED</span>
+          <span className="font-mono text-[9px] font-black uppercase tracking-wider text-black">REC</span>
         </div>
       )}
 
-      <div className="flex items-center gap-2.5 mb-2">
-        {theme.icon}
-        <span className={cn("font-mono text-base font-bold", option.recommended ? theme.text : "text-gray-200")}>
-          {theme.label}
-        </span>
-        {option.tier === "destroy" && (
-          <span className="ml-auto font-mono text-xs font-bold text-red-500 animate-pulse">DANGER</span>
+      {/* Icon */}
+      {theme.icon}
+
+      {/* Label */}
+      <span className={cn("font-mono text-sm font-bold text-center", option.recommended ? theme.text : "text-gray-200")}>
+        {theme.label}
+      </span>
+
+      {/* Severity badge */}
+      <span
+        className={cn(
+          "rounded-md px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider border",
+          theme.sevColor,
         )}
+      >
+        SEV-{option.severity}
+      </span>
+
+      {/* Confidence bar */}
+      <div className="w-full mt-1">
+        <ConfidenceBar value={option.confidence} color={theme.barColor} />
       </div>
 
-      <p className="font-mono text-xs leading-relaxed text-gray-400 mb-3">{option.description}</p>
+      {/* One sentence */}
+      <p className="font-mono text-[10px] leading-relaxed text-gray-500 text-center line-clamp-2 mt-1">
+        {theme.shortDesc}
+      </p>
+    </div>
+  )
+})
 
-      <div className="flex items-center gap-3 mb-3">
-        <span className="rounded-md px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider border text-gray-300 bg-white/5 border-white/10">
-          SEV-{option.severity}
-        </span>
-        {option.deltaVMs > 0 && (
-          <span className="font-mono text-xs text-gray-400">{option.deltaVMs} m/s</span>
-        )}
-        {option.estimatedTimeMin > 0 && (
-          <span className="font-mono text-xs text-gray-400">{option.estimatedTimeMin} min</span>
+/* ================================================================
+   Phase Section — full-width, with data cards and connecting line
+   ================================================================ */
+
+const PhaseSection = memo(function PhaseSection({
+  step,
+  isLast,
+  triggerRisk,
+  responses,
+  selectedResponse,
+  isSessionComplete,
+  fullAutonomy,
+  isExecuting,
+}: {
+  step: AgentFlowStep
+  isLast: boolean
+  triggerRisk: number
+  responses: AgentResponseOption[]
+  selectedResponse: AgentResponseOption | null
+  isSessionComplete: boolean
+  fullAutonomy: boolean
+  isExecuting: boolean
+}) {
+  const meta = STEP_META[step.id]
+  const PhaseIcon = meta.icon
+  const isPending = step.status === "pending"
+  const isActive = step.status === "active"
+  const isComplete = step.status === "complete"
+
+  // Data cards for non-response phases
+  const dataCards = useMemo(() => {
+    if (step.id === "response-selection") return []
+    return extractPhaseCards(step, triggerRisk)
+  }, [step, triggerRisk])
+
+  // Collapsible thinking log — last 3 lines
+  const [thinkingOpen, setThinkingOpen] = useState(false)
+  const recentThinking = useMemo(() => {
+    const relevant = step.thinkingLines.filter((l) => l.type === "reasoning" || l.type === "warning")
+    return relevant.slice(-3)
+  }, [step.thinkingLines])
+
+  // If pending, render minimal placeholder
+  if (isPending) {
+    return (
+      <div className="opacity-30">
+        <div className="flex items-center gap-3 px-6 py-6">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-700/50 bg-gray-800/40">
+            <PhaseIcon className="h-5 w-5 text-gray-600" />
+          </div>
+          <div>
+            <span className="font-mono text-sm font-bold uppercase tracking-wider text-gray-600">
+              PHASE {meta.phaseNum}: {meta.title}
+            </span>
+            <p className="font-mono text-xs text-gray-700 mt-0.5">{meta.subtitle}</p>
+          </div>
+        </div>
+        {/* Connector */}
+        {!isLast && (
+          <div className="flex flex-col items-center pb-2">
+            <div className="w-px h-8 border-l border-dashed border-gray-700/50" />
+            <ChevronDown className="h-3 w-3 text-gray-700/50 -mt-0.5" />
+          </div>
         )}
       </div>
+    )
+  }
 
-      <ConfidenceBar value={option.confidence} color={theme.barColor} />
+  // Active or complete
+  return (
+    <div>
+      {/* Divider */}
+      <div
+        className={cn(
+          "h-px mx-6",
+          isActive
+            ? "bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"
+            : "bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent",
+        )}
+      />
 
-      {(option.benefits.length > 0 || option.risks.length > 0) && (
-        <div className="mt-3 space-y-1">
-          {option.benefits.map((b: string, i: number) => (
-            <div key={`b${i}`} className="flex items-start gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500 mt-0.5" />
-              <span className="font-mono text-xs text-emerald-400/80">{b}</span>
+      {/* Phase header */}
+      <div className="px-6 pt-5 pb-2">
+        <div className="flex items-center gap-3">
+          {/* Status indicator */}
+          {isActive ? (
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-cyan-500/60 bg-cyan-500/10">
+              <PhaseIcon className="h-5 w-5 text-cyan-400" />
+              <div className="absolute inset-0 rounded-full border-2 border-cyan-400/30 animate-ping" />
             </div>
-          ))}
-          {option.risks.map((r: string, i: number) => (
-            <div key={`r${i}`} className="flex items-start gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-500 mt-0.5" />
-              <span className="font-mono text-xs text-red-400/80">{r}</span>
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-emerald-500/40 bg-emerald-500/10">
+              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
             </div>
-          ))}
+          )}
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3">
+              <span
+                className={cn(
+                  "font-mono text-lg font-bold uppercase tracking-wider",
+                  isActive ? "text-cyan-200" : "text-emerald-200",
+                )}
+              >
+                PHASE {meta.phaseNum}: {meta.title}
+              </span>
+              {isActive && (
+                <span className="font-mono text-xs uppercase tracking-wider text-cyan-400 animate-pulse">
+                  PROCESSING
+                </span>
+              )}
+            </div>
+            <p
+              className={cn(
+                "font-mono text-sm mt-0.5",
+                isActive ? "text-cyan-400/60" : "text-gray-500",
+              )}
+            >
+              {meta.subtitle}
+            </p>
+          </div>
+
+          {step.startedAt && (
+            <span className="font-mono text-xs tabular-nums text-gray-500 shrink-0">
+              {formatElapsed(step.startedAt, step.completedAt)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Data cards row */}
+      {step.id !== "response-selection" && dataCards.length > 0 && (
+        <div className="px-6 pb-3 pt-2">
+          <div className="flex flex-wrap gap-3">
+            {dataCards.map((card, i) => (
+              <DataCard key={i} {...card} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Active step: spinner line */}
+      {isActive && step.thinkingLines.length > 0 && (
+        <div className="px-6 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="font-mono text-xs text-cyan-300/70 truncate">
+              {step.thinkingLines[step.thinkingLines.length - 1]?.text}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Thinking lines — collapsible, last 3 reasoning/warning lines */}
+      {isComplete && recentThinking.length > 0 && (
+        <div className="px-6 pb-3">
+          <button
+            onClick={() => setThinkingOpen(!thinkingOpen)}
+            className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-gray-600 hover:text-gray-400 transition-colors"
+          >
+            <Brain className="h-3 w-3" />
+            <span>{thinkingOpen ? "Hide" : "Show"} reasoning ({recentThinking.length})</span>
+            <ChevronDown
+              className={cn("h-3 w-3 transition-transform", thinkingOpen && "rotate-180")}
+            />
+          </button>
+          {thinkingOpen && (
+            <div className="mt-2 space-y-1 pl-1 border-l border-white/5">
+              {recentThinking.map((line) => (
+                <p key={line.id} className="font-mono text-xs text-gray-500 pl-3 leading-relaxed">
+                  {line.text}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* RESPONSE SELECTION PHASE — show the 4 response cards */}
+      {step.id === "response-selection" && responses.length > 0 && (
+        <div className="px-6 pb-4 pt-1">
+          <div className="grid grid-cols-4 gap-3">
+            {responses.map((opt, i) => (
+              <ResponseCard key={opt.tier} option={opt} index={i} />
+            ))}
+          </div>
+
+          {/* Recommended response block */}
+          {selectedResponse && (
+            <div className="mt-4 rounded-xl border border-cyan-500/30 bg-cyan-500/[0.04] p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Star className="h-5 w-5 text-cyan-400" />
+                <span className="font-mono text-sm font-black uppercase tracking-wide text-cyan-300">
+                  RECOMMENDED: {selectedResponse.label}
+                </span>
+              </div>
+              <p className="font-mono text-sm leading-relaxed text-gray-400 mb-3">
+                {selectedResponse.justification}
+              </p>
+
+              {/* Execute button / executing state */}
+              {fullAutonomy && isSessionComplete && (
+                <div className="mt-2">
+                  {isExecuting ? (
+                    <ExecutionProgress />
+                  ) : (
+                    <div className="flex items-center gap-2 text-cyan-400">
+                      <div className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                      <span className="font-mono text-xs uppercase tracking-wider">
+                        Auto-execution queued...
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!fullAutonomy && isSessionComplete && (
+                <button
+                  className={cn(
+                    "mt-2 w-full rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2.5",
+                    "font-mono text-sm font-bold uppercase tracking-wider text-cyan-300",
+                    "hover:bg-cyan-500/20 transition-all",
+                  )}
+                  onClick={() => {
+                    useAgentOpsStore.getState().setIsExecuting(true)
+                  }}
+                >
+                  EXECUTE RESPONSE
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Connector to next phase */}
+      {!isLast && (
+        <div className="flex flex-col items-center pb-2 pt-1">
+          <div
+            className={cn(
+              "w-px h-8",
+              isComplete
+                ? "bg-gradient-to-b from-emerald-500/30 to-cyan-500/10"
+                : "bg-gradient-to-b from-cyan-500/40 to-cyan-500/10",
+            )}
+          />
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 -mt-1",
+              isComplete ? "text-emerald-500/40" : "text-cyan-500/40",
+            )}
+          />
         </div>
       )}
     </div>
   )
 })
 
-/* ── Threshold settings dropdown ──────────────────────── */
+/* ================================================================
+   Execution progress bar
+   ================================================================ */
+
+function ExecutionProgress() {
+  const [pct, setPct] = useState(0)
+  const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    let frame: number
+    const start = Date.now()
+    const duration = 4000 // 4 seconds
+    function tick() {
+      const elapsed = Date.now() - start
+      const p = Math.min(100, (elapsed / duration) * 100)
+      setPct(p)
+      if (p >= 100) {
+        setDone(true)
+        return
+      }
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  if (done) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3">
+        <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+        <span className="font-mono text-sm font-bold uppercase tracking-wider text-emerald-300">
+          RESPONSE EXECUTED
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/[0.05] px-4 py-3">
+      <div className="flex items-center gap-3 mb-2">
+        <Activity className="h-4 w-4 text-cyan-400 animate-pulse" />
+        <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan-300">
+          EXECUTING RECOMMENDED RESPONSE...
+        </span>
+        <span className="font-mono text-xs tabular-nums text-cyan-400/60 ml-auto">{Math.round(pct)}%</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-100"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/* ================================================================
+   Full Autonomy Toggle
+   ================================================================ */
+
+function AutonomyToggle() {
+  const fullAutonomy = useAgentOpsStore((s) => s.fullAutonomy)
+  const setFullAutonomy = useAgentOpsStore((s) => s.setFullAutonomy)
+
+  return (
+    <button
+      onClick={() => setFullAutonomy(!fullAutonomy)}
+      className={cn(
+        "flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-all font-mono text-xs font-bold uppercase tracking-wider",
+        fullAutonomy
+          ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300 shadow-lg shadow-cyan-500/20"
+          : "border-white/10 bg-white/5 text-gray-500 hover:border-white/20 hover:text-gray-400",
+      )}
+    >
+      {fullAutonomy && (
+        <div className="relative">
+          <Zap className="h-3.5 w-3.5 text-cyan-400" />
+          <div className="absolute inset-0 animate-ping">
+            <Zap className="h-3.5 w-3.5 text-cyan-400 opacity-40" />
+          </div>
+        </div>
+      )}
+      {!fullAutonomy && <Zap className="h-3.5 w-3.5" />}
+      <span>FULL AUTONOMY</span>
+      {/* Toggle track */}
+      <div
+        className={cn(
+          "relative h-4 w-8 rounded-full transition-colors ml-1",
+          fullAutonomy ? "bg-cyan-500/40" : "bg-white/10",
+        )}
+      >
+        <div
+          className={cn(
+            "absolute top-0.5 h-3 w-3 rounded-full transition-all",
+            fullAutonomy ? "left-4 bg-cyan-400 shadow-lg shadow-cyan-400/50" : "left-0.5 bg-gray-500",
+          )}
+        />
+      </div>
+    </button>
+  )
+}
+
+/* ================================================================
+   Threshold settings dropdown
+   ================================================================ */
 
 function ThresholdSettings({
   threshold,
@@ -551,7 +938,7 @@ function ThresholdSettings({
         onClick={() => setIsOpen(!isOpen)}
         className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-white/5 hover:text-gray-300"
       >
-        <Settings className="h-5 w-5" />
+        <Settings className="h-4 w-4" />
       </button>
       {isOpen && (
         <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-xl border border-white/10 bg-gray-900/95 p-4 shadow-xl backdrop-blur-lg">
@@ -564,7 +951,9 @@ function ThresholdSettings({
             </span>
           </div>
           <input
-            type="range" min={0} max={100}
+            type="range"
+            min={0}
+            max={100}
             value={Math.round(threshold * 100)}
             onChange={(e) => onThresholdChange(Number(e.target.value) / 100)}
             className="w-full h-2 rounded-full appearance-none cursor-pointer bg-white/10
@@ -580,7 +969,9 @@ function ThresholdSettings({
   )
 }
 
-/* ── Standby state ────────────────────────────────────── */
+/* ================================================================
+   Standby State — adapted for full width
+   ================================================================ */
 
 function AgentStandby({
   threshold,
@@ -616,11 +1007,16 @@ function AgentStandby({
           </h3>
           <p className="mt-3 font-mono text-base text-gray-500 max-w-md leading-relaxed">
             Monitoring fleet risk — autonomous agent will engage when threat
-            exceeds <span className="text-cyan-400 font-bold">{Math.round(threshold * 100)}%</span> threshold
+            exceeds{" "}
+            <span className="text-cyan-400 font-bold">{Math.round(threshold * 100)}%</span>{" "}
+            threshold
           </p>
         </div>
 
-        <div className="w-80 mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-6">
+        {/* Autonomy toggle in standby */}
+        <AutonomyToggle />
+
+        <div className="w-80 mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-sm font-bold uppercase tracking-wide text-gray-500">
               Activation Threshold
@@ -630,7 +1026,9 @@ function AgentStandby({
             </span>
           </div>
           <input
-            type="range" min={0} max={100}
+            type="range"
+            min={0}
+            max={100}
             value={Math.round(threshold * 100)}
             onChange={(e) => onThresholdChange(Number(e.target.value) / 100)}
             className="w-full h-2 rounded-full appearance-none cursor-pointer bg-white/10
@@ -662,9 +1060,9 @@ function AgentStandby({
   )
 }
 
-/* ══════════════════════════════════════════════════════
-   Main Component — AgentOps
-   ══════════════════════════════════════════════════════ */
+/* ================================================================
+   ████  MAIN COMPONENT — AgentOps  ████
+   ================================================================ */
 
 export function AgentOps() {
   const threshold = useAgentOpsStore((s) => s.threshold)
@@ -673,8 +1071,11 @@ export function AgentOps() {
   const pendingThreat = useAgentOpsStore((s) => s.pendingThreat)
   const clearPendingThreat = useAgentOpsStore((s) => s.clearPendingThreat)
   const startSession = useAgentOpsStore((s) => s.startSession)
+  const fullAutonomy = useAgentOpsStore((s) => s.fullAutonomy)
+  const isExecuting = useAgentOpsStore((s) => s.isExecuting)
   const { runSimulation } = useAgentSimulation()
 
+  /* ── Consume pending threats ── */
   const consumedRef = useRef(false)
   useEffect(() => {
     if (pendingThreat && !activeSession && !consumedRef.current) {
@@ -703,8 +1104,8 @@ export function AgentOps() {
     }
   }, [pendingThreat, activeSession, startSession, runSimulation, clearPendingThreat])
 
-  const [selectedStepId, setSelectedStepId] = useState<AgentFlowStepId | null>(null)
-
+  /* ── Auto-scroll to active phase ── */
+  const activePhaseRef = useRef<HTMLDivElement>(null)
   const activeStepId = useMemo(() => {
     if (!activeSession) return null
     const active = activeSession.steps.find((s) => s.status === "active")
@@ -712,47 +1113,30 @@ export function AgentOps() {
   }, [activeSession])
 
   useEffect(() => {
-    if (activeStepId) setSelectedStepId(activeStepId)
+    if (activePhaseRef.current) {
+      activePhaseRef.current.scrollIntoView({ behavior: "smooth", block: "center" })
+    }
   }, [activeStepId])
 
-  const detailStep = useMemo(() => {
-    if (!activeSession) return null
-    if (selectedStepId) return activeSession.steps.find((s) => s.id === selectedStepId) ?? null
-    const active = activeSession.steps.find((s) => s.status === "active")
-    if (active) return active
-    const completed = [...activeSession.steps].reverse().find((s) => s.status === "complete")
-    return completed ?? activeSession.steps[0]
-  }, [activeSession, selectedStepId])
-
-  const isSessionActive = useMemo(() => {
+  const isSessionComplete = useMemo(() => {
     if (!activeSession) return false
-    return activeSession.completedAt === null
+    return activeSession.completedAt !== null
   }, [activeSession])
 
-  const showResponses = useMemo(() => {
-    if (!activeSession) return false
-    const lastStep = activeSession.steps[activeSession.steps.length - 1]
-    return (
-      (lastStep.status === "active" || lastStep.status === "complete") &&
-      activeSession.allResponses.length > 0
-    )
-  }, [activeSession])
+  const handleThresholdChange = useCallback(
+    (value: number) => {
+      setThreshold(value)
+    },
+    [setThreshold],
+  )
 
-  const handleSelectStep = useCallback((stepId: AgentFlowStepId) => {
-    setSelectedStepId(stepId)
-  }, [])
-
-  const handleThresholdChange = useCallback((value: number) => {
-    setThreshold(value)
-  }, [setThreshold])
-
-  /* ── No active session ── */
+  /* ── STANDBY — no active session ── */
   if (!activeSession) {
     return (
       <div className="mx-auto h-full w-full max-w-[1600px]">
         <div
           data-ops-panel
-          className="pointer-events-auto flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg"
+          className="pointer-events-auto flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg font-mono"
         >
           <AgentStandby threshold={threshold} onThresholdChange={handleThresholdChange} />
           <style jsx>{`
@@ -766,157 +1150,116 @@ export function AgentOps() {
     )
   }
 
-  /* ── Active session ── */
+  /* ── ACTIVE SESSION — scrollable journey ── */
   const rs = riskStyle(activeSession.threatLevel)
 
   return (
     <div className="mx-auto h-full w-full max-w-[1600px]">
       <div
         data-ops-panel
-        className="pointer-events-auto relative flex h-full flex-col overflow-hidden rounded-xl border border-red-500/20 bg-card/90 shadow-lg shadow-red-500/5 backdrop-blur-xl"
+        className="pointer-events-auto relative flex h-full flex-col overflow-hidden rounded-xl border border-red-500/20 bg-card/90 shadow-lg shadow-red-500/5 backdrop-blur-xl font-mono"
       >
         <ScanLines />
 
-        {/* ── Header ── */}
-        <div className="relative z-10 border-b border-red-500/20 bg-red-500/[0.03] px-6 py-4 shrink-0">
+        {/* ══ STICKY HEADER ══ */}
+        <div className="sticky top-0 z-30 border-b border-red-500/20 bg-gray-950/95 backdrop-blur-xl px-6 py-3 shrink-0">
           <div className="flex items-center gap-4">
             {/* Pulse dot */}
-            <div className="relative">
-              <div className={cn(
-                "h-3.5 w-3.5 rounded-full",
-                isSessionActive ? "bg-red-500 animate-pulse" : "bg-emerald-400",
-              )} />
-              {isSessionActive && (
-                <div className="absolute inset-0 h-3.5 w-3.5 rounded-full bg-red-500 animate-ping opacity-30" />
+            <div className="relative shrink-0">
+              <div
+                className={cn(
+                  "h-3 w-3 rounded-full",
+                  !isSessionComplete ? "bg-red-500 animate-pulse" : "bg-emerald-400",
+                )}
+              />
+              {!isSessionComplete && (
+                <div className="absolute inset-0 h-3 w-3 rounded-full bg-red-500 animate-ping opacity-30" />
               )}
             </div>
 
-            {/* Title */}
+            {/* Title block */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-lg font-black uppercase tracking-[0.15em] text-red-400">
-                  AUTONOMOUS AGENT RESPONSE
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="font-mono text-base font-black uppercase tracking-[0.15em] text-red-400">
+                  AUTONOMOUS AGENT
                 </span>
-                {isSessionActive ? (
-                  <span className="font-mono text-sm uppercase tracking-wider text-cyan-400 animate-pulse">ACTIVE</span>
+                {!isSessionComplete ? (
+                  <span className="font-mono text-xs uppercase tracking-wider text-cyan-400 animate-pulse">
+                    ACTIVE
+                  </span>
                 ) : (
-                  <span className="font-mono text-sm uppercase tracking-wider text-emerald-400">COMPLETE</span>
+                  <span className="font-mono text-xs uppercase tracking-wider text-emerald-400">
+                    COMPLETE
+                  </span>
                 )}
               </div>
-              {/* Threat info strip */}
-              <div className="mt-1 flex items-center gap-2 text-base">
-                <span className={cn(
-                  "rounded-md px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wider border",
-                  rs.text, rs.bg, rs.border,
-                )}>
+              <div className="mt-0.5 flex items-center gap-2 text-sm">
+                <Skull className="h-3.5 w-3.5 text-red-400/60 shrink-0" />
+                <span className="font-mono text-xs font-semibold text-red-300 truncate">
+                  {activeSession.threatSatelliteName}
+                </span>
+                <span className="text-gray-600">→</span>
+                <Crosshair className="h-3.5 w-3.5 text-cyan-400/60 shrink-0" />
+                <span className="font-mono text-xs font-semibold text-cyan-300 truncate">
+                  {activeSession.satelliteName}
+                </span>
+                <span className="text-gray-700 mx-1">|</span>
+                <span
+                  className={cn(
+                    "rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider border",
+                    rs.text,
+                    rs.bg,
+                    rs.border,
+                  )}
+                >
                   {activeSession.threatLevel}
                 </span>
-                <span className="text-gray-600">|</span>
-                <Skull className="h-4 w-4 text-red-400/60" />
-                <span className="font-mono text-sm font-semibold text-red-300">{activeSession.threatSatelliteName}</span>
-                <span className="text-gray-500 text-lg">→</span>
-                <Crosshair className="h-4 w-4 text-cyan-400/60" />
-                <span className="font-mono text-sm font-semibold text-cyan-300">{activeSession.satelliteName}</span>
               </div>
             </div>
 
-            {/* Right: threat score + settings */}
-            <div className="flex items-center gap-3">
+            {/* Right side: HUD + autonomy + settings */}
+            <div className="flex items-center gap-3 shrink-0">
               <ThreatScoreHUD score={activeSession.triggerRisk} />
+              <AutonomyToggle />
               <ThresholdSettings threshold={threshold} onThresholdChange={handleThresholdChange} />
             </div>
           </div>
         </div>
 
-        {/* ── Content: Two-column layout ── */}
-        <div className="relative z-10 flex min-h-0 flex-1">
-          {/* LEFT: Flowchart (40%) */}
-          <div className="w-[40%] border-r border-white/[0.06] flex flex-col">
-            <div className="flex items-center gap-2 border-b border-white/[0.06] px-5 py-2.5 shrink-0">
-              <Target className="h-4 w-4 text-cyan-400/60" />
-              <span className="font-mono text-sm font-bold uppercase tracking-wide text-gray-400">
-                Decision Pipeline
-              </span>
-            </div>
-            <ScrollArea className="flex-1 min-h-0">
-              <div className="p-4 space-y-0">
-                {activeSession.steps.map((step, i) => (
-                  <FlowchartStep
-                    key={step.id}
+        {/* ══ SCROLLABLE JOURNEY ══ */}
+        <ScrollArea className="flex-1 min-h-0 relative z-10">
+          <div className="pb-12 pt-4">
+            {activeSession.steps.map((step, i) => {
+              const isActivePhase = step.id === activeStepId
+              return (
+                <div
+                  key={step.id}
+                  ref={isActivePhase ? activePhaseRef : undefined}
+                >
+                  <PhaseSection
                     step={step}
                     isLast={i === activeSession.steps.length - 1}
-                    isSelected={selectedStepId === step.id}
-                    onSelect={() => handleSelectStep(step.id)}
+                    triggerRisk={activeSession.triggerRisk}
+                    responses={activeSession.allResponses}
+                    selectedResponse={activeSession.selectedResponse}
+                    isSessionComplete={isSessionComplete}
+                    fullAutonomy={fullAutonomy}
+                    isExecuting={isExecuting}
                   />
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-
-          {/* RIGHT: Step Detail (60%) */}
-          <div className="w-[60%] flex flex-col">
-            <div className="flex-1 min-h-0 p-3">
-              {detailStep ? (
-                <StepDetail step={detailStep} isSessionActive={isSessionActive} />
-              ) : (
-                <div className="flex h-full items-center justify-center">
-                  <span className="font-mono text-base text-gray-600">Select a step to view details</span>
                 </div>
-              )}
-            </div>
+              )
+            })}
           </div>
-        </div>
-
-        {/* ── Response Options (bottom) ── */}
-        {showResponses && (
-          <div className="relative z-10 border-t border-white/[0.06] bg-black/20 shrink-0">
-            <div className="flex items-center gap-3 px-6 py-3 border-b border-white/[0.06]">
-              <Shield className="h-5 w-5 text-cyan-400/60" />
-              <span className="font-mono text-sm font-bold uppercase tracking-wide text-gray-300">
-                Response Protocols
-              </span>
-              <span className="font-mono text-xs text-gray-500 ml-auto">
-                {activeSession.allResponses.length} options evaluated
-              </span>
-            </div>
-            <div className="p-4 grid grid-cols-4 gap-3">
-              {activeSession.allResponses.map((option, i) => (
-                <ResponseCard key={option.tier} option={option} index={i} />
-              ))}
-            </div>
-
-            {activeSession.selectedResponse && (
-              <div className="mx-4 mb-4 rounded-xl border border-cyan-500/30 bg-cyan-500/[0.03] p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Star className="h-5 w-5 text-cyan-400" />
-                  <span className="font-mono text-base font-black uppercase tracking-wide text-cyan-300">
-                    Selected: {activeSession.selectedResponse.label}
-                  </span>
-                </div>
-                <p className="font-mono text-sm leading-relaxed text-gray-400">
-                  {activeSession.selectedResponse.justification}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Geopolitical context strip */}
-        {activeSession.geopoliticalContext && (
-          <div className="relative z-10 border-t border-white/[0.04] bg-purple-500/[0.02] px-6 py-3 shrink-0">
-            <div className="flex items-start gap-3">
-              <Globe className="h-4 w-4 text-purple-400/60 mt-0.5 shrink-0" />
-              <p className="font-mono text-xs leading-relaxed text-gray-400">
-                {activeSession.geopoliticalContext}
-              </p>
-            </div>
-          </div>
-        )}
+        </ScrollArea>
 
         <style jsx>{`
           @keyframes slideUp {
             from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes scanVertical {
+            0% { top: -2px; }
+            100% { top: 100%; }
           }
         `}</style>
       </div>
