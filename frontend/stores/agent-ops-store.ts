@@ -45,6 +45,14 @@ interface AgentOpsState {
   threshold: number
   setThreshold: (value: number) => void
 
+  /** Full autonomy mode — auto-executes the recommended response */
+  fullAutonomy: boolean
+  setFullAutonomy: (enabled: boolean) => void
+
+  /** Whether the agent is currently executing the selected response */
+  isExecuting: boolean
+  setIsExecuting: (executing: boolean) => void
+
   /** Queued threat waiting for user to open the agent panel */
   pendingThreat: PendingThreat | null
   setPendingThreat: (threat: PendingThreat) => void
@@ -107,12 +115,16 @@ let lineCounter = 0
 
 export const useAgentOpsStore = create<AgentOpsState>((set, get) => ({
   threshold: 0.7,
+  fullAutonomy: false,
+  isExecuting: false,
   pendingThreat: null,
   activeSession: null,
   history: [],
   triggeredIds: new Set(),
 
   setThreshold: (value) => set({ threshold: value }),
+  setFullAutonomy: (enabled) => set({ fullAutonomy: enabled }),
+  setIsExecuting: (executing) => set({ isExecuting: executing }),
 
   setPendingThreat: (threat) => {
     const next = new Set(get().triggeredIds)

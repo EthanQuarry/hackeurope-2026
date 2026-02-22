@@ -424,6 +424,12 @@ export function useAgentSimulation() {
       `Recommended: ${recommended.label}. ${recommended.justification}`,
     )
     useAgentOpsStore.getState().completeSession()
+
+    // Full autonomy: auto-execute the recommended response
+    if (useAgentOpsStore.getState().fullAutonomy) {
+      await sleep(1500)
+      useAgentOpsStore.getState().setIsExecuting(true)
+    }
   }
 
   /* ── Main pipeline ──────────────────────────────────── */
