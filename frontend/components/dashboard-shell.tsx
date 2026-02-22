@@ -1,50 +1,60 @@
 "use client";
 
-import { useEffect, useMemo, useCallback, useState, lazy, Suspense } from "react"
-import { Activity, Brain, ChevronLeft, ChevronRight, GitBranch, Lightbulb, Satellite, ShieldAlert, Target, Video } from "lucide-react"
-import { api } from "@/lib/api"
+import {
+  useEffect,
+  useMemo,
+  useCallback,
+  useState,
+  lazy,
+  Suspense,
+} from "react";
+import {
+  Activity,
+  Brain,
+  ChevronLeft,
+  ChevronRight,
+  GitBranch,
+  Lightbulb,
+  Satellite,
+  ShieldAlert,
+  Target,
+  Video,
+} from "lucide-react";
+import { api } from "@/lib/api";
 
-import { GlobeView } from "@/components/globe/globe-view"
-import { DashboardHeader } from "@/components/dashboard-header"
-import { InsightsCard } from "@/components/cards/insights-card"
-import { SatelliteCard } from "@/components/cards/satellite-card"
-import { StatsCards } from "@/components/cards/stats-cards"
-import { SatelliteSearch } from "@/components/cards/satellite-search"
-import { DemoSelector } from "@/components/cards/demo-selector"
-import { ProximityOps } from "@/components/ops/proximity-ops"
-import { SignalOps } from "@/components/ops/signal-ops"
-import { AnomalyOps } from "@/components/ops/anomaly-ops"
-import { CommsOps } from "@/components/ops/comms-ops"
-import { OrbitalOps } from "@/components/ops/orbital-ops"
-import { AdversaryOps } from "@/components/ops/adversary-ops"
-import { FleetRiskOps } from "@/components/ops/fleet-risk-ops"
-import { AgentOps } from "@/components/ops/agent-ops"
-import { useFleetRiskAccumulator } from "@/hooks/use-fleet-risk-accumulator"
-import { useAgentTrigger } from "@/hooks/use-agent-trigger"
-import { useAgentOpsStore } from "@/stores/agent-ops-store"
+import { GlobeView } from "@/components/globe/globe-view";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { InsightsCard } from "@/components/cards/insights-card";
+import { SatelliteCard } from "@/components/cards/satellite-card";
+import { StatsCards } from "@/components/cards/stats-cards";
+import { SatelliteSearch } from "@/components/cards/satellite-search";
+import { DemoSelector } from "@/components/cards/demo-selector";
+import { ProximityOps } from "@/components/ops/proximity-ops";
+import { SignalOps } from "@/components/ops/signal-ops";
+import { AnomalyOps } from "@/components/ops/anomaly-ops";
+import { CommsOps } from "@/components/ops/comms-ops";
+import { OrbitalOps } from "@/components/ops/orbital-ops";
+import { AdversaryOps } from "@/components/ops/adversary-ops";
+import { FleetRiskOps } from "@/components/ops/fleet-risk-ops";
+import { AgentOps } from "@/components/ops/agent-ops";
+import { useFleetRiskAccumulator } from "@/hooks/use-fleet-risk-accumulator";
+import { useAgentTrigger } from "@/hooks/use-agent-trigger";
+import { useAgentOpsStore } from "@/stores/agent-ops-store";
 const SatelliteDetailPage = lazy(() =>
   import("@/components/satellite-detail-page").then((m) => ({
     default: m.SatelliteDetailPage,
   })),
-)
-import { useUIStore, type ActiveView } from "@/stores/ui-store"
-import { cn } from "@/lib/utils"
-import { useGlobeStore } from "@/stores/globe-store"
-import { useFleetStore } from "@/stores/fleet-store"
-import { useThreatStore } from "@/stores/threat-store"
-import { usePolling } from "@/hooks/use-polling"
-import { useScenarioSocket } from "@/hooks/use-scenario-socket"
-import {
-  MOCK_THREATS,
-  MOCK_SATELLITES,
-  MOCK_PROXIMITY_THREATS,
-  MOCK_SIGNAL_THREATS,
-  MOCK_ANOMALY_THREATS,
-} from "@/lib/mock-data";
+);
+import { useUIStore, type ActiveView } from "@/stores/ui-store";
+import { cn } from "@/lib/utils";
+import { useGlobeStore } from "@/stores/globe-store";
+import { useFleetStore } from "@/stores/fleet-store";
+import { useThreatStore } from "@/stores/threat-store";
+import { usePolling } from "@/hooks/use-polling";
+import { useScenarioSocket } from "@/hooks/use-scenario-socket";
 import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants";
 import type {
   SatelliteData,
-  ThreatData,
   DebrisData,
   ProximityThreat,
   SignalThreat,
@@ -53,35 +63,70 @@ import type {
   OrbitalSimilarityThreat,
 } from "@/types";
 
-const SIDEBAR_TABS: { id: ActiveView; icon: typeof Lightbulb; label: string; color: string }[] = [
-  { id: "overview", icon: Lightbulb, label: "Insights", color: "text-muted-foreground" },
-  { id: "orbital", icon: GitBranch, label: "Orbital", color: "text-muted-foreground" },
-  { id: "comms", icon: Satellite, label: "Comms", color: "text-muted-foreground" },
-  { id: "fleet-risk", icon: Activity, label: "Fleet Risk", color: "text-cyan-400/70" },
-  { id: "adversary-detail", icon: Target, label: "Adversary", color: "text-red-400/70" },
-  { id: "agent-ops", icon: ShieldAlert, label: "Agent", color: "text-purple-400/70" },
-]
+const SIDEBAR_TABS: {
+  id: ActiveView;
+  icon: typeof Lightbulb;
+  label: string;
+  color: string;
+}[] = [
+  {
+    id: "overview",
+    icon: Lightbulb,
+    label: "Insights",
+    color: "text-muted-foreground",
+  },
+  {
+    id: "orbital",
+    icon: GitBranch,
+    label: "Orbital",
+    color: "text-muted-foreground",
+  },
+  {
+    id: "comms",
+    icon: Satellite,
+    label: "Comms",
+    color: "text-muted-foreground",
+  },
+  {
+    id: "fleet-risk",
+    icon: Activity,
+    label: "Fleet Risk",
+    color: "text-cyan-400/70",
+  },
+  {
+    id: "adversary-detail",
+    icon: Target,
+    label: "Adversary",
+    color: "text-red-400/70",
+  },
+  {
+    id: "agent-ops",
+    icon: ShieldAlert,
+    label: "Agent",
+    color: "text-purple-400/70",
+  },
+];
 
 export function DashboardShell() {
   // Reset SJ-26 scenario on page load/refresh
   useEffect(() => {
     fetch(`${api.satellites.replace("/satellites", "/scenario/reset")}`, {
       method: "POST",
-    }).catch(() => {})
-  }, [])
+    }).catch(() => {});
+  }, []);
 
-  useFleetRiskAccumulator()
-  useAgentTrigger()
+  useFleetRiskAccumulator();
+  useAgentTrigger();
 
-  const agentPending = useAgentOpsStore((s) => s.pendingThreat)
+  const agentPending = useAgentOpsStore((s) => s.pendingThreat);
 
-  const activeView = useUIStore((s) => s.activeView)
-  const setActiveView = useUIStore((s) => s.setActiveView)
-  const terminalOpen = useUIStore((s) => s.terminalOpen)
-  const leftPanelCollapsed = useUIStore((s) => s.leftPanelCollapsed)
-  const toggleLeftPanel = useUIStore((s) => s.toggleLeftPanel)
+  const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const terminalOpen = useUIStore((s) => s.terminalOpen);
+  const leftPanelCollapsed = useUIStore((s) => s.leftPanelCollapsed);
+  const toggleLeftPanel = useUIStore((s) => s.toggleLeftPanel);
 
-  const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
+  const setFocusTarget = useThreatStore((s) => s.setFocusTarget);
 
   const handleOpsBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -100,6 +145,7 @@ export function DashboardShell() {
   const togglePlaying = useGlobeStore((s) => s.togglePlaying);
 
   const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId);
+  const selectSatellite = useFleetStore((s) => s.selectSatellite);
   const setSatellites = useFleetStore((s) => s.setSatellites);
   const setThreats = useThreatStore((s) => s.setThreats);
   const setDebris = useThreatStore((s) => s.setDebris);
@@ -107,7 +153,9 @@ export function DashboardShell() {
   const setSignalThreats = useThreatStore((s) => s.setSignalThreats);
   const setAnomalyThreats = useThreatStore((s) => s.setAnomalyThreats);
   const setGeoUsLoiterThreats = useThreatStore((s) => s.setGeoUsLoiterThreats);
-  const setOrbitalSimilarityThreats = useThreatStore((s) => s.setOrbitalSimilarityThreats);
+  const setOrbitalSimilarityThreats = useThreatStore(
+    (s) => s.setOrbitalSimilarityThreats,
+  );
   const storeProximity = useThreatStore((s) => s.proximityThreats);
   const storeSignal = useThreatStore((s) => s.signalThreats);
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats);
@@ -167,6 +215,30 @@ export function DashboardShell() {
   const geoLoiterThreats = storeGeoLoiter;
   const orbitalThreats = storeOrbital;
 
+  const globalThreatLevel = useMemo(() => {
+    if (
+      proximityThreats.some((t) => t.severity === "threatened") ||
+      anomalyThreats.some((t) => t.severity === "threatened")
+    )
+      return "HIGH" as const;
+    if (
+      proximityThreats.length > 0 ||
+      signalThreats.length > 0 ||
+      anomalyThreats.length > 0 ||
+      geoLoiterThreats.length > 0
+    )
+      return "ELEVATED" as const;
+    return "NOMINAL" as const;
+  }, [proximityThreats, signalThreats, anomalyThreats, geoLoiterThreats]);
+
+  const adversaryCount = useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of proximityThreats) ids.add(t.foreignSatId);
+    for (const t of signalThreats) ids.add(t.interceptorId);
+    for (const t of anomalyThreats) ids.add(t.satelliteId);
+    return ids.size;
+  }, [proximityThreats, signalThreats, anomalyThreats]);
+
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
       {/* Full-screen globe background */}
@@ -176,7 +248,7 @@ export function DashboardShell() {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-6 pt-4">
         <div className="pointer-events-auto mx-auto w-full max-w-[1600px] overflow-x-auto">
           <DashboardHeader
-            globalThreatLevel="NOMINAL"
+            globalThreatLevel={globalThreatLevel}
             speed={speed}
             playing={playing}
             simTime={simTime}
@@ -202,7 +274,9 @@ export function DashboardShell() {
           data-ops-panel
           className={cn(
             "pointer-events-auto absolute left-6 top-24 bottom-24 z-30",
-            activeView === "overview" && !leftPanelCollapsed ? "w-[280px]" : "w-[48px] flex items-center"
+            activeView === "overview" && !leftPanelCollapsed
+              ? "w-[280px]"
+              : "w-[48px] flex items-center",
           )}
         >
           {activeView === "overview" && !leftPanelCollapsed ? (
@@ -211,27 +285,37 @@ export function DashboardShell() {
               {/* Icon gutter — spans full panel height so centering matches collapsed */}
               <div className="flex w-[48px] shrink-0 flex-col items-center justify-center gap-1 border-r border-white/5">
                 {SIDEBAR_TABS.map((tab) => {
-                  const Icon = tab.icon
-                  const isActive = activeView === tab.id
-                  const hasWarning = tab.id === "agent-ops" && !!agentPending
+                  const Icon = tab.icon;
+                  const isActive = activeView === tab.id;
+                  const hasWarning = tab.id === "agent-ops" && !!agentPending;
                   return (
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setActiveView(tab.id)}
+                      onClick={() => {
+                        if (tab.id === "comms") selectSatellite(null)
+                        setActiveView(tab.id)
+                      }}
                       className={cn(
                         "relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
                         isActive
                           ? tab.id === "adversary-detail"
                             ? "bg-red-500/10 text-red-400"
                             : tab.id === "agent-ops"
-                            ? "bg-purple-500/10 text-purple-400"
-                            : "bg-white/[0.10] text-foreground"
+                              ? "bg-purple-500/10 text-purple-400"
+                              : "bg-white/[0.10] text-foreground"
                           : hasWarning
                             ? "text-red-400 bg-red-500/10 hover:bg-red-500/20"
-                            : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
+                            : cn(
+                                tab.color,
+                                "hover:bg-white/[0.06] hover:text-foreground",
+                              ),
                       )}
-                      title={hasWarning ? "⚠ Threat detected — click to engage agent" : tab.label}
+                      title={
+                        hasWarning
+                          ? "⚠ Threat detected — click to engage agent"
+                          : tab.label
+                      }
                     >
                       <Icon className="h-4 w-4" />
                       {hasWarning && (
@@ -241,7 +325,7 @@ export function DashboardShell() {
                         </>
                       )}
                     </button>
-                  )
+                  );
                 })}
               </div>
 
@@ -278,8 +362,13 @@ export function DashboardShell() {
                 >
                   <Target className="h-4 w-4 shrink-0 text-red-400" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-semibold text-foreground">Adversary Tracker</p>
-                    <p className="text-[9px] text-muted-foreground">5 threats monitored</p>
+                    <p className="text-[11px] font-semibold text-foreground">
+                      Adversary Tracker
+                    </p>
+                    <p className="text-[9px] text-muted-foreground">
+                      {adversaryCount} threat{adversaryCount !== 1 ? "s" : ""}{" "}
+                      monitored
+                    </p>
                   </div>
                   <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
                 </button>
@@ -289,18 +378,19 @@ export function DashboardShell() {
             /* ── Collapsed: compact styled pill, centered by parent ── */
             <div className="flex w-full flex-col items-center gap-1 rounded-2xl border border-white/10 bg-card/60 py-2 backdrop-blur-xl overflow-hidden">
               {SIDEBAR_TABS.map((tab) => {
-                const Icon = tab.icon
-                const isActive = activeView === tab.id
-                const hasWarning = tab.id === "agent-ops" && !!agentPending
+                const Icon = tab.icon;
+                const isActive = activeView === tab.id;
+                const hasWarning = tab.id === "agent-ops" && !!agentPending;
                 return (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => {
                       if (tab.id === "overview") {
-                        setActiveView("overview")
-                        if (leftPanelCollapsed) toggleLeftPanel()
+                        setActiveView("overview");
+                        if (leftPanelCollapsed) toggleLeftPanel();
                       } else {
+                        if (tab.id === "comms") selectSatellite(null)
                         setActiveView(tab.id)
                       }
                     }}
@@ -310,13 +400,20 @@ export function DashboardShell() {
                         ? tab.id === "adversary-detail"
                           ? "bg-red-500/10 text-red-400"
                           : tab.id === "agent-ops"
-                          ? "bg-purple-500/10 text-purple-400"
-                          : "bg-white/[0.10] text-foreground"
+                            ? "bg-purple-500/10 text-purple-400"
+                            : "bg-white/[0.10] text-foreground"
                         : hasWarning
                           ? "text-red-400 bg-red-500/10 hover:bg-red-500/20"
-                          : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
+                          : cn(
+                              tab.color,
+                              "hover:bg-white/[0.06] hover:text-foreground",
+                            ),
                     )}
-                    title={hasWarning ? "⚠ Threat detected — click to engage agent" : tab.label}
+                    title={
+                      hasWarning
+                        ? "⚠ Threat detected — click to engage agent"
+                        : tab.label
+                    }
                   >
                     <Icon className="h-4 w-4" />
                     {hasWarning && (
@@ -326,7 +423,7 @@ export function DashboardShell() {
                       </>
                     )}
                   </button>
-                )
+                );
               })}
               {/* Expand toggle — only in overview */}
               {activeView === "overview" && (
@@ -351,7 +448,6 @@ export function DashboardShell() {
               {selectedSatelliteId && <SatelliteCard />}
               <StatsCards />
             </div>
-
           </div>
         ) : (
           /* Ops pages: full mission view */
@@ -363,7 +459,17 @@ export function DashboardShell() {
             {activeView === "anomaly" && (
               <AnomalyOps threats={anomalyThreats} />
             )}
-            {activeView === "comms" && <CommsOps />}
+            {activeView === "comms" && (
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    Loading…
+                  </div>
+                }
+              >
+                <SatelliteDetailPage />
+              </Suspense>
+            )}
             {activeView === "satellite-detail" && (
               <Suspense
                 fallback={
@@ -375,7 +481,9 @@ export function DashboardShell() {
                 <SatelliteDetailPage />
               </Suspense>
             )}
-            {activeView === "orbital" && <OrbitalOps threats={orbitalThreats} />}
+            {activeView === "orbital" && (
+              <OrbitalOps threats={orbitalThreats} />
+            )}
             {activeView === "fleet-risk" && <FleetRiskOps />}
             {activeView === "adversary-detail" && <AdversaryOps />}
             {activeView === "agent-ops" && <AgentOps />}
@@ -388,8 +496,8 @@ export function DashboardShell() {
         <button
           type="button"
           onClick={() => {
-            setActiveView("overview")
-            useGlobeStore.getState().setCinematicActive(true)
+            setActiveView("overview");
+            useGlobeStore.getState().setCinematicActive(true);
           }}
           className="pointer-events-auto group flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-card/60 text-muted-foreground backdrop-blur-xl transition-all hover:scale-105 hover:border-white/20 hover:bg-card/80 hover:text-foreground"
           title="Cinematic flyover"
@@ -400,7 +508,6 @@ export function DashboardShell() {
           <DemoSelector />
         </div>
       </div>
-
     </main>
   );
 }

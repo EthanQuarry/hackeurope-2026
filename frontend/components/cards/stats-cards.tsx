@@ -5,7 +5,7 @@ import { ShieldAlert, Satellite, GitBranch, ChevronDown, Globe, SlidersHorizonta
 
 import { cn } from "@/lib/utils"
 import { THREAT_COLORS, type ThreatSeverity } from "@/lib/constants"
-import { MOCK_SATELLITES, MOCK_ORBITAL_SIMILARITY_THREATS } from "@/lib/mock-data"
+import { MOCK_ORBITAL_SIMILARITY_THREATS } from "@/lib/mock-data"
 import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
@@ -241,7 +241,7 @@ const FLEET_CATEGORIES: { label: string; key: FleetCategory }[] = [
 ]
 
 function FleetOverviewPanel() {
-  const satellites = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
+  const satellites = useSatellitesWithDerivedStatus()
   const total = satellites.length
 
   const counts: Record<string, number> = {}

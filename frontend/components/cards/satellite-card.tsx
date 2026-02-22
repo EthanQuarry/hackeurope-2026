@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useUIStore } from "@/stores/ui-store"
 import { useSatellitesWithDerivedStatus } from "@/hooks/use-derived-status"
-import { MOCK_SATELLITES } from "@/lib/mock-data"
 import { ThreatBadge } from "@/components/shared/threat-badge"
 
 function MetricCell({ label, value, unit }: { label: string; value: string; unit?: string }) {
@@ -44,7 +43,7 @@ function getPurpose(name: string): string {
 
 export function SatelliteCard({ className }: { className?: string }) {
   const selectedId = useFleetStore((s) => s.selectedSatelliteId)
-  const satellites = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
+  const satellites = useSatellitesWithDerivedStatus()
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
   const setActiveView = useUIStore((s) => s.setActiveView)
 

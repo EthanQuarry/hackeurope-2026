@@ -31,12 +31,7 @@ import {
   GEO_US_TARGETS,
 } from "@/lib/demo-geo-loiter";
 import {
-  MOCK_SATELLITES,
   generateMockDebris,
-  MOCK_THREATS,
-  MOCK_PROXIMITY_THREATS,
-  MOCK_SIGNAL_THREATS,
-  MOCK_ANOMALY_THREATS,
 } from "@/lib/mock-data";
 import type {
   SatelliteData,
@@ -357,8 +352,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const storeSatellites = useFleetStore((s) => s.satellites);
 
   // Show all satellites — no filtering by status
-  const allSatellites =
-    storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES;
+  const allSatellites = storeSatellites;
   const satellites = allSatellites;
   const activeDemo = useGlobeStore((s) => s.activeDemo);
 

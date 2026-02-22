@@ -164,7 +164,7 @@ export function DashboardHeader({
 
       {/* Right: Sim time + speed controls + play/pause */}
       <div className="flex items-center gap-3">
-        <div className="font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+        <div className="font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
           {formatSimTime(simTime)}
         </div>
 

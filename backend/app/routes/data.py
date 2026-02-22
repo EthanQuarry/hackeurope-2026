@@ -115,7 +115,6 @@ FLEET_NORAD_IDS = [
     58400,  # MALLIGYONG-1 (NKOR spy satellite)
     # --- Iranian ---
     53370,  # KHAYYAM (IRAN remote sensing)
-    58817,  # SORAYA (IRAN orbital launch)
     61072,  # CHAMRAN-1 (IRAN military)
     # --- Recent Russian military ---
     55978,  # COSMOS 2567 (CIS LEO military)
