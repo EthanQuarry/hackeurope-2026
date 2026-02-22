@@ -1096,7 +1096,7 @@ export function AgentOps() {
   /* ── STANDBY — no active session ── */
   if (!activeSession) {
     return (
-      <div className="mr-auto h-full w-full max-w-[480px]">
+      <div className="mr-auto h-full w-full max-w-[560px]">
         <div
           data-ops-panel
           className="pointer-events-auto flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg font-mono"
@@ -1117,7 +1117,7 @@ export function AgentOps() {
   const rs = riskStyle(activeSession.threatLevel)
 
   return (
-    <div className="mr-auto h-full w-full max-w-[480px]">
+    <div className="mr-auto h-full w-full max-w-[560px]">
       <div
         data-ops-panel
         className="pointer-events-auto relative flex h-full flex-col overflow-hidden rounded-xl border border-red-500/20 bg-card/90 shadow-lg shadow-red-500/5 backdrop-blur-xl font-mono"
