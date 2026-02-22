@@ -111,7 +111,7 @@ export function SatelliteMarker({
   // Trail vertex colors — fades from dim tail to bright head
   const trailColors = useMemo(() => {
     const baseOpacity =
-      status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35
+      status === "threatened" || status === "threat" ? 0.85 : status === "watched" ? 0.55 : 0.35
     const colors: [number, number, number][] = []
     for (let i = 0; i < trailLen; i++) {
       const t = i / Math.max(1, trailLen - 1)
@@ -131,7 +131,7 @@ export function SatelliteMarker({
     if (!geo?.setColors) return
     const flat: number[] = []
     const baseOpacity =
-      status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35
+      status === "threatened" || status === "threat" ? 0.85 : status === "watched" ? 0.55 : 0.35
     for (let i = 0; i < trailLen; i++) {
       const t = i / Math.max(1, trailLen - 1)
       const fade = Math.pow(t, 2.5)
@@ -220,8 +220,8 @@ export function SatelliteMarker({
   })
 
   const labelsEnabled = useGlobeStore((s) => s.showLabels)
-  const showLabel = selected || (labelsEnabled && (status === "threatened" || status === "watched"))
-  const markerSize = status === "threatened" ? size * 1.3 : size
+  const showLabel = selected || (labelsEnabled && (status === "threatened" || status === "threat" || status === "watched"))
+  const markerSize = status === "threatened" || status === "threat" ? size * 1.3 : size
 
   // Full orbit ring — clean closed loop (no maneuver splice)
   const fullOrbitRing = useMemo(() => {
@@ -249,7 +249,7 @@ export function SatelliteMarker({
       {maneuverArc && maneuverArc.length > 1 && (
         <Line
           points={maneuverArc}
-          color={status === "threatened" ? "#ff2244" : status === "watched" ? "#ff9100" : "#ffcc00"}
+          color={status === "threat" ? "#ff1744" : status === "watched" ? "#4488ff" : "#ff9100"}
           transparent
           opacity={0.7}
           lineWidth={2.0}
@@ -263,7 +263,7 @@ export function SatelliteMarker({
         vertexColors={trailColors}
         transparent
         opacity={1}
-        lineWidth={status === "threatened" ? 1.8 : status === "watched" ? 1.4 : 1.0}
+        lineWidth={status === "threatened" || status === "threat" ? 1.8 : status === "watched" ? 1.4 : 1.0}
       />
 
       {/* Satellite dot */}
@@ -298,9 +298,11 @@ export function SatelliteMarker({
                     fontWeight: 600,
                     fontFamily: "monospace",
                     color:
-                      status === "threatened"
-                        ? "rgba(255,68,102,0.7)"
-                        : "rgba(255,145,0,0.6)",
+                      status === "threat"
+                        ? "rgba(255,23,68,0.8)"
+                        : status === "watched"
+                          ? "rgba(68,136,255,0.8)"
+                          : "rgba(255,145,0,0.8)",
                   }}
                 >
                   {threatPercent}%
@@ -326,7 +328,7 @@ export function SatelliteMarker({
         <meshBasicMaterial
           color={threeColor}
           transparent
-          opacity={selected ? 0.4 : status === "threatened" ? 0.25 : 0.12}
+          opacity={selected ? 0.4 : status === "threatened" || status === "threat" ? 0.25 : 0.12}
         />
       </mesh>
 

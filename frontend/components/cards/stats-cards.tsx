@@ -8,6 +8,7 @@ import { THREAT_COLORS, type ThreatSeverity } from "@/lib/constants"
 import { MOCK_SATELLITES, MOCK_ORBITAL_SIMILARITY_THREATS } from "@/lib/mock-data"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
+import { useSatellitesWithDerivedStatus } from "@/hooks/use-derived-status"
 import type { OrbitalSimilarityThreat } from "@/types"
 
 /* ═══════════════════════════════════════════════════════
@@ -138,18 +139,18 @@ function OrbitalSimilarityPanel() {
    Fleet Overview Panel
    ═══════════════════════════════════════════════════════ */
 
-type FleetCategory = "friendly" | "nominal" | "watched" | "threatened"
+type FleetCategory = "friendly" | "nominal" | "watched" | "threat" | "threatened"
 
 const FLEET_CATEGORIES: { label: string; key: FleetCategory }[] = [
   { label: "Friendly", key: "friendly" },
   { label: "Nominal", key: "nominal" },
   { label: "Watched", key: "watched" },
+  { label: "Threat", key: "threat" },
   { label: "Threatened", key: "threatened" },
 ]
 
 function FleetOverviewPanel() {
-  const storeSats = useFleetStore((s) => s.satellites)
-  const satellites = storeSats.length > 0 ? storeSats : MOCK_SATELLITES
+  const satellites = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
   const total = satellites.length
 
   const counts: Record<string, number> = {}

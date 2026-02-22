@@ -40,8 +40,26 @@ def _get_satellites() -> list[dict]:
     return _satellites_cache or _generate_fallback_satellites()
 
 
+THREAT_ACTOR_COUNTRIES = {"PRC", "RUS", "CIS"}
+
+# Friendly satellites that must never be threat actors (e.g. ISS is international)
+FRIENDLY_FORCE_EXCLUDE_NORAD = {25544}  # ISS (ZARYA)
+FRIENDLY_FORCE_EXCLUDE_NAMES = ("ISS",)  # ISS is international, never a threat actor
+
+
+def _is_friendly_force_excluded(sat: dict) -> bool:
+    norad = sat.get("noradId") or sat.get("norad_id")
+    if norad is not None and int(norad) in FRIENDLY_FORCE_EXCLUDE_NORAD:
+        return True
+    name = (sat.get("name") or "").upper()
+    return any(exc in name for exc in FRIENDLY_FORCE_EXCLUDE_NAMES)
+
+
 def _get_adversarial_and_allied(sats: list[dict]) -> tuple[list[dict], list[dict]]:
-    adversarial = [s for s in sats if s["status"] == "watched"]
+    adversarial = [
+        s for s in sats
+        if s.get("country_code") in THREAT_ACTOR_COUNTRIES and not _is_friendly_force_excluded(s)
+    ]
     allied = [s for s in sats if s["status"] in ("allied", "friendly")]
     return adversarial, allied
 

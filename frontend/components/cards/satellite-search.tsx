@@ -8,6 +8,7 @@ import { THREAT_COLORS } from "@/lib/constants"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { useUIStore } from "@/stores/ui-store"
+import { useSatellitesWithDerivedStatus } from "@/hooks/use-derived-status"
 import { useGlobeStore } from "@/stores/globe-store"
 import { MOCK_SATELLITES, MOCK_PROXIMITY_THREATS } from "@/lib/mock-data"
 
@@ -17,7 +18,6 @@ export function SatelliteSearch({ className }: { className?: string }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const storeSatellites = useFleetStore((s) => s.satellites)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
   const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
   const storeProximity = useThreatStore((s) => s.proximityThreats)
@@ -25,10 +25,10 @@ export function SatelliteSearch({ className }: { className?: string }) {
   const showLabels = useGlobeStore((s) => s.showLabels)
   const toggleLabels = useGlobeStore((s) => s.toggleLabels)
 
-  const allSatellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
+  const satellitesWithDerivedStatus = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
   const satellites = useMemo(
-    () => allSatellites.filter((s) => s.status !== "allied" || s.id === "sat-6"),
-    [allSatellites]
+    () => satellitesWithDerivedStatus.filter((s) => s.status !== "allied" || s.id === "sat-6"),
+    [satellitesWithDerivedStatus]
   )
   const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
 

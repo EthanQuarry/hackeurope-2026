@@ -155,6 +155,7 @@ def gp_to_satellite(gp: dict, idx: int) -> dict:
         "name": name,
         "noradId": norad_id,
         "status": status,
+        "country_code": country,
         "altitude_km": round(alt_km, 1),
         "velocity_kms": round(v_kms, 2),
         "inclination_deg": round(inc_deg, 1),

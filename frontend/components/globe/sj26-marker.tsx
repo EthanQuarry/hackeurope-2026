@@ -189,7 +189,7 @@ export function SJ26Marker({ simTimeRef, selected = false, onSelect }: SJ26Marke
         <meshBasicMaterial color={threeColor} />
 
         {/* Label */}
-        {(selected || scenario.status === "threatened" || scenario.status === "watched") && (
+        {(selected || scenario.status === "threatened" || scenario.status === "watched" || scenario.status === "threat") && (
           <Html center distanceFactor={6} style={{ pointerEvents: "none", userSelect: "none" }}>
             <div style={{ transform: "translateY(-14px)", textAlign: "center", whiteSpace: "nowrap" }}>
               {scenario.phase > 0 && (
@@ -197,7 +197,7 @@ export function SJ26Marker({ simTimeRef, selected = false, onSelect }: SJ26Marke
                   fontSize: "8px",
                   fontWeight: 600,
                   fontFamily: "monospace",
-                  color: scenario.status === "threatened" ? "rgba(255,68,102,0.8)" : "rgba(255,145,0,0.7)",
+                  color: THREAT_COLORS[scenario.status]?.hex ? `${THREAT_COLORS[scenario.status].hex}cc` : "rgba(255,145,0,0.7)",
                 }}>
                   {scenario.missDistanceKm < 10
                     ? `${scenario.missDistanceKm.toFixed(1)} km`

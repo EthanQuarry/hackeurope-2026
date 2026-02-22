@@ -17,6 +17,7 @@ import { Starfield } from "@/components/globe/starfield"
 import { CameraFocus } from "@/components/globe/camera-focus"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
+import { useSatellitesWithDerivedStatus } from "@/hooks/use-derived-status"
 import { useUIStore } from "@/stores/ui-store"
 import {
   MOCK_SATELLITES,
@@ -228,18 +229,18 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId)
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
   const setActiveView = useUIStore((s) => s.setActiveView)
-  const storeSatellites = useFleetStore((s) => s.satellites)
   const storeThreats = useThreatStore((s) => s.threats)
   const storeDebris = useThreatStore((s) => s.debris)
   const storeProximity = useThreatStore((s) => s.proximityThreats)
   const storeSignal = useThreatStore((s) => s.signalThreats)
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
 
+  const satellitesWithDerivedStatus = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
   const fallbackDebris = useMemo(() => generateMockDebris(2500), [])
 
-  // Use store data (populated by polling), fall back to mocks
+  // Use store data (populated by polling), fall back to mocks; derived status applied in hook
   // Filter out allied satellites except scenario-critical ones (USA-245)
-  const allSatellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
+  const allSatellites = satellitesWithDerivedStatus
   const satellites = useMemo(
     () => allSatellites.filter((s) => s.status !== "allied" || s.id === "sat-6"),
     [allSatellites]

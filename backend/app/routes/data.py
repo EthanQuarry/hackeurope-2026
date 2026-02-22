@@ -114,6 +114,7 @@ def _build_usa245_satellite(idx: int) -> dict:
         "name": "USA-245 (NROL-65)",
         "noradId": 39232,
         "status": "allied",
+        "country_code": "USA",
         "altitude_km": round(alt_km, 1),
         "velocity_kms": round(v_kms, 2),
         "inclination_deg": round(inc_deg, 1),
@@ -234,6 +235,7 @@ def _build_sj26_satellite(idx: int) -> dict:
         "name": "SJ-26 (SHIJIAN-26)",
         "noradId": scenario.SJ26_NORAD_ID,
         "status": status,
+        "country_code": "PRC",
         "altitude_km": round(SJ_ALT, 1),
         "velocity_kms": round(v_kms, 2),
         "inclination_deg": round(SJ_INC, 1),
@@ -249,6 +251,26 @@ def _build_sj26_satellite(idx: int) -> dict:
         result["maneuverArc"] = maneuver_arc
 
     return result
+
+
+def _nation_to_country_code(nation: str) -> str:
+    """Map nation string to Space-Track-style country code."""
+    n = (nation or "").lower()
+    if "russia" in n:
+        return "RUS"
+    if "china" in n:
+        return "PRC"
+    if "united states" in n or "usa" in n:
+        return "USA"
+    if "united kingdom" in n or "uk" in n:
+        return "UK"
+    if "europe" in n or "esa" in n or "eu" in n:
+        return "ESA"
+    if "international" in n:
+        return "UNK"
+    if "luxembourg" in n or "finland" in n or "japan" in n:
+        return "UNK"
+    return "UNK"
 
 
 def _generate_fallback_satellites() -> list[dict]:
@@ -311,11 +333,13 @@ def _generate_fallback_satellites() -> list[dict]:
             lon = math.degrees(math.atan2(ye, xe))
             trajectory.append({"t": t, "lat": round(lat, 2), "lon": round(lon, 2), "alt_km": round(alt_km, 1)})
 
+        country_code = _nation_to_country_code(entry.get("nation", "Unknown"))
         sats.append({
             "id": f"sat-{sat_id}",
             "name": entry.get("name", f"SAT-{sat_id}"),
             "noradId": entry.get("norad_id", 99000 + idx),
             "status": status,
+            "country_code": country_code,
             "altitude_km": round(alt_km, 1),
             "velocity_kms": round(v_kms, 2),
             "inclination_deg": round(inc_deg, 1),
