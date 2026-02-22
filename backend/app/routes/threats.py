@@ -52,7 +52,7 @@ async def get_proximity_threats():
     global _prox_cache, _prox_cache_time, _prox_phase
     now = time.time()
     phase = scenario.current_phase()
-    if _prox_cache and (now - _prox_cache_time) < CACHE_TTL and _prox_phase == phase:
+    if _prox_cache and (now - _prox_cache_time) < scenario.scaled_ttl(CACHE_TTL) and _prox_phase == phase:
         return _prox_cache
 
     sats = _get_satellites()
@@ -201,7 +201,7 @@ async def get_signal_threats():
     global _sig_cache, _sig_cache_time, _sig_phase
     now = time.time()
     phase = scenario.current_phase()
-    if _sig_cache and (now - _sig_cache_time) < CACHE_TTL and _sig_phase == phase:
+    if _sig_cache and (now - _sig_cache_time) < scenario.scaled_ttl(CACHE_TTL) and _sig_phase == phase:
         return _sig_cache
 
     sats = _get_satellites()
@@ -314,7 +314,7 @@ async def get_anomaly_threats():
     global _anom_cache, _anom_cache_time, _anom_phase
     now = time.time()
     phase = scenario.current_phase()
-    if _anom_cache and (now - _anom_cache_time) < CACHE_TTL and _anom_phase == phase:
+    if _anom_cache and (now - _anom_cache_time) < scenario.scaled_ttl(CACHE_TTL) and _anom_phase == phase:
         return _anom_cache
 
     sats = _get_satellites()

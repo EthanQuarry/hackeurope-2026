@@ -19,6 +19,8 @@ export interface SatelliteData {
   inclination_deg: number
   period_min: number
   trajectory: TrajectoryPoint[]
+  /** Maneuver arc in scene-space [x,y,z] — only for scenario satellites */
+  maneuverArc?: [number, number, number][]
   health: {
     power: number
     comms: number

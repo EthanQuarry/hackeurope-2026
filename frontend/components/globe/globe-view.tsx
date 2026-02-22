@@ -29,6 +29,42 @@ import type { DebrisData, SatelliteData, ThreatData, ProximityThreat, SignalThre
 import type { ThreatSeverity } from "@/lib/constants"
 import { PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants"
 
+/** Compute live threat score (0-100) per satellite from ops-level threat data.
+ *  Aggregates the highest signal across proximity, signal, and anomaly threats. */
+function buildThreatScores(
+  proximity: ProximityThreat[],
+  signal: SignalThreat[],
+  anomaly: AnomalyThreat[],
+): Map<string, number> {
+  const scores = new Map<string, number>()
+
+  const update = (id: string, score: number) => {
+    scores.set(id, Math.max(scores.get(id) ?? 0, score))
+  }
+
+  for (const t of proximity) {
+    // Proximity confidence (0-1) → percent, boosted by close distance
+    const distFactor = Math.max(0, 1 - t.missDistanceKm / 500)
+    const score = Math.round(Math.min(99, (t.confidence * 0.6 + distFactor * 0.4) * 100))
+    update(t.foreignSatId, score)
+    // Also score the target (it's under threat)
+    update(t.targetAssetId, Math.round(score * 0.5))
+  }
+
+  for (const t of signal) {
+    const score = Math.round(Math.min(99, t.interceptionProbability * 100))
+    update(t.interceptorId, score)
+    update(t.targetLinkAssetId, Math.round(score * 0.4))
+  }
+
+  for (const t of anomaly) {
+    const score = Math.round(Math.min(99, (t.confidence * 0.5 + t.baselineDeviation * 0.5) * 100))
+    update(t.satelliteId, score)
+  }
+
+  return scores
+}
+
 interface HostileMarkerData {
   id: string
   name: string
@@ -75,6 +111,7 @@ function Scene({
   debris,
   threats,
   hostileMarkers,
+  threatScores,
   selectedSatelliteId,
   onSelectSatellite,
   simTimeRef,
@@ -86,6 +123,7 @@ function Scene({
   debris: DebrisData[]
   threats: ThreatData[]
   hostileMarkers: HostileMarkerData[]
+  threatScores: Map<string, number>
   selectedSatelliteId: string | null
   onSelectSatellite: (id: string) => void
   simTimeRef: React.RefObject<number>
@@ -105,10 +143,11 @@ function Scene({
 
       {/* Satellites */}
       {satellites.map((sat) => {
-        // Compute threat % for watched/threatened satellites
-        let threatPercent: number | undefined
-        if (sat.status === "threatened") threatPercent = 60 + Math.floor((parseInt(sat.id.replace(/\D/g, ""), 10) || 0) % 35)
-        else if (sat.status === "watched") threatPercent = 15 + Math.floor((parseInt(sat.id.replace(/\D/g, ""), 10) || 0) % 40)
+        // Live threat score from proximity/signal/anomaly data (updates every poll cycle)
+        const liveScore = threatScores.get(sat.id)
+        const threatPercent = liveScore != null && liveScore > 0 ? liveScore : undefined
+
+        const showFull = sat.id === "sat-6" || sat.id === "sat-25" || sat.id === selectedSatelliteId
 
         return (
           <SatelliteMarker
@@ -122,9 +161,12 @@ function Scene({
             simTimeRef={simTimeRef}
             threatPercent={threatPercent}
             threatScore={satScores[sat.id] ?? 0}
+            showFullOrbit={showFull}
+            maneuverArc={sat.maneuverArc}
           />
         )
       })}
+
 
       {/* Hostile / foreign satellite markers from live threat data */}
       {hostileMarkers.map((h) => (
@@ -194,13 +236,24 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const fallbackDebris = useMemo(() => generateMockDebris(2500), [])
 
   // Use store data (populated by polling), fall back to mocks
-  const satellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
+  // Filter out allied satellites except scenario-critical ones (USA-245)
+  const allSatellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
+  const satellites = useMemo(
+    () => allSatellites.filter((s) => s.status !== "allied" || s.id === "sat-6"),
+    [allSatellites]
+  )
   const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris
   const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS
 
   const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
   const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
   const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+
+  // Live threat scores from ops-level data — updates every poll cycle
+  const threatScores = useMemo(
+    () => buildThreatScores(proximityThreats, signalThreats, anomalyThreats),
+    [proximityThreats, signalThreats, anomalyThreats],
+  )
 
   // Derive hostile markers, excluding IDs that already exist as fleet satellites
   const hostileMarkers = useMemo(() => {
@@ -237,6 +290,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
           debris={debris}
           threats={threats}
           hostileMarkers={hostileMarkers}
+          threatScores={threatScores}
           selectedSatelliteId={selectedSatelliteId}
           onSelectSatellite={selectSatellite}
           simTimeRef={simTimeRef}

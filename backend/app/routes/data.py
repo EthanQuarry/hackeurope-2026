@@ -127,37 +127,128 @@ def _build_usa245_satellite(idx: int) -> dict:
     }
 
 
+def _orbit_xyz(alt_km: float, inc_deg: float, raan_deg: float, ta: float):
+    """Orbital elements → scene-space xyz (Earth radius = 1.0, Y=north, Z=-lon90).
+    Same coordinate system as frontend's geodeticToSceneVec3."""
+    r = 1.0 + alt_km / 6378.137
+    inc = math.radians(inc_deg)
+    raan = math.radians(raan_deg)
+    xo, yo = math.cos(ta), math.sin(ta)
+    # ECI
+    xe = xo * math.cos(raan) - yo * math.cos(inc) * math.sin(raan)
+    ye_eci = xo * math.sin(raan) + yo * math.cos(inc) * math.cos(raan)
+    ze = yo * math.sin(inc)
+    # ECI → scene (match geodeticToSceneVec3: x=cos(lat)cos(lon), y=sin(lat), z=-cos(lat)sin(lon))
+    lat = math.asin(max(-1, min(1, ze)))
+    lon = math.atan2(ye_eci, xe)
+    return (
+        r * math.cos(lat) * math.cos(lon),
+        r * math.sin(lat),
+        -r * math.cos(lat) * math.sin(lon),
+    )
+
+
 def _build_sj26_satellite(idx: int) -> dict:
-    """Build the SJ-26 scenario satellite entry with phase-driven orbital parameters."""
+    """Build SJ-26 on its OWN orbit, near but separate from USA-245.
+
+    SJ-26 is on a nearby but different orbit (slightly different inclination).
+    The two rings are close but visibly separate — they don't overlap.
+    SJ-26 is positioned ahead of USA-245 in the direction of travel.
+
+    Phase 0: SJ-26 goes straight on its own orbit ring. Green. Normal.
+    Phase 1+: SJ-26 fires thrusters and arcs OFF its orbit INTO USA-245's
+              orbit path. The maneuver arc is a curved line from SJ-26's
+              ring to USA-245's ring, creating a collision course.
+    """
     from app.spacetrack import _generate_trajectory
 
-    alt_km = scenario.sj26_altitude_km()
-    inc_offset = scenario.sj26_inclination_offset()
-    raan_offset = scenario.sj26_raan_offset()
-    inc_deg = scenario.TARGET_INC_DEG + inc_offset
-    raan_deg = scenario.TARGET_RAAN_DEG + raan_offset
-    period_min = 2 * math.pi * math.sqrt((6378.137 + alt_km) ** 3 / 398600.4418) / 60
-    v_kms = math.sqrt(398600.4418 / (6378.137 + alt_km))
+    phase = scenario.current_phase()
+    progress = scenario.phase_progress()
     status = scenario.sj26_status()
 
-    trajectory = _generate_trajectory(inc_deg, alt_km, raan_deg, 0.0, period_min)
+    # USA-245's orbit
+    TGT_ALT = scenario.TARGET_ALT_KM      # 500 km
+    TGT_INC = scenario.TARGET_INC_DEG     # 63.4°
+    TGT_RAAN = scenario.TARGET_RAAN_DEG   # 142°
 
-    return {
+    # SJ-26's OWN orbit — same altitude, slightly different inclination
+    # This makes two rings that are close but tilted differently
+    SJ_ALT = 505.0           # slightly higher
+    SJ_INC = TGT_INC + 5.0   # 68.4° — 5° more tilted
+    SJ_RAAN = TGT_RAAN + 3.0 # 145° — slightly rotated
+
+    # SJ-26 is ahead of USA-245: USA-245 at ma=45°, SJ-26 at ma=65°
+    SJ_MA = 65.0
+
+    period_min = 2 * math.pi * math.sqrt((6378.137 + SJ_ALT) ** 3 / 398600.4418) / 60
+
+    # SJ-26 always orbits on its own ring
+    trajectory = _generate_trajectory(SJ_INC, SJ_ALT, SJ_RAAN, SJ_MA, period_min)
+
+    # Maneuver arc: SJ-26 arcs from its own orbit into USA-245's orbit
+    maneuver_arc = None
+    if phase >= 1:
+        # P0: point on SJ-26's orbit (where it departs)
+        ta_depart = math.radians(SJ_MA + 30)  # 30° ahead of start position
+        p0 = _orbit_xyz(SJ_ALT, SJ_INC, SJ_RAAN, ta_depart)
+
+        # P2: point on USA-245's orbit (where it arrives — the collision point)
+        # This is on USA-245's ring, ahead of where USA-245 currently is
+        ta_arrive = math.radians(45 + 15)  # USA-245 at 45°, collision point at 60°
+        p2 = _orbit_xyz(TGT_ALT, TGT_INC, TGT_RAAN, ta_arrive)
+
+        # Control point: between the two orbits, bulging outward
+        # Midpoint of P0 and P2, pushed outward from Earth for visible curve
+        mx = (p0[0] + p2[0]) / 2
+        my = (p0[1] + p2[1]) / 2
+        mz = (p0[2] + p2[2]) / 2
+        m_len = math.sqrt(mx*mx + my*my + mz*mz)
+        # Push outward by 0.08 scene units (~500 km) for visible arc
+        bulge = 0.08
+        p1 = (
+            mx + (mx / m_len) * bulge,
+            my + (my / m_len) * bulge,
+            mz + (mz / m_len) * bulge,
+        )
+
+        # Sample quadratic Bezier
+        arc_points = []
+        num_samples = 100
+        for i in range(num_samples + 1):
+            u = i / num_samples
+            w0 = (1 - u) ** 2
+            w1 = 2 * (1 - u) * u
+            w2 = u * u
+            arc_points.append([
+                w0 * p0[0] + w1 * p1[0] + w2 * p2[0],
+                w0 * p0[1] + w1 * p1[1] + w2 * p2[1],
+                w0 * p0[2] + w1 * p1[2] + w2 * p2[2],
+            ])
+        maneuver_arc = arc_points
+
+    period_sec = period_min * 60
+    v_kms = math.sqrt(398600.4418 / (6378.137 + SJ_ALT))
+
+    result = {
         "id": scenario.SJ26_SAT_ID,
         "name": "SJ-26 (SHIJIAN-26)",
         "noradId": scenario.SJ26_NORAD_ID,
         "status": status,
-        "altitude_km": round(alt_km, 1),
+        "altitude_km": round(SJ_ALT, 1),
         "velocity_kms": round(v_kms, 2),
-        "inclination_deg": round(inc_deg, 1),
+        "inclination_deg": round(SJ_INC, 1),
         "period_min": round(period_min, 1),
         "trajectory": trajectory,
         "health": {
             "power": 94,
             "comms": 97,
-            "propellant": 82,
+            "propellant": 82 if phase < 2 else max(30, 82 - phase * 15),
         },
     }
+    if maneuver_arc:
+        result["maneuverArc"] = maneuver_arc
+
+    return result
 
 
 def _generate_fallback_satellites() -> list[dict]:
@@ -263,9 +354,10 @@ async def get_satellites(speed: float = 1.0):
     phase = scenario.current_phase()
 
     # Invalidate cache on phase transitions so SJ-26 data evolves
+    # TTL scales inversely with sim speed (30s at 1x, 3s at 10x, 0.5s at 60x+)
     cache_valid = (
         _satellites_cache
-        and (now - _satellites_cache_time) < 30  # shorter TTL for scenario responsiveness
+        and (now - _satellites_cache_time) < scenario.scaled_ttl(30)
         and _scenario_phase_at_cache == phase
     )
     if cache_valid:
@@ -288,6 +380,46 @@ async def get_satellites(speed: float = 1.0):
     _satellites_cache_time = now
     _scenario_phase_at_cache = phase
     return sats
+
+
+@router.get("/scenario/sj26")
+async def get_sj26_scenario(speed: float = 1.0):
+    """Return SJ-26 scenario state for frontend trajectory computation."""
+    scenario.set_speed(speed)
+    return {
+        "phase": scenario.current_phase(),
+        "progress": round(scenario.phase_progress(), 3),
+        "status": scenario.sj26_status(),
+        "elapsed": round(scenario.elapsed(), 1),
+        # Original orbit (benign)
+        "originalOrbit": {
+            "altKm": 520.0,
+            "incDeg": scenario.TARGET_INC_DEG + 8.0,
+            "raanDeg": scenario.TARGET_RAAN_DEG + 25.0,
+        },
+        # Current converged orbit (phase-dependent)
+        "currentOrbit": {
+            "altKm": round(scenario.sj26_altitude_km(), 1),
+            "incDeg": round(scenario.TARGET_INC_DEG + scenario.sj26_inclination_offset(), 1),
+            "raanDeg": round(scenario.TARGET_RAAN_DEG + scenario.sj26_raan_offset(), 1),
+        },
+        # USA-245 target orbit
+        "targetOrbit": {
+            "altKm": scenario.TARGET_ALT_KM,
+            "incDeg": scenario.TARGET_INC_DEG,
+            "raanDeg": scenario.TARGET_RAAN_DEG,
+        },
+        "missDistanceKm": round(scenario.sj26_miss_distance_km(), 1),
+        # How much of the orbit is normal before maneuver
+        "normalFraction": round(
+            1.0 if scenario.current_phase() == 0 else
+            max(0.05, {0: 1.0, 1: 0.7 - 0.25 * scenario.phase_progress(),
+                       2: 0.45 - 0.25 * scenario.phase_progress(),
+                       3: 0.2 - 0.15 * scenario.phase_progress()}.get(scenario.current_phase(), 0.5)),
+            2
+        ),
+        "arcHeightKm": 40.0,  # Bezier control point altitude boost
+    }
 
 
 @router.get("/debris")

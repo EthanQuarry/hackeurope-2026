@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useMemo, useRef, useEffect } from "react"
-import { Search, X } from "lucide-react"
+import { Search, X, Tag, TagsIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { THREAT_COLORS, PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
+import { useGlobeStore } from "@/stores/globe-store"
 import { MOCK_SATELLITES, MOCK_PROXIMITY_THREATS } from "@/lib/mock-data"
 
 export function SatelliteSearch({ className }: { className?: string }) {
@@ -19,8 +20,14 @@ export function SatelliteSearch({ className }: { className?: string }) {
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
   const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
   const storeProximity = useThreatStore((s) => s.proximityThreats)
+  const showLabels = useGlobeStore((s) => s.showLabels)
+  const toggleLabels = useGlobeStore((s) => s.toggleLabels)
 
-  const satellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
+  const allSatellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
+  const satellites = useMemo(
+    () => allSatellites.filter((s) => s.status !== "allied" || s.id === "sat-6"),
+    [allSatellites]
+  )
   const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
 
   const satScores = useMemo(() => {
@@ -65,35 +72,54 @@ export function SatelliteSearch({ className }: { className?: string }) {
     setOpen(false)
   }
 
+  const LabelIcon = showLabels ? Tag : TagsIcon
+
   return (
     <div ref={containerRef} className={cn("pointer-events-auto relative w-[280px]", className)}>
-      {/* Search input */}
-      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-card/60 px-3 py-2 backdrop-blur-xl shadow-2xl">
-        <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          placeholder="Search satellites..."
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setOpen(true)
-          }}
-          onFocus={() => setOpen(true)}
-          className="flex-1 bg-transparent text-xs text-gray-200 placeholder:text-gray-500 outline-none"
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={() => {
-              setQuery("")
-              inputRef.current?.focus()
+      {/* Search input + labels toggle */}
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-card/60 px-3 py-2 backdrop-blur-xl shadow-2xl">
+          <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            placeholder="Search satellites..."
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setOpen(true)
             }}
-            className="text-gray-500 hover:text-gray-300"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
+            onFocus={() => setOpen(true)}
+            className="flex-1 bg-transparent text-xs text-gray-200 placeholder:text-gray-500 outline-none"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("")
+                inputRef.current?.focus()
+              }}
+              className="text-gray-500 hover:text-gray-300"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Labels toggle */}
+        <button
+          type="button"
+          onClick={toggleLabels}
+          title={showLabels ? "Hide threat labels" : "Show threat labels"}
+          className={cn(
+            "flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-xl border backdrop-blur-xl shadow-2xl transition-colors",
+            showLabels
+              ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-400"
+              : "border-white/10 bg-card/60 text-gray-500 hover:text-gray-300"
+          )}
+        >
+          <LabelIcon className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       {/* Dropdown results */}

@@ -55,6 +55,16 @@ def set_speed(speed: float) -> None:
     _speed = max(1.0, speed)
 
 
+def get_speed() -> float:
+    """Current sim speed multiplier."""
+    return _speed
+
+
+def scaled_ttl(base_ttl: float) -> float:
+    """Scale a cache TTL inversely with sim speed. Floor at 0.5s."""
+    return max(0.5, base_ttl / _speed)
+
+
 # ---------------------------------------------------------------------------
 # Time helpers
 # ---------------------------------------------------------------------------

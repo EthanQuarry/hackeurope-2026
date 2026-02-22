@@ -19,6 +19,7 @@ import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { usePolling } from "@/hooks/use-polling"
+import { useScenarioSocket } from "@/hooks/use-scenario-socket"
 import { api } from "@/lib/api"
 import {
   MOCK_THREATS,
@@ -65,21 +66,23 @@ export function DashboardShell() {
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
   const storeOrbital = useThreatStore((s) => s.orbitalSimilarityThreats)
 
-  // Poll backend for live data — falls back to mocks on error
-  // Pass speed so scenario timing syncs with sim speed
+  // ── WebSocket: sole source for all threat data ──
+  // Pushes complete threat arrays (general + SJ-26) every tick.
+  // Tick rate scales with sim speed. No REST polling for threats.
+  useScenarioSocket()
+
+  // ── REST polling: satellites + debris only (large payloads, infrequent) ──
+  const orbitInterval = Math.max(1000, Math.round(10_000 / speed))
+  const debrisInterval = Math.max(2000, Math.round(DEBRIS_REFRESH_MS / speed))
+
   usePolling<SatelliteData[]>({
     url: `${api.satellites}?speed=${speed}`,
-    intervalMs: 10_000,
+    intervalMs: orbitInterval,
     onData: setSatellites,
-  })
-  usePolling<ThreatData[]>({
-    url: api.threats,
-    intervalMs: THREAT_REFRESH_MS,
-    onData: setThreats,
   })
   usePolling<DebrisData[]>({
     url: api.debris,
-    intervalMs: DEBRIS_REFRESH_MS,
+    intervalMs: debrisInterval,
     onData: setDebris,
   })
 

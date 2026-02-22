@@ -10,6 +10,7 @@ export const api = {
   signalThreats: `${BASE}/threats/signal`,
   anomalyThreats: `${BASE}/threats/anomaly`,
   orbitalSimilarityThreats: `${BASE}/threats/orbital-similarity`,
+  sj26Scenario: `${BASE}/scenario/sj26`,
   analysisStream: `${BASE}/analysis/stream`,
   responses: `${BASE}/responses`,
   commsChat: `${BASE}/comms/chat`,

@@ -7,6 +7,7 @@ import * as THREE from "three"
 
 import { geodeticToSceneVec3 } from "@/lib/geo"
 import { THREAT_COLORS, PROXIMITY_FLAG_THRESHOLD, type ThreatSeverity } from "@/lib/constants"
+import { useGlobeStore } from "@/stores/globe-store"
 import type { TrajectoryPoint } from "@/types"
 
 interface SatelliteMarkerProps {
@@ -20,6 +21,17 @@ interface SatelliteMarkerProps {
   simTimeRef: React.RefObject<number>
   threatPercent?: number
   threatScore?: number
+  /** Show the full predicted orbit path (faint) — used for scenario satellites */
+  showFullOrbit?: boolean
+  /** Maneuver arc in scene-space xyz — rendered as separate overlay */
+  maneuverArc?: [number, number, number][]
+}
+
+/** Fit a Catmull-Rom spline and sample it */
+function catmull(points: THREE.Vector3[], closed = false, samples = 600): THREE.Vector3[] {
+  if (points.length < 4) return points
+  const curve = new THREE.CatmullRomCurve3(points, closed, "centripetal", 0.2)
+  return curve.getPoints(samples)
 }
 
 const TRAIL_FRACTION = 0.20
@@ -49,6 +61,8 @@ export function SatelliteMarker({
   simTimeRef,
   threatPercent,
   threatScore = 0,
+  showFullOrbit = false,
+  maneuverArc,
 }: SatelliteMarkerProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
@@ -205,12 +219,44 @@ export function SatelliteMarker({
     }
   })
 
-  // Only show label for selected or threatened satellites (not all of them)
-  const showLabel = selected || status === "threatened"
+  const labelsEnabled = useGlobeStore((s) => s.showLabels)
+  // Show label when globally enabled, or always for selected satellite
+  const showLabel = selected || (labelsEnabled && (status === "threatened" || status === "watched"))
   const markerSize = status === "threatened" ? size * 1.5 : size
+
+  // Full orbit ring — clean closed loop (no maneuver splice)
+  const fullOrbitRing = useMemo(() => {
+    if (!showFullOrbit || scenePoints.length < 4) return null
+    return catmull([...scenePoints, scenePoints[0].clone()], true, 800)
+  }, [showFullOrbit, scenePoints])
 
   return (
     <group>
+      {/* Full orbit ring — clean spline, no maneuver */}
+      {fullOrbitRing && (
+        <Line
+          points={fullOrbitRing}
+          color={color}
+          transparent
+          opacity={0.15}
+          lineWidth={0.6}
+          dashed
+          dashSize={0.01}
+          gapSize={0.008}
+        />
+      )}
+
+      {/* Maneuver arc overlay — separate curved transfer path (pre-computed xyz from backend) */}
+      {maneuverArc && maneuverArc.length > 1 && (
+        <Line
+          points={maneuverArc}
+          color={status === "threatened" ? "#ff2244" : status === "watched" ? "#ff9100" : "#ffcc00"}
+          transparent
+          opacity={0.7}
+          lineWidth={2.0}
+        />
+      )}
+
       {/* Orbit trail — positions updated every frame in useFrame */}
       <Line
         ref={lineRef}
