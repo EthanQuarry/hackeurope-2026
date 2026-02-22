@@ -108,7 +108,7 @@ export function DashboardHeader({
 
   return (
     <header className="flex min-w-max items-center gap-4 rounded-2xl border border-white/10 bg-card/60 px-6 py-3 shadow-2xl backdrop-blur-xl">
-      {/* Left: Logo + branding + planet selector */}
+      {/* Left: Logo + branding */}
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -120,7 +120,6 @@ export function DashboardHeader({
             Orbital Shield
           </h1>
         </button>
-        <PlanetSelector />
       </div>
 
       {/* Center: Pill-style nav tabs */}
