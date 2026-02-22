@@ -191,14 +191,14 @@ def _build_sj26_satellite(idx: int) -> dict:
     TGT_INC = scenario.TARGET_INC_DEG     # 63.4°
     TGT_RAAN = scenario.TARGET_RAAN_DEG   # 142°
 
-    # SJ-26's OWN orbit — same altitude, slightly different inclination
-    # This makes two rings that are close but tilted differently
-    SJ_ALT = 505.0           # slightly higher
-    SJ_INC = TGT_INC + 5.0   # 68.4° — 5° more tilted
-    SJ_RAAN = TGT_RAAN + 3.0 # 145° — slightly rotated
+    # SJ-26's OWN orbit — close to USA-245 but slightly different
+    # Small offsets so they're nearby but visibly separate orbits
+    SJ_ALT = 502.0           # 2km higher
+    SJ_INC = TGT_INC + 2.0   # 65.4° — 2° more tilted
+    SJ_RAAN = TGT_RAAN + 1.5 # 143.5° — slightly rotated
 
-    # SJ-26 is ahead of USA-245: USA-245 at ma=45°, SJ-26 at ma=65°
-    SJ_MA = 65.0
+    # SJ-26 is ahead of USA-245: USA-245 at ma=45°, SJ-26 at ma=55°
+    SJ_MA = 55.0
 
     period_min = 2 * math.pi * math.sqrt((6378.137 + SJ_ALT) ** 3 / 398600.4418) / 60
 
@@ -297,7 +297,7 @@ async def get_satellites():
     global _satellites_cache, _satellites_cache_time
     now = time.time()
 
-    if _satellites_cache and (now - _satellites_cache_time) < 3600:
+    if _satellites_cache and (now - _satellites_cache_time) < 30:
         return _satellites_cache
 
     try:

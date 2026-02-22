@@ -210,12 +210,16 @@ const MemoScene = React.memo(function Scene({
     // Check for visual alert threshold crossings
     checkThresholdTriggers(scores, prevScoresRef.current, THREAT_ALERT_THRESHOLD)
 
-    // Check for response agent threshold crossings (90%)
+    // Check for response agent threshold crossings — defer to avoid setState during render
     const responseTriggered = checkThresholdTriggers(scores, prevScoresRef.current, RESPONSE_AGENT_THRESHOLD)
     if (responseTriggered.length > 0 && onResponseAgentTrigger) {
-      for (const satId of responseTriggered) {
-        onResponseAgentTrigger(satId, scores.get(satId) ?? 90)
-      }
+      const cb = onResponseAgentTrigger
+      const triggered = responseTriggered.map((id) => ({ id, score: scores.get(id) ?? 90 }))
+      queueMicrotask(() => {
+        for (const { id, score } of triggered) {
+          cb(id, score)
+        }
+      })
     }
 
     prevScoresRef.current = scores

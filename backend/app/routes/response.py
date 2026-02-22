@@ -30,7 +30,7 @@ async def _response_generator(
     approach_pattern: str,
     tca_minutes: int,
 ):
-    """Run the ThreatResponseAgent and yield SSE events."""
+    """Run the ThreatResponseAgent and yield SSE events live as they happen."""
 
     yield _sse_line({
         "type": "response_start",
@@ -42,45 +42,47 @@ async def _response_generator(
     })
     await asyncio.sleep(0.1)
 
-    progress_events: list[dict] = []
+    # Async queue so progress events stream live during agent execution
+    queue: asyncio.Queue[dict | None] = asyncio.Queue()
 
     async def on_progress(text: str):
-        # Classify progress events
         if text.startswith("[Tool:"):
-            progress_events.append({"type": "response_tool", "text": text})
+            await queue.put({"type": "response_tool", "text": text})
         else:
-            progress_events.append({"type": "response_progress", "text": text})
+            await queue.put({"type": "response_progress", "text": text})
 
     agent = ThreatResponseAgent(on_progress=on_progress)
 
-    try:
-        decision = await agent.run(
-            satellite_id=satellite_id,
-            satellite_name=satellite_name,
-            threat_satellite_id=threat_satellite_id,
-            threat_satellite_name=threat_satellite_name,
-            threat_score=threat_score,
-            miss_distance_km=miss_distance_km,
-            approach_pattern=approach_pattern,
-            tca_minutes=tca_minutes,
-        )
-    except Exception as exc:
-        logger.exception("Threat response agent failed")
-        yield _sse_line({"type": "response_error", "message": str(exc)})
-        return
+    # Run agent in background task so we can yield from queue concurrently
+    async def run_agent():
+        try:
+            decision = await agent.run(
+                satellite_id=satellite_id,
+                satellite_name=satellite_name,
+                threat_satellite_id=threat_satellite_id,
+                threat_satellite_name=threat_satellite_name,
+                threat_score=threat_score,
+                miss_distance_km=miss_distance_km,
+                approach_pattern=approach_pattern,
+                tca_minutes=tca_minutes,
+            )
+            await queue.put({"type": "response_complete", "data": decision.model_dump()})
+        except Exception as exc:
+            logger.exception("Threat response agent failed")
+            await queue.put({"type": "response_error", "message": str(exc)})
+        finally:
+            await queue.put(None)  # sentinel to stop yielding
 
-    # Yield buffered progress events
-    for ev in progress_events:
-        yield _sse_line(ev)
-        await asyncio.sleep(0.05)
+    task = asyncio.create_task(run_agent())
 
-    await asyncio.sleep(0.2)
+    # Yield events from queue as they arrive — live streaming
+    while True:
+        event = await queue.get()
+        if event is None:
+            break
+        yield _sse_line(event)
 
-    # Yield final decision
-    yield _sse_line({
-        "type": "response_complete",
-        "data": decision.model_dump(),
-    })
+    await task  # ensure clean completion
 
 
 @router.get("/response/stream")

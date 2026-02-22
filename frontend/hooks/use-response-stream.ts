@@ -40,8 +40,8 @@ export function useResponseStream() {
         })
       }
 
-      // Open the command center (comms view)
-      setActiveView("comms")
+      // Stay on overview — the threat response overlay shows in the corner
+      setActiveView("overview")
 
       // Abort any existing stream
       abortRef.current?.abort()
