@@ -16,12 +16,12 @@ const driftState: Record<string, number> = {}
 function addVariance(satId: string, trueRisk: number): number {
   if (trueRisk === 0) return 0
   const prev = driftState[satId] ?? 0
-  // Random walk step: ±0.08 max per tick
-  const step = (Math.random() - 0.5) * 0.16
-  // Mean-revert toward 0 so drift doesn't run away
-  const drift = prev * 0.7 + step
+  // Large random walk step: ±0.25 per tick for dramatic swings
+  const step = (Math.random() - 0.5) * 0.50
+  // Weak mean-reversion so it drifts far before pulling back
+  const drift = prev * 0.85 + step
   driftState[satId] = drift
-  return Math.max(0, Math.min(1, trueRisk + drift * trueRisk))
+  return Math.max(0, Math.min(1, trueRisk + drift))
 }
 
 export function useFleetRiskAccumulator() {

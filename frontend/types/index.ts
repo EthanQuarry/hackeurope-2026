@@ -292,3 +292,72 @@ export interface ThreatResponseDecision {
   time_sensitivity: string
   intelligence_summary: string
 }
+
+// --- Autonomous Agent Ops Types ---
+
+/** Flowchart step identifiers for the agent decision pipeline */
+export type AgentFlowStepId =
+  | "threshold-breach"
+  | "deep-research-target"
+  | "deep-research-threat"
+  | "geopolitical-analysis"
+  | "threat-assessment"
+  | "response-selection"
+
+/** Status of a single flowchart step */
+export type AgentStepStatus = "pending" | "active" | "complete" | "error"
+
+/** A single thinking line within a flowchart step */
+export interface AgentThinkingLine {
+  id: number
+  text: string
+  timestamp: number
+  type: "reasoning" | "tool" | "result" | "warning" | "data"
+}
+
+/** A flowchart step with its content and status */
+export interface AgentFlowStep {
+  id: AgentFlowStepId
+  label: string
+  status: AgentStepStatus
+  thinkingLines: AgentThinkingLine[]
+  summary: string | null
+  startedAt: number | null
+  completedAt: number | null
+}
+
+/** Response tier severity — ordered from least to most severe */
+export type AgentResponseTier = "manoeuvre" | "sarcastic-manoeuvre" | "decoy" | "destroy"
+
+/** A single response option in the agent's final decision */
+export interface AgentResponseOption {
+  tier: AgentResponseTier
+  label: string
+  description: string
+  severity: number          // 1-4 (1 = least, 4 = WW3)
+  justification: string
+  confidence: number        // 0-1
+  risks: string[]
+  benefits: string[]
+  estimatedTimeMin: number
+  deltaVMs: number
+  recommended: boolean
+}
+
+/** Full agent session representing one autonomous decision pipeline */
+export interface AgentSession {
+  id: string
+  satelliteId: string
+  satelliteName: string
+  threatSatelliteId: string
+  threatSatelliteName: string
+  triggerRisk: number
+  triggerReason: string
+  startedAt: number
+  completedAt: number | null
+  steps: AgentFlowStep[]
+  selectedResponse: AgentResponseOption | null
+  allResponses: AgentResponseOption[]
+  threatLevel: "low" | "medium" | "high" | "critical"
+  geopoliticalContext: string | null
+}

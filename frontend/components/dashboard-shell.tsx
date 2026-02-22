@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useCallback, useState, lazy, Suspense } from "react"
-import { Activity, Brain, ChevronLeft, ChevronRight, GitBranch, Lightbulb, Satellite, Target, Video } from "lucide-react"
+import { Activity, Brain, ChevronLeft, ChevronRight, GitBranch, Lightbulb, Satellite, ShieldAlert, Target, Video } from "lucide-react"
 import { api } from "@/lib/api"
 
 import { GlobeView } from "@/components/globe/globe-view"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { InsightsCard } from "@/components/cards/insights-card"
 import { SatelliteCard } from "@/components/cards/satellite-card"
-import { AiChatBar } from "@/components/cards/ai-chat-bar"
 import { StatsCards } from "@/components/cards/stats-cards"
 import { SatelliteSearch } from "@/components/cards/satellite-search"
 import { DemoSelector } from "@/components/cards/demo-selector"
@@ -19,7 +18,9 @@ import { CommsOps } from "@/components/ops/comms-ops"
 import { OrbitalOps } from "@/components/ops/orbital-ops"
 import { AdversaryOps } from "@/components/ops/adversary-ops"
 import { FleetRiskOps } from "@/components/ops/fleet-risk-ops"
+import { AgentOps } from "@/components/ops/agent-ops"
 import { useFleetRiskAccumulator } from "@/hooks/use-fleet-risk-accumulator"
+import { useAgentTrigger } from "@/hooks/use-agent-trigger"
 const SatelliteDetailPage = lazy(() =>
   import("@/components/satellite-detail-page").then((m) => ({
     default: m.SatelliteDetailPage,
@@ -57,6 +58,7 @@ const SIDEBAR_TABS: { id: ActiveView; icon: typeof Lightbulb; label: string; col
   { id: "comms", icon: Satellite, label: "Comms", color: "text-muted-foreground" },
   { id: "fleet-risk", icon: Activity, label: "Fleet Risk", color: "text-cyan-400/70" },
   { id: "adversary-detail", icon: Target, label: "Adversary", color: "text-red-400/70" },
+  { id: "agent-ops", icon: ShieldAlert, label: "Agent", color: "text-purple-400/70" },
 ]
 
 export function DashboardShell() {
@@ -68,6 +70,7 @@ export function DashboardShell() {
   }, [])
 
   useFleetRiskAccumulator()
+  useAgentTrigger()
 
   const activeView = useUIStore((s) => s.activeView)
   const setActiveView = useUIStore((s) => s.setActiveView)
@@ -217,6 +220,8 @@ export function DashboardShell() {
                         isActive
                           ? tab.id === "adversary-detail"
                             ? "bg-red-500/10 text-red-400"
+                            : tab.id === "agent-ops"
+                            ? "bg-purple-500/10 text-purple-400"
                             : "bg-white/[0.10] text-foreground"
                           : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
                       )}
@@ -291,6 +296,8 @@ export function DashboardShell() {
                       isActive
                         ? tab.id === "adversary-detail"
                           ? "bg-red-500/10 text-red-400"
+                          : tab.id === "agent-ops"
+                          ? "bg-purple-500/10 text-purple-400"
                           : "bg-white/[0.10] text-foreground"
                         : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
                     )}
@@ -324,10 +331,6 @@ export function DashboardShell() {
               <StatsCards />
             </div>
 
-            {/* Bottom center: AI Chat input bar */}
-            <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
-              <AiChatBar />
-            </div>
           </div>
         ) : (
           /* Ops pages: full mission view */
@@ -354,6 +357,7 @@ export function DashboardShell() {
             {activeView === "orbital" && <OrbitalOps threats={orbitalThreats} />}
             {activeView === "fleet-risk" && <FleetRiskOps />}
             {activeView === "adversary-detail" && <AdversaryOps />}
+            {activeView === "agent-ops" && <AgentOps />}
           </div>
         )}
       </div>

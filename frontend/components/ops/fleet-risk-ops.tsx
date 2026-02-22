@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState, useEffect } from "react"
+import { useMemo, useRef, useState, useEffect, memo, useCallback } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useFleetStore } from "@/stores/fleet-store"
@@ -8,63 +8,128 @@ import { useThreatStore } from "@/stores/threat-store"
 import { useFleetRiskStore, type RiskSnapshot } from "@/stores/fleet-risk-store"
 import { computeFleetRisk } from "@/lib/fleet-risk"
 
-/* ── Sparkline ─────────────────────────────────────────── */
+/* ── Color helper ──────────────────────────────────────── */
 
-function RiskSparkline({ snapshots, width, height }: { snapshots: RiskSnapshot[]; width: number; height: number }) {
-  if (snapshots.length === 0) {
-    return (
-      <svg width={width} height={height} className="opacity-30">
-        <line x1={0} y1={height / 2} x2={width} y2={height / 2} stroke="currentColor" strokeWidth={0.5} strokeDasharray="2,4" />
-      </svg>
-    )
-  }
-
-  const pad = { top: 2, bottom: 2, left: 0, right: 32 }
-  const plotW = width - pad.left - pad.right
-  const plotH = height - pad.top - pad.bottom
-
-  const tMin = snapshots[0].t
-  const tMax = snapshots[snapshots.length - 1].t
-  const tRange = tMax - tMin || 1
-
-  const points = snapshots.map((s) => ({
-    x: pad.left + ((s.t - tMin) / tRange) * plotW,
-    y: pad.top + plotH - s.risk * plotH,
-    risk: s.risk,
-  }))
-
-  const polyline = points.map((p) => `${p.x},${p.y}`).join(" ")
-  const last = points[points.length - 1]
-  const pct = Math.round(last.risk * 100)
-
-  const color =
-    last.risk > 0.6 ? "#ff1744" : last.risk > 0.3 ? "#ffc800" : last.risk > 0 ? "#00e676" : "#555"
-
-  return (
-    <svg width={width} height={height}>
-      <line
-        x1={pad.left} y1={pad.top + plotH}
-        x2={pad.left + plotW} y2={pad.top + plotH}
-        stroke="currentColor" strokeWidth={0.3} className="text-border/40"
-      />
-      <polygon
-        points={`${pad.left},${pad.top + plotH} ${polyline} ${last.x},${pad.top + plotH}`}
-        fill={color} fillOpacity={0.08}
-      />
-      <polyline
-        points={polyline}
-        fill="none" stroke={color} strokeWidth={1.5}
-        strokeLinejoin="round" strokeLinecap="round"
-      />
-      <circle cx={last.x} cy={last.y} r={2.5} fill={color} />
-      <text x={last.x + 6} y={last.y + 3} fill={color} fontSize={9} fontFamily="monospace" fontWeight={600}>
-        {pct}%
-      </text>
-    </svg>
-  )
+function riskColor(risk: number) {
+  if (risk > 0.6) return "#ff1744"
+  if (risk > 0.3) return "#ffc800"
+  if (risk > 0) return "#00e676"
+  return "#555"
 }
 
-function ResponsiveSparkline({ snapshots, height }: { snapshots: RiskSnapshot[]; height: number }) {
+/* ── Downsample to max N points using LTTB-lite ────────── */
+
+function downsample(data: RiskSnapshot[], maxPoints: number): RiskSnapshot[] {
+  if (data.length <= maxPoints) return data
+  const step = (data.length - 2) / (maxPoints - 2)
+  const out: RiskSnapshot[] = [data[0]]
+  for (let i = 1; i < maxPoints - 1; i++) {
+    const idx = Math.round(1 + i * step)
+    out.push(data[Math.min(idx, data.length - 1)])
+  }
+  out.push(data[data.length - 1])
+  return out
+}
+
+/* ── Canvas sparkline with per-segment threshold coloring ── */
+
+const CanvasSparkline = memo(function CanvasSparkline({ snapshots, width, height }: { snapshots: RiskSnapshot[]; width: number; height: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = width * dpr
+    canvas.height = height * dpr
+    ctx.scale(dpr, dpr)
+    ctx.clearRect(0, 0, width, height)
+
+    if (snapshots.length === 0) {
+      ctx.strokeStyle = "#333"
+      ctx.lineWidth = 0.5
+      ctx.setLineDash([2, 4])
+      ctx.beginPath()
+      ctx.moveTo(0, height / 2)
+      ctx.lineTo(width, height / 2)
+      ctx.stroke()
+      return
+    }
+
+    const pad = { top: 2, bottom: 2, left: 0, right: 32 }
+    const plotW = width - pad.left - pad.right
+    const plotH = height - pad.top - pad.bottom
+    const baseline = pad.top + plotH
+
+    const tMin = snapshots[0].t
+    const tMax = snapshots[snapshots.length - 1].t
+    const tRange = tMax - tMin || 1
+
+    const pts = snapshots.map((s) => ({
+      x: pad.left + ((s.t - tMin) / tRange) * plotW,
+      y: pad.top + plotH - s.risk * plotH,
+      risk: s.risk,
+    }))
+
+    // Draw baseline
+    ctx.strokeStyle = "rgba(255,255,255,0.06)"
+    ctx.lineWidth = 0.3
+    ctx.setLineDash([])
+    ctx.beginPath()
+    ctx.moveTo(pad.left, baseline)
+    ctx.lineTo(pad.left + plotW, baseline)
+    ctx.stroke()
+
+    // Draw per-segment fills + lines
+    ctx.lineWidth = 1.5
+    ctx.lineCap = "round"
+    for (let i = 1; i < pts.length; i++) {
+      const prev = pts[i - 1]
+      const cur = pts[i]
+      const color = riskColor((prev.risk + cur.risk) / 2)
+
+      // Fill
+      ctx.fillStyle = color
+      ctx.globalAlpha = 0.06
+      ctx.beginPath()
+      ctx.moveTo(prev.x, baseline)
+      ctx.lineTo(prev.x, prev.y)
+      ctx.lineTo(cur.x, cur.y)
+      ctx.lineTo(cur.x, baseline)
+      ctx.closePath()
+      ctx.fill()
+
+      // Line
+      ctx.globalAlpha = 1
+      ctx.strokeStyle = color
+      ctx.beginPath()
+      ctx.moveTo(prev.x, prev.y)
+      ctx.lineTo(cur.x, cur.y)
+      ctx.stroke()
+    }
+
+    // Current value dot
+    const last = pts[pts.length - 1]
+    const dotColor = riskColor(last.risk)
+    ctx.fillStyle = dotColor
+    ctx.globalAlpha = 1
+    ctx.beginPath()
+    ctx.arc(last.x, last.y, 2.5, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Percentage text
+    ctx.font = "600 9px monospace"
+    ctx.fillStyle = dotColor
+    ctx.fillText(`${Math.round(last.risk * 100)}%`, last.x + 6, last.y + 3)
+  }, [snapshots, width, height])
+
+  return <canvas ref={canvasRef} width={width} height={height} style={{ width, height }} />
+})
+
+const ResponsiveSparkline = memo(function ResponsiveSparkline({ snapshots, height }: { snapshots: RiskSnapshot[]; height: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(400)
 
@@ -81,10 +146,10 @@ function ResponsiveSparkline({ snapshots, height }: { snapshots: RiskSnapshot[];
 
   return (
     <div ref={ref} className="w-full">
-      <RiskSparkline snapshots={snapshots} width={width} height={height} />
+      <CanvasSparkline snapshots={snapshots} width={width} height={height} />
     </div>
   )
-}
+})
 
 /* ── Main Component ────────────────────────────────────── */
 
@@ -103,13 +168,10 @@ export function FleetRiskOps() {
     [satellites, proximityThreats, signalThreats, anomalyThreats, orbitalThreats, geoLoiterThreats],
   )
 
+  // Alphabetical sort
   const sortedSatellites = useMemo(() => {
-    return [...satellites].sort((a, b) => {
-      const diff = (currentRisk[b.id] ?? 0) - (currentRisk[a.id] ?? 0)
-      if (diff !== 0) return diff
-      return a.name.localeCompare(b.name)
-    })
-  }, [satellites, currentRisk])
+    return [...satellites].sort((a, b) => a.name.localeCompare(b.name))
+  }, [satellites])
 
   const totalSats = satellites.length
   const threatenedCount = satellites.filter((s) => (currentRisk[s.id] ?? 0) > 0.6).length
