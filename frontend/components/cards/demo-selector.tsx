@@ -5,6 +5,7 @@ import { Play, Square, ChevronDown, Swords } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useGlobeStore } from "@/stores/globe-store"
+import { useResponseStore } from "@/stores/response-store"
 import { api } from "@/lib/api"
 
 interface Demo {
@@ -44,6 +45,7 @@ export function DemoSelector({ className }: { className?: string }) {
 
   const activeDemo = useGlobeStore((s) => s.activeDemo)
   const setActiveDemo = useGlobeStore((s) => s.setActiveDemo)
+  const resetTriggered = useResponseStore((s) => s.resetTriggered)
 
   // Close on outside click
   useEffect(() => {
@@ -59,6 +61,7 @@ export function DemoSelector({ className }: { className?: string }) {
   async function handleSelect(demo: Demo) {
     // Reset scenario clock so it starts fresh
     fetch("/api/backend/scenario/reset", { method: "POST" }).catch(() => {})
+    resetTriggered()
     setActiveDemo(demo.id)
     setOpen(false)
     if (demo.id === "geo-us-loiter") {
