@@ -438,6 +438,7 @@ export function SatelliteMarker({
   const showLabel =
     selected ||
     threatPercent != null ||
+    isFriendly ||
     (labelsEnabled && (displayStatus === "threatened" || displayStatus === "watched"));
   const markerSize = displayStatus === "threatened" ? size * 1.3 : size;
 
