@@ -210,7 +210,18 @@ export function SatelliteMarker({
   const posFlatRef = useRef<Float32Array>(new Float32Array(0));
   const isFlagged = threatScore > PROXIMITY_FLAG_THRESHOLD;
 
-  const color = THREAT_COLORS[status]?.hex ?? "#00e5ff";
+  // Friendly/allied sats: green when safe, lerp to red when threatened
+  const isFriendly = status === "allied" || status === "friendly" || status === "nominal";
+  const color = useMemo(() => {
+    if (isFriendly && threatPercent != null && threatPercent > 0) {
+      // Lerp green → red as threat rises from 0 → 100
+      const t = Math.min(1, threatPercent / 100);
+      const green = new THREE.Color("#00e676");
+      const red = new THREE.Color("#ff1744");
+      return "#" + green.lerp(red, t).getHexString();
+    }
+    return THREAT_COLORS[status]?.hex ?? "#00e676";
+  }, [status, isFriendly, threatPercent]);
   const threeColor = useMemo(() => new THREE.Color(color), [color]);
 
   const scenePoints = useMemo(() => {

@@ -25,8 +25,9 @@ export function HostileMarker({
 }: HostileMarkerProps) {
   const pulseRef = useRef<THREE.Mesh>(null)
 
-  const color = THREAT_COLORS[severity].hex
-  const threeColor = useMemo(() => new THREE.Color(color), [color])
+  // Adversaries are always orange regardless of severity
+  const color = "#ff9100"
+  const threeColor = useMemo(() => new THREE.Color(color), [])
 
   const scenePos = useMemo(() => {
     const [x, y, z] = geodeticToSceneVec3(position.lat, position.lon, position.altKm)
@@ -77,7 +78,7 @@ export function HostileMarker({
           <div style={{
             fontSize: "7px",
             fontFamily: "monospace",
-            color: severity === "threatened" ? "rgba(255,102,136,0.5)" : severity === "watched" ? "rgba(255,204,102,0.45)" : "rgba(136,204,255,0.4)",
+            color: "rgba(255,145,0,0.5)",
             letterSpacing: "0.3px",
           }}>
             {name}

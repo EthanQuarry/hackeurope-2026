@@ -28,8 +28,8 @@ export const SIGNAL_NOMINAL_PCT = 15
 
 /** Threat severity colors — tech/military palette */
 export const THREAT_COLORS = {
-  allied: { text: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40", hex: "#4488ff" },
-  nominal: { text: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40", hex: "#00e5ff" },
+  allied: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
+  nominal: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
   watched: { text: "text-yellow-400", bg: "bg-yellow-500/15", border: "border-yellow-500/40", hex: "#ffc800" },
   threatened: { text: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", hex: "#ff1744" },
   friendly: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
