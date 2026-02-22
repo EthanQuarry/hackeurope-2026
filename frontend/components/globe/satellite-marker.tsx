@@ -129,7 +129,7 @@ function SpriteLabel({
     if (threatPercent != null) {
       lines.push({
         text: `${threatPercent}%`,
-        fontSize: 7,
+        fontSize: 5,
         bold: true,
         color:
           (threatPercent ?? 0) >= 70
