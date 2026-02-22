@@ -41,8 +41,13 @@ import type {
 import type { ThreatSeverity } from "@/lib/constants";
 import { PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants";
 
-/** Compute live threat score (0-100) per satellite from ops-level threat data.
- *  Aggregates the highest signal across proximity, signal, and anomaly threats. */
+/** Threat alert threshold — when a satellite's risk score crosses this,
+ *  a trigger fires (placeholder for agent call). */
+const THREAT_ALERT_THRESHOLD = 70
+
+/** Compute risk score (0-100) per OUR satellite from ops-level threat data.
+ *  Score goes on the TARGET (our asset under threat), not the attacker.
+ *  Aggregates the highest risk across proximity, signal, and anomaly threats. */
 function buildThreatScores(
   proximity: ProximityThreat[],
   signal: SignalThreat[],
@@ -55,30 +60,47 @@ function buildThreatScores(
   };
 
   for (const t of proximity) {
-    // Proximity confidence (0-1) → percent, boosted by close distance
+    // Score goes on the TARGET asset — how much danger is it in?
     const distFactor = Math.max(0, 1 - t.missDistanceKm / 500);
     const score = Math.round(
       Math.min(99, (t.confidence * 0.6 + distFactor * 0.4) * 100),
     );
-    update(t.foreignSatId, score);
-    // Also score the target (it's under threat)
-    update(t.targetAssetId, Math.round(score * 0.5));
+    update(t.targetAssetId, score);
   }
 
   for (const t of signal) {
+    // Score on the asset whose comms are being intercepted
     const score = Math.round(Math.min(99, t.interceptionProbability * 100));
-    update(t.interceptorId, score);
-    update(t.targetLinkAssetId, Math.round(score * 0.4));
+    update(t.targetLinkAssetId, score);
   }
 
   for (const t of anomaly) {
-    const score = Math.round(
-      Math.min(99, (t.confidence * 0.5 + t.baselineDeviation * 0.5) * 100),
-    );
-    update(t.satelliteId, score);
+    // Anomaly is on the foreign sat itself — score any allied sat it's near
+    // (anomaly threats don't have a target, so skip for now)
   }
 
   return scores;
+}
+
+/** Check if any satellite just crossed the alert threshold.
+ *  Returns IDs that are newly above threshold. */
+function checkThresholdTriggers(
+  current: Map<string, number>,
+  previous: Map<string, number>,
+): string[] {
+  const triggered: string[] = []
+  for (const [id, score] of current) {
+    const prev = previous.get(id) ?? 0
+    if (score >= THREAT_ALERT_THRESHOLD && prev < THREAT_ALERT_THRESHOLD) {
+      triggered.push(id)
+    }
+  }
+  return triggered
+}
+
+// TODO: Replace with actual agent call when ready
+function onThreatAlertTriggered(_satelliteIds: string[]) {
+  // Placeholder — will trigger AI agent analysis pipeline
 }
 
 interface HostileMarkerData {
@@ -174,11 +196,20 @@ const MemoScene = React.memo(function Scene({
   const anomalyThreats =
     storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS;
 
-  // Live threat scores from ops-level data — updates every poll cycle
-  const threatScores = useMemo(
-    () => buildThreatScores(proximityThreats, signalThreats, anomalyThreats),
-    [proximityThreats, signalThreats, anomalyThreats],
-  );
+  // Live risk scores on OUR satellites — updates every poll cycle
+  const prevScoresRef = useRef(new Map<string, number>())
+  const threatScores = useMemo(() => {
+    const scores = buildThreatScores(proximityThreats, signalThreats, anomalyThreats)
+
+    // Check for threshold crossings
+    const triggered = checkThresholdTriggers(scores, prevScoresRef.current)
+    if (triggered.length > 0) {
+      onThreatAlertTriggered(triggered)
+    }
+    prevScoresRef.current = scores
+
+    return scores
+  }, [proximityThreats, signalThreats, anomalyThreats]);
 
   // Derive hostile markers, excluding IDs that already exist as fleet satellites
   const hostileMarkers = useMemo(() => {
@@ -333,7 +364,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         return {
           ...s,
           trajectory: interceptTrajectory,
-          status: "threatened" as const,
+          // Status comes from the backend scenario engine + detection system
         };
       }
       return s;

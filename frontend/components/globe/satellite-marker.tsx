@@ -119,9 +119,11 @@ function SpriteLabel({
         fontSize: 11,
         bold: true,
         color:
-          status === "threatened"
-            ? "rgba(255,68,102,0.9)"
-            : "rgba(255,145,0,0.8)",
+          (threatPercent ?? 0) >= 70
+            ? "rgba(255,68,102,0.9)"   // red — high risk
+            : (threatPercent ?? 0) >= 40
+              ? "rgba(255,145,0,0.8)"  // orange — medium risk
+              : "rgba(100,200,255,0.8)", // blue — low risk
       })
     }
 
@@ -362,6 +364,7 @@ export function SatelliteMarker({
   const labelsEnabled = useGlobeStore((s) => s.showLabels);
   const showLabel =
     selected ||
+    threatPercent != null ||
     (labelsEnabled && (status === "threatened" || status === "watched"));
   const markerSize = status === "threatened" ? size * 1.3 : size;
 
