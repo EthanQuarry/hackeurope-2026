@@ -11,7 +11,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.spacetrack import get_client, gp_to_satellite, gp_to_debris
-from app import scenario
+from app import scenario, geo_loiter_demo
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,14 @@ FLEET_NORAD_IDS = [
     49492,  # YAOGAN-34
     50258,  # YAOGAN-35C
     41838,  # TIANLIAN-1-04
+    # --- Chinese GEO (threat: loiter over Americas) ---
+    40402,   # SHIJIAN-13 (Chinese GEO tech demo)
+    42836,   # CHINASAT-16
+    54066,   # CHINASAT-6E
+    # --- Russian GEO (threat: Luch/Olymp approach pattern) ---
+    55841,   # LUCH (OLYMP) 2 — approaches Western GEO sats
+    40391,   # LUCH-5A
+    37763,   # LUCH-5V
     # --- Other notable ---
     37820,  # TIANGONG-1 successor
     28654,  # IRIDIUM 33 (collision remnant)
@@ -114,6 +122,7 @@ def _build_usa245_satellite(idx: int) -> dict:
         "name": "USA-245 (NROL-65)",
         "noradId": 39232,
         "status": "allied",
+        "country_code": "USA",
         "altitude_km": round(alt_km, 1),
         "velocity_kms": round(v_kms, 2),
         "inclination_deg": round(inc_deg, 1),
@@ -228,6 +237,7 @@ def _build_sj26_satellite(idx: int) -> dict:
         "name": "SJ-26 (SHIJIAN-26)",
         "noradId": scenario.SJ26_NORAD_ID,
         "status": status,
+        "country_code": "PRC",
         "altitude_km": round(SJ_ALT, 1),
         "velocity_kms": round(v_kms, 2),
         "inclination_deg": round(SJ_INC, 1),
@@ -508,6 +518,25 @@ async def get_threats():
     severity_order = {"threatened": 0, "watched": 1, "nominal": 2}
     threats.sort(key=lambda t: (severity_order.get(t["severity"], 3), t["tcaInMinutes"]))
     return threats[:15]
+
+
+@router.post("/demo/geo-loiter/start")
+async def start_geo_loiter_demo():
+    """Activate the GEO US Loiter demo — injects Chinese/Russian satellites at GEO over US."""
+    geo_loiter_demo.start()
+    # Force immediate cache refresh in threats endpoint
+    from app.routes import threats as threat_routes
+    threat_routes._geo_cache_time = 0
+    return {"status": "started", "active": True}
+
+
+@router.post("/demo/geo-loiter/stop")
+async def stop_geo_loiter_demo():
+    """Deactivate the GEO US Loiter demo — returns to real satellite data."""
+    geo_loiter_demo.stop()
+    from app.routes import threats as threat_routes
+    threat_routes._geo_cache_time = 0
+    return {"status": "stopped", "active": False}
 
 
 @router.get("/responses")

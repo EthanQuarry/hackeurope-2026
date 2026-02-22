@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Line } from "@react-three/drei";
 import * as THREE from "three";
@@ -29,6 +29,19 @@ interface SatelliteMarkerProps {
   showFullOrbit?: boolean;
   /** Maneuver arc in scene-space xyz — rendered as separate overlay */
   maneuverArc?: [number, number, number][];
+  /**
+   * Whether the trajectory should loop when it reaches the end.
+   * Set to false for demo satellites that should hold position at the last
+   * trajectory point (e.g. GEO station-keeping) rather than snapping back.
+   * @default true
+   */
+  loop?: boolean;
+  /**
+   * When true, derive effective status from trajectory phase (0-1) for progressive
+   * threat display: frac < 0.35 = watched, 0.5-0.65 = blend, >= 0.65 = threatened.
+   * Used for GEO loiter demo so detection escalates as satellites approach US.
+   */
+  useProgressiveThreat?: boolean;
 }
 
 /** Fit a Catmull-Rom spline and sample it */
@@ -185,6 +198,21 @@ function findTimeIndex(
   return lo;
 }
 
+/** Map trajectory phase (0-1) to effective status for progressive GEO loiter demo */
+function progressiveStatusFromFrac(frac: number): ThreatSeverity {
+  if (frac < 0.5) return "watched"
+  if (frac < 0.65) return "watched"  // still blending visually via threatScore
+  return "threatened"
+}
+
+/** Map trajectory phase to 0-1 threat score for flag ring (progressive demo) */
+function progressiveThreatScoreFromFrac(frac: number): number {
+  if (frac < 0.35) return 0.2
+  if (frac < 0.5) return 0.3
+  if (frac < 0.65) return 0.3 + ((frac - 0.5) / 0.15) * 0.5
+  return 0.85
+}
+
 export function SatelliteMarker({
   id,
   name,
@@ -198,6 +226,8 @@ export function SatelliteMarker({
   threatScore = 0,
   showFullOrbit = false,
   maneuverArc,
+  loop = true,
+  useProgressiveThreat = false,
 }: SatelliteMarkerProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
@@ -207,9 +237,24 @@ export function SatelliteMarker({
   const targetPos = useRef(new THREE.Vector3());
   const initialized = useRef(false);
   const posFlatRef = useRef<Float32Array>(new Float32Array(0));
-  const isFlagged = threatScore > PROXIMITY_FLAG_THRESHOLD;
+  const [progressiveState, setProgressiveState] = useState<{
+    status: ThreatSeverity;
+    threatScore: number;
+  } | null>(null);
 
-  const color = THREAT_COLORS[status]?.hex ?? "#00e5ff";
+  useEffect(() => {
+    if (!useProgressiveThreat) setProgressiveState(null);
+  }, [useProgressiveThreat]);
+
+  const displayStatus = useProgressiveThreat && progressiveState
+    ? progressiveState.status
+    : status;
+  const displayThreatScore = useProgressiveThreat && progressiveState
+    ? progressiveState.threatScore
+    : threatScore;
+  const isFlagged = displayThreatScore > PROXIMITY_FLAG_THRESHOLD;
+
+  const color = THREAT_COLORS[displayStatus]?.hex ?? "#00e5ff";
   const threeColor = useMemo(() => new THREE.Color(color), [color]);
 
   const scenePoints = useMemo(() => {
@@ -249,7 +294,7 @@ export function SatelliteMarker({
   // Trail vertex colors — fades from dim tail to bright head
   const trailColors = useMemo(() => {
     const baseOpacity =
-      status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35;
+      displayStatus === "threatened" ? 0.85 : displayStatus === "watched" ? 0.55 : 0.35;
     const colors: [number, number, number][] = [];
     for (let i = 0; i < trailLen; i++) {
       const t = i / Math.max(1, trailLen - 1);
@@ -261,7 +306,7 @@ export function SatelliteMarker({
       ]);
     }
     return colors;
-  }, [threeColor, status, trailLen]);
+  }, [threeColor, displayStatus, trailLen]);
 
   // Sync Line2 colors when status / color changes after mount
   useEffect(() => {
@@ -269,7 +314,7 @@ export function SatelliteMarker({
     if (!geo?.setColors) return;
     const flat: number[] = [];
     const baseOpacity =
-      status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35;
+      displayStatus === "threatened" ? 0.85 : displayStatus === "watched" ? 0.55 : 0.35;
     for (let i = 0; i < trailLen; i++) {
       const t = i / Math.max(1, trailLen - 1);
       const fade = Math.pow(t, 2.5);
@@ -280,7 +325,7 @@ export function SatelliteMarker({
       );
     }
     geo.setColors(flat);
-  }, [threeColor, status, trailLen]);
+  }, [threeColor, displayStatus, trailLen]);
 
   // Keep reusable flat array sized correctly
   useEffect(() => {
@@ -295,9 +340,22 @@ export function SatelliteMarker({
     if (totalDuration <= 0) return;
 
     const elapsed = currentSimTime - trajectory[0].t;
-    const loopedTime =
-      trajectory[0].t +
-      (((elapsed % totalDuration) + totalDuration) % totalDuration);
+    // When loop=false the satellite clamps at the last trajectory point (GEO hold)
+    // instead of wrapping back through Earth to the start of the orbit.
+    const timeOffset = loop
+      ? (((elapsed % totalDuration) + totalDuration) % totalDuration)
+      : Math.min(Math.max(elapsed, 0), totalDuration);
+    const loopedTime = trajectory[0].t + timeOffset;
+
+    if (useProgressiveThreat && totalDuration > 0) {
+      const frac = timeOffset / totalDuration;
+      const effStatus = progressiveStatusFromFrac(frac);
+      const effScore = progressiveThreatScoreFromFrac(frac);
+      setProgressiveState((prev) => {
+        if (prev && prev.status === effStatus && Math.abs(prev.threatScore - effScore) < 0.01) return prev;
+        return { status: effStatus, threatScore: effScore };
+      });
+    }
     const idx = findTimeIndex(trajectory, loopedTime);
     const nextIdx = Math.min(idx + 1, trajectory.length - 1);
     const t0 = trajectory[idx].t;
@@ -365,8 +423,8 @@ export function SatelliteMarker({
   const showLabel =
     selected ||
     threatPercent != null ||
-    (labelsEnabled && (status === "threatened" || status === "watched"));
-  const markerSize = status === "threatened" ? size * 1.3 : size;
+    (labelsEnabled && (displayStatus === "threatened" || displayStatus === "watched"));
+  const markerSize = displayStatus === "threatened" ? size * 1.3 : size;
 
   // Cached Three.js geometries & materials — avoids recreation every render
   const markerGeo = useMemo(
@@ -386,9 +444,9 @@ export function SatelliteMarker({
       new THREE.MeshBasicMaterial({
         color: threeColor,
         transparent: true,
-        opacity: selected ? 0.4 : status === "threatened" ? 0.25 : 0.12,
+        opacity: selected ? 0.4 : displayStatus === "threatened" ? 0.25 : 0.12,
       }),
-    [threeColor, selected, status],
+    [threeColor, selected, displayStatus],
   );
   const flagGeo = useMemo(
     () => new THREE.SphereGeometry(markerSize, 16, 16),
@@ -435,7 +493,7 @@ export function SatelliteMarker({
         transparent
         opacity={1}
         lineWidth={
-          status === "threatened" ? 1.8 : status === "watched" ? 1.4 : 1.0
+          displayStatus === "threatened" ? 1.8 : displayStatus === "watched" ? 1.4 : 1.0
         }
       />
 
@@ -456,7 +514,7 @@ export function SatelliteMarker({
           meshRef={meshRef}
           name={name}
           threatPercent={threatPercent}
-          status={status}
+          status={displayStatus}
           size={markerSize}
         />
       )}

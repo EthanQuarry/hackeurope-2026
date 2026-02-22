@@ -41,6 +41,7 @@ import type {
   ProximityThreat,
   SignalThreat,
   AnomalyThreat,
+  GeoLoiterThreat,
 } from "@/types";
 
 export function DashboardShell() {
@@ -77,9 +78,11 @@ export function DashboardShell() {
   const setProximityThreats = useThreatStore((s) => s.setProximityThreats);
   const setSignalThreats = useThreatStore((s) => s.setSignalThreats);
   const setAnomalyThreats = useThreatStore((s) => s.setAnomalyThreats);
+  const setGeoUsLoiterThreats = useThreatStore((s) => s.setGeoUsLoiterThreats);
   const storeProximity = useThreatStore((s) => s.proximityThreats);
   const storeSignal = useThreatStore((s) => s.signalThreats);
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats);
+  const storeGeoLoiter = useThreatStore((s) => s.geoUsLoiterThreats);
 
   // ── WebSocket: sole source for all threat data ──
   // Pushes complete threat arrays (general + SJ-26) every tick.
@@ -117,6 +120,11 @@ export function DashboardShell() {
     intervalMs: THREAT_REFRESH_MS,
     onData: setAnomalyThreats,
   });
+  usePolling<GeoLoiterThreat[]>({
+    url: api.geoUsLoiterThreats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setGeoUsLoiterThreats,
+  });
   // Use live data when available, fall back to mocks
   const proximityThreats =
     storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS;
@@ -124,6 +132,7 @@ export function DashboardShell() {
     storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS;
   const anomalyThreats =
     storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS;
+  const geoLoiterThreats = storeGeoLoiter;
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -144,6 +153,7 @@ export function DashboardShell() {
               proximity: proximityThreats.length,
               signal: signalThreats.length,
               anomaly: anomalyThreats.length,
+              geoLoiter: geoLoiterThreats.length,
             }}
           />
         </div>

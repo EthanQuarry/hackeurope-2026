@@ -124,6 +124,26 @@ export interface OrbitalSimilarityThreat {
   position: { lat: number; lon: number; altKm: number }
 }
 
+/** Geo-US loiter threat — Chinese/Russian satellites geostationary or hovering over US */
+export interface GeoLoiterThreat {
+  id: string
+  satelliteId: string
+  satelliteName: string
+  noradId: number
+  countryCode: string
+  orbitType: "geostationary" | "geosynchronous" | "molniya" | "other"
+  subsatelliteLonDeg: number
+  subsatelliteLatDeg: number
+  altitudeKm: number
+  dwellFractionOverUs: number
+  severity: ThreatSeverity
+  threatScore: number
+  description: string
+  confidence: number
+  position: { lat: number; lon: number; altKm: number }
+  detectedAt: number
+}
+
 /** AI terminal log entry */
 export interface TerminalLogEntry {
   id: number

@@ -15,7 +15,7 @@ interface DashboardHeaderProps {
   simTime: number
   onSpeedChange: (speed: number) => void
   onPlayToggle: () => void
-  threatCounts?: { proximity: number; signal: number; anomaly: number }
+  threatCounts?: { proximity: number; signal: number; anomaly: number; geoLoiter?: number }
 }
 
 const NAV_TABS: { id: ActiveView; label: string; icon: typeof LayoutGrid }[] = [
