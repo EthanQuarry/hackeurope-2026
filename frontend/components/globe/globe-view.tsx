@@ -36,40 +36,61 @@ function buildThreatScores(
   signal: SignalThreat[],
   anomaly: AnomalyThreat[],
 ): Map<string, number> {
-  const scores = new Map<string, number>()
+  const scores = new Map<string, number>();
 
   const update = (id: string, score: number) => {
-    scores.set(id, Math.max(scores.get(id) ?? 0, score))
-  }
+    scores.set(id, Math.max(scores.get(id) ?? 0, score));
+  };
 
   for (const t of proximity) {
-    // Proximity confidence (0-1) → percent, boosted by close distance
-    const distFactor = Math.max(0, 1 - t.missDistanceKm / 500)
-    const score = Math.round(Math.min(99, (t.confidence * 0.6 + distFactor * 0.4) * 100))
-    update(t.foreignSatId, score)
-    // Also score the target (it's under threat)
-    update(t.targetAssetId, Math.round(score * 0.5))
+    // Score goes on the TARGET asset — how much danger is it in?
+    const distFactor = Math.max(0, 1 - t.missDistanceKm / 500);
+    const score = Math.round(
+      Math.min(99, (t.confidence * 0.6 + distFactor * 0.4) * 100),
+    );
+    update(t.targetAssetId, score);
   }
 
   for (const t of signal) {
-    const score = Math.round(Math.min(99, t.interceptionProbability * 100))
-    update(t.interceptorId, score)
-    update(t.targetLinkAssetId, Math.round(score * 0.4))
+    // Score on the asset whose comms are being intercepted
+    const score = Math.round(Math.min(99, t.interceptionProbability * 100));
+    update(t.targetLinkAssetId, score);
   }
 
   for (const t of anomaly) {
-    const score = Math.round(Math.min(99, (t.confidence * 0.5 + t.baselineDeviation * 0.5) * 100))
-    update(t.satelliteId, score)
+    // Anomaly is on the foreign sat itself — score any allied sat it's near
+    // (anomaly threats don't have a target, so skip for now)
   }
 
-  return scores
+  return scores;
+}
+
+/** Check if any satellite just crossed the alert threshold.
+ *  Returns IDs that are newly above threshold. */
+function checkThresholdTriggers(
+  current: Map<string, number>,
+  previous: Map<string, number>,
+): string[] {
+  const triggered: string[] = []
+  for (const [id, score] of current) {
+    const prev = previous.get(id) ?? 0
+    if (score >= THREAT_ALERT_THRESHOLD && prev < THREAT_ALERT_THRESHOLD) {
+      triggered.push(id)
+    }
+  }
+  return triggered
+}
+
+// TODO: Replace with actual agent call when ready
+function onThreatAlertTriggered(_satelliteIds: string[]) {
+  // Placeholder — will trigger AI agent analysis pipeline
 }
 
 interface HostileMarkerData {
-  id: string
-  name: string
-  position: { lat: number; lon: number; altKm: number }
-  severity: ThreatSeverity
+  id: string;
+  name: string;
+  position: { lat: number; lon: number; altKm: number };
+  severity: ThreatSeverity;
 }
 
 /** Derive hostile markers from live ops threat data */
@@ -78,59 +99,127 @@ function deriveHostileMarkers(
   signal: SignalThreat[],
   anomaly: AnomalyThreat[],
 ): HostileMarkerData[] {
-  const markers: HostileMarkerData[] = []
-  const seen = new Set<string>()
+  const markers: HostileMarkerData[] = [];
+  const seen = new Set<string>();
 
   for (const t of proximity) {
     if (!seen.has(t.foreignSatId)) {
-      seen.add(t.foreignSatId)
-      markers.push({ id: t.foreignSatId, name: t.foreignSatName, position: t.primaryPosition, severity: t.severity })
+      seen.add(t.foreignSatId);
+      markers.push({
+        id: t.foreignSatId,
+        name: t.foreignSatName,
+        position: t.primaryPosition,
+        severity: t.severity,
+      });
     }
   }
   for (const t of signal) {
     if (!seen.has(t.interceptorId)) {
-      seen.add(t.interceptorId)
-      markers.push({ id: t.interceptorId, name: t.interceptorName, position: t.position, severity: t.severity })
+      seen.add(t.interceptorId);
+      markers.push({
+        id: t.interceptorId,
+        name: t.interceptorName,
+        position: t.position,
+        severity: t.severity,
+      });
     }
   }
   for (const t of anomaly) {
     if (!seen.has(t.satelliteId)) {
-      seen.add(t.satelliteId)
-      markers.push({ id: t.satelliteId, name: t.satelliteName, position: t.position, severity: t.severity })
+      seen.add(t.satelliteId);
+      markers.push({
+        id: t.satelliteId,
+        name: t.satelliteName,
+        position: t.position,
+        severity: t.severity,
+      });
     }
   }
-  return markers
+  return markers;
 }
 
 interface GlobeViewProps {
-  compacted?: boolean
+  compacted?: boolean;
 }
 
-function Scene({
+/* ── Scene: subscribes to threat stores directly so GlobeView doesn't
+ *    re-render on every threat/debris poll update.  Wrapped with React.memo
+ *    so it also skips re-renders when parent props haven't changed. ──────── */
+const MemoScene = React.memo(function Scene({
   satellites,
-  debris,
-  threats,
-  hostileMarkers,
-  threatScores,
   selectedSatelliteId,
   onSelectSatellite,
   simTimeRef,
   speedRef,
   controlsRef,
-  satScores,
 }: {
-  satellites: SatelliteData[]
-  debris: DebrisData[]
-  threats: ThreatData[]
-  hostileMarkers: HostileMarkerData[]
-  threatScores: Map<string, number>
-  selectedSatelliteId: string | null
-  onSelectSatellite: (id: string) => void
-  simTimeRef: React.RefObject<number>
-  speedRef: React.RefObject<number>
-  controlsRef: React.RefObject<OrbitControlsImpl | null>
-  satScores: Record<string, number>
+  satellites: SatelliteData[];
+  selectedSatelliteId: string | null;
+  onSelectSatellite: (id: string) => void;
+  simTimeRef: React.RefObject<number>;
+  speedRef: React.RefObject<number>;
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
 }) {
+  // Threat store subscriptions live here — only Scene re-renders when these update
+  const storeThreats = useThreatStore((s) => s.threats);
+  const storeDebris = useThreatStore((s) => s.debris);
+  const storeProximity = useThreatStore((s) => s.proximityThreats);
+  const storeSignal = useThreatStore((s) => s.signalThreats);
+  const storeAnomaly = useThreatStore((s) => s.anomalyThreats);
+
+  const fallbackDebris = useMemo(() => generateMockDebris(2500), []);
+
+  // Use store data (populated by polling), fall back to mocks
+  const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris;
+  const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS;
+  const proximityThreats =
+    storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS;
+  const signalThreats =
+    storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS;
+  const anomalyThreats =
+    storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS;
+
+  // Live risk scores on OUR satellites — updates every poll cycle
+  const prevScoresRef = useRef(new Map<string, number>())
+  const threatScores = useMemo(() => {
+    const scores = buildThreatScores(proximityThreats, signalThreats, anomalyThreats)
+
+    // Check for threshold crossings
+    const triggered = checkThresholdTriggers(scores, prevScoresRef.current)
+    if (triggered.length > 0) {
+      onThreatAlertTriggered(triggered)
+    }
+    prevScoresRef.current = scores
+
+    return scores
+  }, [proximityThreats, signalThreats, anomalyThreats]);
+
+  // Derive hostile markers, excluding IDs that already exist as fleet satellites
+  const hostileMarkers = useMemo(() => {
+    const fleetIds = new Set(satellites.map((s) => s.id));
+    return deriveHostileMarkers(
+      proximityThreats,
+      signalThreats,
+      anomalyThreats,
+    ).filter((h) => !fleetIds.has(h.id));
+  }, [satellites, proximityThreats, signalThreats, anomalyThreats]);
+
+  // Derive per-satellite max Bayesian posterior from proximity threats
+  const satScores = useMemo(() => {
+    const scores: Record<string, number> = {};
+    for (const threat of proximityThreats) {
+      scores[threat.foreignSatId] = Math.max(
+        scores[threat.foreignSatId] ?? 0,
+        threat.confidence,
+      );
+      scores[threat.targetAssetId] = Math.max(
+        scores[threat.targetAssetId] ?? 0,
+        threat.confidence,
+      );
+    }
+    return scores;
+  }, [proximityThreats]);
+
   return (
     <>
       {/* Custom shader starfield with twinkling */}
@@ -144,8 +233,9 @@ function Scene({
       {/* Satellites */}
       {satellites.map((sat) => {
         // Live threat score from proximity/signal/anomaly data (updates every poll cycle)
-        const liveScore = threatScores.get(sat.id)
-        const threatPercent = liveScore != null && liveScore > 0 ? liveScore : undefined
+        const liveScore = threatScores.get(sat.id);
+        const threatPercent =
+          liveScore != null && liveScore > 0 ? liveScore : undefined;
 
         const showFull = sat.id === selectedSatelliteId
 
@@ -164,9 +254,8 @@ function Scene({
             showFullOrbit={showFull}
             maneuverArc={sat.maneuverArc}
           />
-        )
+        );
       })}
-
 
       {/* Hostile / foreign satellite markers from live threat data */}
       {hostileMarkers.map((h) => (
@@ -216,8 +305,8 @@ function Scene({
 
       <CameraFocus controlsRef={controlsRef} simTimeRef={simTimeRef} />
     </>
-  )
-}
+  );
+});
 
 export function GlobeView({ compacted = false }: GlobeViewProps) {
   const simTimeRef = useRef(Date.now())
@@ -278,7 +367,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
     <div
       className={cn(
         "absolute inset-0 h-full w-full origin-center overflow-hidden transition-transform duration-500 ease-in-out",
-        compacted ? "-translate-y-16 scale-[0.7]" : "translate-y-0 scale-100"
+        compacted ? "-translate-y-16 scale-[0.7]" : "translate-y-0 scale-100",
       )}
     >
       <Canvas
@@ -287,20 +376,15 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         style={{ background: "#000006" }}
         dpr={[1, 2]}
       >
-        <Scene
-          satellites={satellites}
-          debris={debris}
-          threats={threats}
-          hostileMarkers={hostileMarkers}
-          threatScores={threatScores}
+        <MemoScene
+          satellites={demoSatellites}
           selectedSatelliteId={selectedSatelliteId}
           onSelectSatellite={handleSelectSatellite}
           simTimeRef={simTimeRef}
           speedRef={speedRef}
           controlsRef={controlsRef}
-          satScores={satScores}
         />
       </Canvas>
     </div>
-  )
+  );
 }

@@ -126,11 +126,9 @@ def _smoothstep(t: float) -> float:
 # ---------------------------------------------------------------------------
 
 def sj26_status() -> str:
-    """Dashboard status string for SJ-26."""
+    """Dashboard status string for SJ-26. Always watched (Chinese) — escalates to threatened."""
     phase = current_phase()
-    if phase == 0:
-        return "friendly"
-    if phase == 1:
+    if phase <= 1:
         return "watched"
     if phase == 2:
         p = phase_progress()

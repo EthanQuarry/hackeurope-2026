@@ -13,7 +13,8 @@ fi
 
 echo "Starting backend on :8000..."
 cd "$ROOT/backend"
-python3 run.py &
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+"$PYTHON" run.py &
 
 echo "Starting frontend on :3000..."
 cd "$ROOT/frontend"

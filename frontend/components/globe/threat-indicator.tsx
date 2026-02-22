@@ -168,18 +168,26 @@ export function ThreatIndicator({ threat, simTimeRef, satellites }: ThreatIndica
       )
     }
 
-    // Update Line2 geometry buffer directly (no allocation)
+    // Update Line2 geometry buffer only when positions changed meaningfully
     if (lineRef.current?.geometry) {
       const startAttr = lineRef.current.geometry.getAttribute("instanceStart")
       if (startAttr?.data) {
         const buf = startAttr.data.array as Float32Array
-        buf[0] = currentPrimary.current.x
-        buf[1] = currentPrimary.current.y
-        buf[2] = currentPrimary.current.z
-        buf[3] = currentSecondary.current.x
-        buf[4] = currentSecondary.current.y
-        buf[5] = currentSecondary.current.z
-        startAttr.data.needsUpdate = true
+        const px = currentPrimary.current.x
+        const py = currentPrimary.current.y
+        const pz = currentPrimary.current.z
+        const sx = currentSecondary.current.x
+        const sy = currentSecondary.current.y
+        const sz = currentSecondary.current.z
+        const d0 = px - buf[0], d1 = py - buf[1], d2 = pz - buf[2]
+        const d3 = sx - buf[3], d4 = sy - buf[4], d5 = sz - buf[5]
+        const delta = d0*d0 + d1*d1 + d2*d2 + d3*d3 + d4*d4 + d5*d5
+
+        if (delta > 1e-10) {
+          buf[0] = px; buf[1] = py; buf[2] = pz
+          buf[3] = sx; buf[4] = sy; buf[5] = sz
+          startAttr.data.needsUpdate = true
+        }
       }
     }
 

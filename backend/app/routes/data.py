@@ -107,84 +107,164 @@ _debris_cache: list[dict] | None = None
 _debris_cache_time: float = 0
 
 
-def _nation_to_country_code(nation: str) -> str:
-    """Map nation string to Space-Track-style country code."""
-    n = (nation or "").lower()
-    if "russia" in n:
-        return "RUS"
-    if "china" in n:
-        return "PRC"
-    if "united states" in n or "usa" in n:
-        return "USA"
-    if "united kingdom" in n or "uk" in n:
-        return "UK"
-    if "europe" in n or "esa" in n or "eu" in n:
-        return "ESA"
-    if "international" in n:
-        return "UNK"
-    if "luxembourg" in n or "finland" in n or "japan" in n:
-        return "UNK"
-    return "UNK"
+def _build_usa245_satellite(idx: int) -> dict:
+    """Inject USA-245 (NRO KH-11) — classified, not in public Space-Track data."""
+    from app.spacetrack import _generate_trajectory
+
+    alt_km = scenario.TARGET_ALT_KM
+    inc_deg = scenario.TARGET_INC_DEG
+    raan_deg = scenario.TARGET_RAAN_DEG
+    period_min = 2 * math.pi * math.sqrt((6378.137 + alt_km) ** 3 / 398600.4418) / 60
+    v_kms = math.sqrt(398600.4418 / (6378.137 + alt_km))
+
+    trajectory = _generate_trajectory(inc_deg, alt_km, raan_deg, 45.0, period_min)
+
+    return {
+        "id": scenario.TARGET_SAT_ID,
+        "name": "USA-245 (NROL-65)",
+        "noradId": 39232,
+        "status": "allied",
+        "altitude_km": round(alt_km, 1),
+        "velocity_kms": round(v_kms, 2),
+        "inclination_deg": round(inc_deg, 1),
+        "period_min": round(period_min, 1),
+        "trajectory": trajectory,
+        "health": {
+            "power": 91,
+            "comms": 96,
+            "propellant": 68,
+        },
+    }
+
+
+def _orbit_xyz(alt_km: float, inc_deg: float, raan_deg: float, ta: float):
+    """Orbital elements → scene-space xyz (Earth radius = 1.0, Y=north, Z=-lon90).
+    Same coordinate system as frontend's geodeticToSceneVec3."""
+    r = 1.0 + alt_km / 6378.137
+    inc = math.radians(inc_deg)
+    raan = math.radians(raan_deg)
+    xo, yo = math.cos(ta), math.sin(ta)
+    # ECI
+    xe = xo * math.cos(raan) - yo * math.cos(inc) * math.sin(raan)
+    ye_eci = xo * math.sin(raan) + yo * math.cos(inc) * math.cos(raan)
+    ze = yo * math.sin(inc)
+    # ECI → scene (match geodeticToSceneVec3: x=cos(lat)cos(lon), y=sin(lat), z=-cos(lat)sin(lon))
+    lat = math.asin(max(-1, min(1, ze)))
+    lon = math.atan2(ye_eci, xe)
+    return (
+        r * math.cos(lat) * math.cos(lon),
+        r * math.sin(lat),
+        -r * math.cos(lat) * math.sin(lon),
+    )
+
+
+def _build_sj26_satellite(idx: int) -> dict:
+    """Build SJ-26 on its OWN orbit, near but separate from USA-245.
+
+    SJ-26 is on a nearby but different orbit (slightly different inclination).
+    The two rings are close but visibly separate — they don't overlap.
+    SJ-26 is positioned ahead of USA-245 in the direction of travel.
+
+    Phase 0: SJ-26 goes straight on its own orbit ring. Green. Normal.
+    Phase 1+: SJ-26 fires thrusters and arcs OFF its orbit INTO USA-245's
+              orbit path. The maneuver arc is a curved line from SJ-26's
+              ring to USA-245's ring, creating a collision course.
+    """
+    from app.spacetrack import _generate_trajectory
+
+    phase = scenario.current_phase()
+    progress = scenario.phase_progress()
+    status = scenario.sj26_status()
+
+    # USA-245's orbit
+    TGT_ALT = scenario.TARGET_ALT_KM      # 500 km
+    TGT_INC = scenario.TARGET_INC_DEG     # 63.4°
+    TGT_RAAN = scenario.TARGET_RAAN_DEG   # 142°
+
+    # SJ-26's OWN orbit — same altitude, slightly different inclination
+    # This makes two rings that are close but tilted differently
+    SJ_ALT = 505.0           # slightly higher
+    SJ_INC = TGT_INC + 5.0   # 68.4° — 5° more tilted
+    SJ_RAAN = TGT_RAAN + 3.0 # 145° — slightly rotated
+
+    # SJ-26 is ahead of USA-245: USA-245 at ma=45°, SJ-26 at ma=65°
+    SJ_MA = 65.0
+
+    period_min = 2 * math.pi * math.sqrt((6378.137 + SJ_ALT) ** 3 / 398600.4418) / 60
+
+    # SJ-26 always orbits on its own ring
+    trajectory = _generate_trajectory(SJ_INC, SJ_ALT, SJ_RAAN, SJ_MA, period_min)
+
+    # Maneuver arc: only appears in phase 2+ (when threat is actually detected)
+    # Phase 0-1: no arc — SJ-26 is just being watched, no confirmed hostile maneuver yet
+    # Phase 2+: arc shows the projected collision course from SJ-26's orbit to USA-245's
+    maneuver_arc = None
+    if phase >= 2:
+        ta_depart = math.radians(SJ_MA + 30)
+        p0 = _orbit_xyz(SJ_ALT, SJ_INC, SJ_RAAN, ta_depart)
+
+        ta_arrive = math.radians(45 + 15)
+        p2 = _orbit_xyz(TGT_ALT, TGT_INC, TGT_RAAN, ta_arrive)
+
+        mx = (p0[0] + p2[0]) / 2
+        my = (p0[1] + p2[1]) / 2
+        mz = (p0[2] + p2[2]) / 2
+        m_len = math.sqrt(mx*mx + my*my + mz*mz)
+        bulge = 0.08
+        p1 = (
+            mx + (mx / m_len) * bulge,
+            my + (my / m_len) * bulge,
+            mz + (mz / m_len) * bulge,
+        )
+
+        arc_points = []
+        for i in range(101):
+            u = i / 100
+            w0 = (1 - u) ** 2
+            w1 = 2 * (1 - u) * u
+            w2 = u * u
+            arc_points.append([
+                w0 * p0[0] + w1 * p1[0] + w2 * p2[0],
+                w0 * p0[1] + w1 * p1[1] + w2 * p2[1],
+                w0 * p0[2] + w1 * p1[2] + w2 * p2[2],
+            ])
+        maneuver_arc = arc_points
+
+    period_sec = period_min * 60
+    v_kms = math.sqrt(398600.4418 / (6378.137 + SJ_ALT))
+
+    result = {
+        "id": scenario.SJ26_SAT_ID,
+        "name": "SJ-26 (SHIJIAN-26)",
+        "noradId": scenario.SJ26_NORAD_ID,
+        "status": status,
+        "altitude_km": round(SJ_ALT, 1),
+        "velocity_kms": round(v_kms, 2),
+        "inclination_deg": round(SJ_INC, 1),
+        "period_min": round(period_min, 1),
+        "trajectory": trajectory,
+        "health": {
+            "power": 94,
+            "comms": 97,
+            "propellant": 82 if phase < 2 else max(30, 82 - phase * 15),
+        },
+    }
+    if maneuver_arc:
+        result["maneuverArc"] = maneuver_arc
+
+    return result
 
 
 def _generate_fallback_satellites() -> list[dict]:
-    """Fallback mock data if Space-Track is unavailable. Uses seeded RNG for deterministic orbits."""
-    from app.mock_data import SATELLITE_CATALOG
-    rng = random.Random(42)
-    base_t = time.time()
-    sats = []
-    for idx, (sat_id, entry) in enumerate(SATELLITE_CATALOG.items()):
-        alt_km = {
-            "LEO": 400 + rng.random() * 400,
-            "MEO": 2000 + rng.random() * 18000,
-            "GEO": 35786,
-        }.get(entry.get("orbit_type", "LEO"), 500)
-        inc_deg = 51.6 + rng.random() * 40
-        raan_deg = rng.random() * 360
-        nation = entry.get("nation", "Unknown")
-        status = "friendly"
-        if "Russia" in nation or "China" in nation:
-            status = "watched"
-        if entry.get("suspicious"):
-            status = "threatened"
+    """Fallback when Space-Track is unavailable.
 
-        period_min = 2 * math.pi * math.sqrt((6378.137 + alt_km) ** 3 / 398600.4418) / 60
-        v_kms = math.sqrt(398600.4418 / (6378.137 + alt_km))
-
-        trajectory = []
-        period_sec = period_min * 60
-        inc_rad = math.radians(inc_deg)
-        raan_rad = math.radians(raan_deg)
-        for i in range(180):
-            step = period_sec / 180
-            t = base_t + i * step
-            ta = (2 * math.pi / period_sec) * (i * step)
-            x, y = math.cos(ta), math.sin(ta)
-            xe = x * math.cos(raan_rad) - y * math.cos(inc_rad) * math.sin(raan_rad)
-            ye = x * math.sin(raan_rad) + y * math.cos(inc_rad) * math.cos(raan_rad)
-            ze = y * math.sin(inc_rad)
-            lat = math.degrees(math.asin(max(-1, min(1, ze))))
-            lon = math.degrees(math.atan2(ye, xe))
-            trajectory.append({"t": t, "lat": round(lat, 2), "lon": round(lon, 2), "alt_km": round(alt_km, 1)})
-
-        country_code = _nation_to_country_code(entry.get("nation", "Unknown"))
-        sats.append({
-            "id": f"sat-{sat_id}",
-            "name": entry.get("name", f"SAT-{sat_id}"),
-            "noradId": entry.get("norad_id", 99000 + idx),
-            "status": status,
-            "country_code": country_code,
-            "altitude_km": round(alt_km, 1),
-            "velocity_kms": round(v_kms, 2),
-            "inclination_deg": round(inc_deg, 1),
-            "period_min": round(period_min, 1),
-            "trajectory": trajectory,
-            "health": {
-                "power": 60 + (sat_id * 7) % 35,
-                "comms": 70 + (sat_id * 11) % 30,
-                "propellant": 20 + (sat_id * 13) % 70,
-            },
-        })
+    Only generates scenario-critical satellites (USA-245 + SJ-26).
+    Real satellite data should come from Space-Track.
+    """
+    sats = [
+        _build_usa245_satellite(0),
+        _build_sj26_satellite(1),
+    ]
     return sats
 
 
@@ -221,6 +301,53 @@ async def get_satellites():
     _satellites_cache = sats
     _satellites_cache_time = now
     return sats
+
+
+@router.post("/scenario/reset")
+async def reset_scenario():
+    """Reset the SJ-26 scenario clock back to phase 0."""
+    scenario.reset()
+    return {"status": "reset", "phase": 0}
+
+
+@router.get("/scenario/sj26")
+async def get_sj26_scenario(speed: float = 1.0):
+    """Return SJ-26 scenario state for frontend trajectory computation."""
+    scenario.set_speed(speed)
+    return {
+        "phase": scenario.current_phase(),
+        "progress": round(scenario.phase_progress(), 3),
+        "status": scenario.sj26_status(),
+        "elapsed": round(scenario.elapsed(), 1),
+        # Original orbit (benign)
+        "originalOrbit": {
+            "altKm": 520.0,
+            "incDeg": scenario.TARGET_INC_DEG + 8.0,
+            "raanDeg": scenario.TARGET_RAAN_DEG + 25.0,
+        },
+        # Current converged orbit (phase-dependent)
+        "currentOrbit": {
+            "altKm": round(scenario.sj26_altitude_km(), 1),
+            "incDeg": round(scenario.TARGET_INC_DEG + scenario.sj26_inclination_offset(), 1),
+            "raanDeg": round(scenario.TARGET_RAAN_DEG + scenario.sj26_raan_offset(), 1),
+        },
+        # USA-245 target orbit
+        "targetOrbit": {
+            "altKm": scenario.TARGET_ALT_KM,
+            "incDeg": scenario.TARGET_INC_DEG,
+            "raanDeg": scenario.TARGET_RAAN_DEG,
+        },
+        "missDistanceKm": round(scenario.sj26_miss_distance_km(), 1),
+        # How much of the orbit is normal before maneuver
+        "normalFraction": round(
+            1.0 if scenario.current_phase() == 0 else
+            max(0.05, {0: 1.0, 1: 0.7 - 0.25 * scenario.phase_progress(),
+                       2: 0.45 - 0.25 * scenario.phase_progress(),
+                       3: 0.2 - 0.15 * scenario.phase_progress()}.get(scenario.current_phase(), 0.5)),
+            2
+        ),
+        "arcHeightKm": 40.0,  # Bezier control point altitude boost
+    }
 
 
 @router.get("/debris")

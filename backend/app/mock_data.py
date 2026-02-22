@@ -1,65 +1,15 @@
-"""Mock satellite catalog for demo — includes a mix of real-ish satellites and suspicious ones."""
+"""Satellite catalog & lookup functions.
+
+Provides lookup_satellite() and search_catalog() used by the AI agent pipeline.
+Data comes from the live satellite cache (populated by Space-Track polling).
+Falls back to a minimal built-in catalog for scenario-critical satellites only
+(USA-245, SJ-26) so the demo works even if Space-Track is unreachable.
+"""
 
 from __future__ import annotations
 
+# Minimal catalog — only scenario-critical entries that may not be in public TLE data
 SATELLITE_CATALOG: dict[int, dict] = {
-    # --- LEO: Weather & Earth observation ---
-    0: {
-        "norad_id": 25544,
-        "name": "ISS (ZARYA)",
-        "nation": "International",
-        "owner": "NASA / Roscosmos",
-        "purpose": "Crewed space station, scientific research",
-        "orbit_type": "LEO",
-        "launch_year": 1998,
-    },
-    1: {
-        "norad_id": 43013,
-        "name": "NOAA-20 (JPSS-1)",
-        "nation": "United States",
-        "owner": "NOAA",
-        "purpose": "Weather observation and climate monitoring",
-        "orbit_type": "LEO",
-        "launch_year": 2017,
-    },
-    2: {
-        "norad_id": 27424,
-        "name": "AQUA",
-        "nation": "United States",
-        "owner": "NASA",
-        "purpose": "Earth science — water cycle, precipitation, oceans",
-        "orbit_type": "LEO",
-        "launch_year": 2002,
-    },
-    3: {
-        "norad_id": 36508,
-        "name": "CRYOSAT-2",
-        "nation": "Europe (ESA)",
-        "owner": "European Space Agency",
-        "purpose": "Ice sheet and sea ice thickness monitoring",
-        "orbit_type": "LEO",
-        "launch_year": 2010,
-    },
-    # --- LEO: Communications constellations ---
-    4: {
-        "norad_id": 44238,
-        "name": "STARLINK-1007",
-        "nation": "United States",
-        "owner": "SpaceX",
-        "purpose": "Broadband internet constellation",
-        "orbit_type": "LEO",
-        "launch_year": 2019,
-    },
-    5: {
-        "norad_id": 56700,
-        "name": "ONEWEB-0453",
-        "nation": "United Kingdom",
-        "owner": "OneWeb",
-        "purpose": "Broadband internet constellation",
-        "orbit_type": "LEO",
-        "launch_year": 2022,
-    },
-    # --- LEO: Military / Reconnaissance ---
     6: {
         "norad_id": 39232,
         "name": "USA-245 (NROL-65)",
@@ -69,136 +19,6 @@ SATELLITE_CATALOG: dict[int, dict] = {
         "orbit_type": "LEO",
         "launch_year": 2013,
     },
-    7: {
-        "norad_id": 48274,
-        "name": "COSMOS-2558",
-        "nation": "Russia",
-        "owner": "Russian Aerospace Forces",
-        "purpose": "Classified military satellite — suspected inspector satellite",
-        "orbit_type": "LEO",
-        "launch_year": 2022,
-    },
-    8: {
-        "norad_id": 50258,
-        "name": "YAOGAN-35C",
-        "nation": "China",
-        "owner": "PLA Strategic Support Force",
-        "purpose": "Officially 'scientific experiment' — assessed as ELINT/SIGINT reconnaissance",
-        "orbit_type": "LEO",
-        "launch_year": 2022,
-    },
-    # --- MEO: Navigation ---
-    12: {
-        "norad_id": 28474,
-        "name": "GPS IIR-M 3 (USA-190)",
-        "nation": "United States",
-        "owner": "US Space Force",
-        "purpose": "Global Positioning System navigation satellite",
-        "orbit_type": "MEO",
-        "launch_year": 2006,
-    },
-    13: {
-        "norad_id": 37846,
-        "name": "GALILEO-IOV 1",
-        "nation": "Europe (ESA)",
-        "owner": "European Union / ESA",
-        "purpose": "Galileo navigation constellation",
-        "orbit_type": "MEO",
-        "launch_year": 2011,
-    },
-    14: {
-        "norad_id": 32393,
-        "name": "GLONASS-M 26",
-        "nation": "Russia",
-        "owner": "Roscosmos",
-        "purpose": "GLONASS navigation constellation",
-        "orbit_type": "MEO",
-        "launch_year": 2008,
-    },
-    15: {
-        "norad_id": 44204,
-        "name": "BEIDOU-3 M17",
-        "nation": "China",
-        "owner": "CNSA",
-        "purpose": "BeiDou navigation constellation",
-        "orbit_type": "MEO",
-        "launch_year": 2019,
-    },
-    # --- GEO: Communications ---
-    16: {
-        "norad_id": 40258,
-        "name": "ASTRA 2G",
-        "nation": "Luxembourg",
-        "owner": "SES S.A.",
-        "purpose": "Direct-to-home television broadcasting",
-        "orbit_type": "GEO",
-        "launch_year": 2014,
-    },
-    17: {
-        "norad_id": 41866,
-        "name": "INTELSAT 36",
-        "nation": "United States",
-        "owner": "Intelsat",
-        "purpose": "Telecommunications and broadcast services",
-        "orbit_type": "GEO",
-        "launch_year": 2016,
-    },
-    18: {
-        "norad_id": 43435,
-        "name": "WGS-10 (USA-291)",
-        "nation": "United States",
-        "owner": "US Space Force",
-        "purpose": "Wideband Global SATCOM — military broadband communications",
-        "orbit_type": "GEO",
-        "launch_year": 2019,
-    },
-    # --- More LEO variety ---
-    20: {
-        "norad_id": 43600,
-        "name": "ICEYE-X1",
-        "nation": "Finland",
-        "owner": "ICEYE",
-        "purpose": "SAR (Synthetic Aperture Radar) Earth imaging",
-        "orbit_type": "LEO",
-        "launch_year": 2018,
-    },
-    21: {
-        "norad_id": 49260,
-        "name": "TIANHE (CSS)",
-        "nation": "China",
-        "owner": "CMSA",
-        "purpose": "Chinese Space Station core module",
-        "orbit_type": "LEO",
-        "launch_year": 2021,
-    },
-    22: {
-        "norad_id": 25994,
-        "name": "TERRA",
-        "nation": "United States",
-        "owner": "NASA",
-        "purpose": "Earth observing — land, atmosphere, oceans",
-        "orbit_type": "LEO",
-        "launch_year": 1999,
-    },
-    23: {
-        "norad_id": 41240,
-        "name": "SENTINEL-2A",
-        "nation": "Europe (ESA)",
-        "owner": "European Space Agency / Copernicus",
-        "purpose": "High-resolution optical imaging for Copernicus programme",
-        "orbit_type": "LEO",
-        "launch_year": 2015,
-    },
-    24: {
-        "norad_id": 54321,
-        "name": "ELECTRON KICK STAGE DEB",
-        "nation": "United States / New Zealand",
-        "owner": "Rocket Lab (debris)",
-        "purpose": "Spent upper stage — space debris",
-        "orbit_type": "LEO",
-        "launch_year": 2023,
-    },
-    # --- SJ-26: Evolving threat scenario (static shell — runtime data from scenario.py) ---
     25: {
         "norad_id": 99910,
         "name": "SJ-26 (SHIJIAN-26)",
@@ -211,23 +31,90 @@ SATELLITE_CATALOG: dict[int, dict] = {
 }
 
 
+def _get_live_satellites() -> list[dict]:
+    """Get satellites from the live cache if available."""
+    try:
+        from app.routes.data import _satellites_cache
+        return _satellites_cache or []
+    except Exception:
+        return []
+
+
 def lookup_satellite(satellite_id: int) -> dict | None:
-    """Look up a satellite by its simulation ID. Returns catalog entry or None."""
+    """Look up a satellite by its simulation catalog ID.
+
+    Checks the live Space-Track cache first, falls back to the minimal catalog.
+    For SJ-26, returns the dynamic scenario entry.
+    """
     if satellite_id == 25:
         from app.scenario import sj26_catalog_entry
         return sj26_catalog_entry()
+
+    # Check live satellite data
+    live = _get_live_satellites()
+    for sat in live:
+        # Match by catalog ID pattern (sat-{id})
+        if sat.get("id") == f"sat-{satellite_id}":
+            return {
+                "norad_id": sat.get("noradId", 0),
+                "name": sat.get("name", "Unknown"),
+                "nation": _infer_nation(sat),
+                "status": sat.get("status", "nominal"),
+                "altitude_km": sat.get("altitude_km", 0),
+                "orbit_type": _infer_orbit_type(sat.get("altitude_km", 0)),
+            }
+
+    # Fall back to minimal catalog
     return SATELLITE_CATALOG.get(satellite_id)
 
 
 def search_catalog(query: str) -> list[dict]:
-    """Simple keyword search across satellite catalog entries."""
+    """Search satellites by keyword. Checks live data first, then minimal catalog."""
     from app.scenario import sj26_catalog_entry, SJ26_CATALOG_ID
+
     query_lower = query.lower()
     results = []
+
+    # Search live satellites
+    live = _get_live_satellites()
+    for sat in live:
+        name = sat.get("name", "")
+        if query_lower in name.lower() or query_lower in str(sat.get("noradId", "")):
+            results.append({
+                "id": sat.get("id", ""),
+                "norad_id": sat.get("noradId", 0),
+                "name": name,
+                "status": sat.get("status", "nominal"),
+            })
+
+    # Also search minimal catalog for scenario satellites
     for sat_id, entry in SATELLITE_CATALOG.items():
-        # Use dynamic entry for SJ-26
         effective = sj26_catalog_entry() if sat_id == SJ26_CATALOG_ID else entry
         searchable = " ".join(str(v) for v in effective.values()).lower()
         if query_lower in searchable:
-            results.append({"id": sat_id, **effective})
+            # Avoid duplicates
+            eid = f"sat-{sat_id}"
+            if not any(r.get("id") == eid for r in results):
+                results.append({"id": eid, **effective})
+
     return results
+
+
+def _infer_nation(sat: dict) -> str:
+    """Infer nation from satellite status."""
+    status = sat.get("status", "")
+    if status in ("allied", "friendly"):
+        return "Allied"
+    if status == "watched":
+        return "Adversary"
+    if status == "threatened":
+        return "Hostile"
+    return "Unknown"
+
+
+def _infer_orbit_type(alt_km: float) -> str:
+    if alt_km < 2000:
+        return "LEO"
+    if alt_km < 35000:
+        return "MEO"
+    return "GEO"
