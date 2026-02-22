@@ -84,9 +84,23 @@ FLEET_NORAD_IDS = [
     # --- Other notable ---
     28654,  # IRIDIUM 33 (collision remnant)
     22675,  # COSMOS 2251 (collision remnant)
+    # --- Additional allied military SATCOM ---
+    39533,  # WGS-6 (US mil SATCOM)
+    41471,  # WGS-8 (US mil SATCOM)
+    42741,  # WGS-9 (US mil SATCOM)
+    44481,  # AEHF-5 (US mil protected comms)
+    43689,  # AEHF-6 (US mil protected comms)
+    # --- Additional Russian adversarial ---
+    44547,  # COSMOS-2536 (ELINT)
+    49808,  # COSMOS-2553 (inspector)
+    # --- Additional Chinese adversarial ---
+    49481,  # YAOGAN-33 (PRC recon)
+    54216,  # YAOGAN-36C (PRC SAR)
+    # --- Additional ISR ---
+    26900,  # USA-160 (NOSS 3-2, naval ocean surveillance)
 ]
 
-# Cached results
+# Cached results — set time to 0 to force a fresh fetch on next request
 _satellites_cache: list[dict] | None = None
 _satellites_cache_time: float = 0
 _debris_cache: list[dict] | None = None

@@ -8,20 +8,33 @@ Divergence metric (lower = more similar orbits):
     d_alt  = |alt_a - alt_b| / 500.0        (normalised; 500 km reference spread)
     divergence = sqrt(d_inc^2 + d_alt^2)
 
-Benign distribution:  LogNormal(mu=0.2,  sigma=0.6)  — random pairs diverge widely
-Threat distribution:  LogNormal(mu=-3.0, sigma=0.8)  — shadowing pairs nearly identical
+Benign distribution:  LogNormal(mu=-1.0, sigma=1.0)
+    Centred at e^{-1} ≈ 0.37 with wide spread — accounts for the fact that many
+    legitimate satellites (GPS blocks, weather constellations, Starlink shells)
+    naturally share similar altitudes and inclinations.
+
+Threat distribution:  LogNormal(mu=-3.0, sigma=0.8)
+    Centred at e^{-3} ≈ 0.05 — intentional shadowing pairs are nearly identical.
+
+Prior: 0.20 for adversarial nations (PRC/RUS/CIS), near-zero otherwise.
+    Much lower than the proximity scorer's 0.9 — that prior is conditioned on
+    "satellite is already within 500 km"; here we're asking across all pairs
+    whether the orbit match is deliberate, which is a far rarer event.
 """
 
 from __future__ import annotations
 
 import math
 
-# Import priors from the proximity scorer so changes propagate consistently
-from app.bayesian_scorer import PRIOR_ADVERSARIAL, PRIOR_BENIGN, ADVERSARIAL_COUNTRIES
+from app.bayesian_scorer import ADVERSARIAL_COUNTRIES
+
+# Orbital-similarity-specific priors (separate from proximity scorer)
+PRIOR_ADVERSARIAL = 0.05
+PRIOR_BENIGN = 0.0000005
 
 # Log-normal parameters for orbital divergence score
-BENIGN_MU = 0.2
-BENIGN_SIGMA = 0.6
+BENIGN_MU = -1.0
+BENIGN_SIGMA = 1.0
 
 THREAT_MU = -3.0
 THREAT_SIGMA = 0.8
