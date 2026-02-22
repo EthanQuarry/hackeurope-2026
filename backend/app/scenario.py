@@ -40,13 +40,61 @@ _scenario_time: float = 0.0
 _last_tick: float = time.time()
 _speed: float = 1.0
 
+# ---------------------------------------------------------------------------
+# USA-245 evasion state
+# ---------------------------------------------------------------------------
+_usa245_evading: bool = False
+_usa245_evasion_start: float = 0.0
+
+# Evasion orbital parameters — USA-245 raises altitude and shifts RAAN to separate
+USA245_EVADE_ALT_BOOST = 15.0    # km altitude raise
+USA245_EVADE_RAAN_SHIFT = 4.0    # degrees RAAN shift
+USA245_EVADE_DURATION = 90.0     # scenario-seconds for maneuver to complete
+
+
+def trigger_usa245_evasion() -> None:
+    """Trigger USA-245 evasive maneuver — raises orbit to separate from SJ-26."""
+    global _usa245_evading, _usa245_evasion_start
+    _usa245_evading = True
+    _usa245_evasion_start = _scenario_time
+
+
+def usa245_evading() -> bool:
+    """Whether USA-245 is currently executing an evasive maneuver."""
+    return _usa245_evading
+
+
+def usa245_evasion_progress() -> float:
+    """Progress of USA-245 evasion maneuver, 0.0 → 1.0."""
+    if not _usa245_evading:
+        return 0.0
+    _tick()
+    dt = _scenario_time - _usa245_evasion_start
+    return min(1.0, dt / USA245_EVADE_DURATION)
+
+
+def usa245_altitude_offset() -> float:
+    """Altitude boost from evasion (km). 0 when not evading."""
+    if not _usa245_evading:
+        return 0.0
+    return USA245_EVADE_ALT_BOOST * _smoothstep(usa245_evasion_progress())
+
+
+def usa245_raan_offset() -> float:
+    """RAAN shift from evasion (degrees). 0 when not evading."""
+    if not _usa245_evading:
+        return 0.0
+    return USA245_EVADE_RAAN_SHIFT * _smoothstep(usa245_evasion_progress())
+
 
 def reset() -> None:
     """Reset the scenario clock (useful for testing)."""
-    global _start_time, _scenario_time, _last_tick
+    global _start_time, _scenario_time, _last_tick, _usa245_evading, _usa245_evasion_start
     _start_time = time.time()
     _scenario_time = 0.0
     _last_tick = time.time()
+    _usa245_evading = False
+    _usa245_evasion_start = 0.0
 
 
 def set_speed(speed: float) -> None:
@@ -177,16 +225,23 @@ def sj26_raan_offset() -> float:
 
 
 def sj26_miss_distance_km() -> float:
-    """Projected miss distance to USA-245."""
+    """Projected miss distance to USA-245 (accounts for USA-245 evasion)."""
     phase = current_phase()
     p = _smoothstep(phase_progress())
     if phase == 0:
-        return _lerp(1200.0, 1000.0, p)    # benign distance
-    if phase == 1:
-        return _lerp(1000.0, 400.0, p)     # starting to close but still far
-    if phase == 2:
-        return _lerp(400.0, 2.0, p)        # aggressive closing
-    return _lerp(2.0, 0.1, p)              # critical — near collision
+        base = _lerp(1200.0, 1000.0, p)
+    elif phase == 1:
+        base = _lerp(1000.0, 400.0, p)
+    elif phase == 2:
+        base = _lerp(400.0, 2.0, p)
+    else:
+        base = _lerp(2.0, 0.1, p)
+
+    # When USA-245 evades, miss distance increases as it separates
+    if _usa245_evading:
+        evasion_boost = _smoothstep(usa245_evasion_progress()) * 200.0  # up to +200km
+        return base + evasion_boost
+    return base
 
 
 # ---------------------------------------------------------------------------

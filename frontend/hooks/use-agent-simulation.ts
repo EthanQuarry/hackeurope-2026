@@ -289,11 +289,11 @@ export function useAgentSimulation() {
     // Build the 4 response options
     const manoeuvre: AgentResponseOption = {
       tier: "manoeuvre",
-      label: "Defensive Orbit Manoeuvre",
-      description: `Execute a ${(1.5 + Math.random() * 3).toFixed(1)} m/s delta-V burn to raise orbit by ${randInt(5, 20)}km, increasing separation from ${params.threatSatelliteName}. Maintains current mission coverage with minimal disruption.`,
+      label: "Evasive Orbit Manoeuvre",
+      description: `Execute retrograde burn on ${params.satelliteName} — ${(1.5 + Math.random() * 3).toFixed(1)} m/s delta-V to raise orbit by 15km and shift RAAN by 4°. This moves ${params.satelliteName} off ${params.threatSatelliteName}'s approach vector, increasing separation to safe distance.`,
       severity: 1,
-      justification: `Standard defensive response to ${approach} approach. Increases miss distance from ${missKm.toFixed(1)}km to ${(missKm + randInt(15, 50)).toFixed(1)}km while preserving mission capability.`,
-      confidence: 0.92,
+      justification: `${params.satelliteName} must change trajectory to avoid ${params.threatSatelliteName}. ${approach} approach at ${missKm.toFixed(1)}km is within collision hazard threshold. Orbit raise + RAAN shift increases miss distance to ${(missKm + 200).toFixed(0)}km.`,
+      confidence: 0.95,
       risks: [
         `Propellant expenditure reduces remaining delta-V budget by ~${randInt(5, 15)}%`,
         "Temporary loss of optimal imaging geometry for 2-3 orbits",
@@ -391,19 +391,14 @@ export function useAgentSimulation() {
     await think(stepId, "warning", `Option 4 — KINETIC NEUTRALIZATION: Maximum severity. ${threatLevel === "critical" ? "Available but NOT recommended without NCA authorization. Escalation risk unacceptable." : "NOT RECOMMENDED — threat level does not warrant kinetic response."}`)
     checkAbort()
 
-    // Determine recommended option
+    // Determine recommended option — ALWAYS favour manoeuvre to separate from threat
     let recommended: AgentResponseOption
-    if (threatLevel === "critical") {
-      recommended = decoy
-      await think(stepId, "reasoning", "CRITICAL threat level — recommending DECOY DEPLOYMENT. Kinetic option available but escalation risk prohibitive without explicit NCA authorization.")
-    } else if (threatLevel === "high") {
-      // Randomly pick sarcastic-manoeuvre or decoy for high threats
-      const pick = Math.random() > 0.5 ? sarcasticManoeuvre : decoy
-      recommended = pick
-      await think(stepId, "reasoning", `HIGH threat level — recommending ${pick.label.toUpperCase()}. Balances deterrence with escalation management.`)
+    if (threatLevel === "critical" || threatLevel === "high") {
+      recommended = manoeuvre
+      await think(stepId, "reasoning", `${threatLevel.toUpperCase()} threat level — recommending EVASIVE ORBIT MANOEUVRE. ${params.satelliteName} must change trajectory to increase separation from ${params.threatSatelliteName}. Immediate burn required.`)
     } else {
       recommended = manoeuvre
-      await think(stepId, "reasoning", `${threatLevel.toUpperCase()} threat level — recommending DEFENSIVE MANOEUVRE. Proportional response minimizes escalation risk.`)
+      await think(stepId, "reasoning", `${threatLevel.toUpperCase()} threat level — recommending EVASIVE MANOEUVRE. Proportional response to increase miss distance and reduce collision risk.`)
     }
     checkAbort()
 

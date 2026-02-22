@@ -35,18 +35,35 @@ class SpaceTrackClient:
         self._debris_cache: list[dict] | None = None
         self._debris_cache_time: float = 0
 
+    # Backup credentials in case primary .env creds expire or are missing
+    BACKUP_CREDS = [
+        ("me@ethanquarry.com", "ethanQuarry12456"),
+    ]
+
     def _login(self) -> None:
         if self._cookie and (time.time() - self._cookie_time) < 1800:
             return
         logger.info("Logging in to Space-Track...")
-        resp = self._client.post(LOGIN_URL, data={
-            "identity": self.username,
-            "password": self.password,
-        })
-        resp.raise_for_status()
-        self._cookie = resp.cookies.get("chocolatechip")
-        self._cookie_time = time.time()
-        logger.info("Space-Track login successful")
+
+        # Try primary credentials first, then backups
+        creds_to_try = [(self.username, self.password)] + self.BACKUP_CREDS
+        last_err = None
+        for user, passwd in creds_to_try:
+            try:
+                resp = self._client.post(LOGIN_URL, data={
+                    "identity": user,
+                    "password": passwd,
+                })
+                resp.raise_for_status()
+                self._cookie = resp.cookies.get("chocolatechip")
+                self._cookie_time = time.time()
+                logger.info("Space-Track login successful (user: %s)", user)
+                return
+            except Exception as exc:
+                last_err = exc
+                logger.warning("Space-Track login failed for %s: %s", user, exc)
+
+        raise last_err or RuntimeError("All Space-Track credentials failed")
 
     def _query(self, url: str) -> list[dict]:
         self._login()

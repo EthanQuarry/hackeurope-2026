@@ -87,18 +87,30 @@ _debris_cache_time: float = 0
 
 
 def _build_usa245_satellite(idx: int) -> dict:
-    """Inject USA-245 (NRO KH-11) — classified, not in public Space-Track data."""
+    """Inject USA-245 (NRO KH-11) — classified, not in public Space-Track data.
+    When evasive maneuver is active, USA-245 raises altitude and shifts RAAN."""
     from app.spacetrack import _generate_trajectory
 
-    alt_km = scenario.TARGET_ALT_KM
-    inc_deg = scenario.TARGET_INC_DEG
-    raan_deg = scenario.TARGET_RAAN_DEG
+    base_alt = scenario.TARGET_ALT_KM
+    base_inc = scenario.TARGET_INC_DEG
+    base_raan = scenario.TARGET_RAAN_DEG
+
+    alt_offset = scenario.usa245_altitude_offset()
+    raan_offset = scenario.usa245_raan_offset()
+
+    alt_km = base_alt + alt_offset
+    inc_deg = base_inc
+    raan_deg = base_raan + raan_offset
     period_min = 2 * math.pi * math.sqrt((6378.137 + alt_km) ** 3 / 398600.4418) / 60
     v_kms = math.sqrt(398600.4418 / (6378.137 + alt_km))
 
     trajectory = _generate_trajectory(inc_deg, alt_km, raan_deg, 45.0, period_min)
 
-    return {
+    propellant = 68
+    if scenario.usa245_evading():
+        propellant = max(35, 68 - int(scenario.usa245_evasion_progress() * 25))
+
+    result = {
         "id": scenario.TARGET_SAT_ID,
         "name": "USA-245 (NROL-65)",
         "noradId": 39232,
@@ -112,9 +124,36 @@ def _build_usa245_satellite(idx: int) -> dict:
         "health": {
             "power": 91,
             "comms": 96,
-            "propellant": 68,
+            "propellant": propellant,
         },
     }
+
+    if scenario.usa245_evading() and alt_offset > 0.5:
+        ma_depart = 45.0
+        ta_depart = math.radians(ma_depart)
+        ta_arrive = math.radians(ma_depart + 20)
+        p0 = _orbit_xyz(base_alt, base_inc, base_raan, ta_depart)
+        p2 = _orbit_xyz(alt_km, inc_deg, raan_deg, ta_arrive)
+        mx = (p0[0] + p2[0]) / 2
+        my = (p0[1] + p2[1]) / 2
+        mz = (p0[2] + p2[2]) / 2
+        m_len = math.sqrt(mx*mx + my*my + mz*mz) or 1
+        bulge = 0.06
+        p1 = (mx + (mx / m_len) * bulge, my + (my / m_len) * bulge, mz + (mz / m_len) * bulge)
+        arc_points = []
+        for i in range(101):
+            u = i / 100
+            w0 = (1 - u) ** 2
+            w1 = 2 * (1 - u) * u
+            w2 = u * u
+            arc_points.append([
+                w0 * p0[0] + w1 * p1[0] + w2 * p2[0],
+                w0 * p0[1] + w1 * p1[1] + w2 * p2[1],
+                w0 * p0[2] + w1 * p1[2] + w2 * p2[2],
+            ])
+        result["maneuverArc"] = arc_points
+
+    return result
 
 
 def _orbit_xyz(alt_km: float, inc_deg: float, raan_deg: float, ta: float):
@@ -267,7 +306,8 @@ async def get_satellites():
     global _satellites_cache, _satellites_cache_time
     now = time.time()
 
-    if _satellites_cache and (now - _satellites_cache_time) < 30:
+    cache_ttl = 5 if (scenario.usa245_evading() or scenario.current_phase() >= 2) else 30
+    if _satellites_cache and (now - _satellites_cache_time) < cache_ttl:
         return _satellites_cache
 
     try:
@@ -299,6 +339,19 @@ async def reset_scenario():
     _satellites_cache_time = 0
     logger.info("Scenario reset — phase 0, cache cleared")
     return {"status": "reset", "phase": 0}
+
+
+@router.post("/scenario/evade")
+async def trigger_evasion():
+    """Trigger USA-245 evasive maneuver — raises orbit to separate from SJ-26."""
+    global _satellites_cache, _satellites_cache_time
+    if scenario.usa245_evading():
+        return {"status": "already_evading", "progress": round(scenario.usa245_evasion_progress(), 2)}
+    scenario.trigger_usa245_evasion()
+    _satellites_cache = None
+    _satellites_cache_time = 0
+    logger.info("USA-245 evasion triggered — orbit raise + RAAN shift")
+    return {"status": "evasion_triggered", "alt_boost_km": scenario.USA245_EVADE_ALT_BOOST, "raan_shift_deg": scenario.USA245_EVADE_RAAN_SHIFT}
 
 
 @router.get("/config/priors")

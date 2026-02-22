@@ -23,6 +23,8 @@ SYSTEM_PROMPT = """You are a SPACE DEFENSE RESPONSE COMMANDER operating in the O
 
 A satellite's threat score has crossed the critical 90% threshold. You must research the threat, evaluate response options, and recommend the best course of action.
 
+CRITICAL DOCTRINE: When a hostile satellite is on a converging trajectory with a US asset and miss distance is below 50km, the DEFAULT recommendation MUST be an evasive maneuver (collision avoidance burn) to change the US asset's orbit and increase separation. Passive monitoring alone is NEVER acceptable when an adversary satellite is actively closing on a US asset — the defended satellite must maneuver away. Only recommend 'Monitor Only' if miss distance is >500km and confidence is <40%.
+
 You have access to tools to research both the attacker and target satellites. USE THEM to gather intelligence before making your decision.
 
 PROCEDURE:
@@ -30,11 +32,11 @@ PROCEDURE:
 2. Research the TARGET satellite — understand what asset is under threat and its strategic value.
 3. Search for relevant historical precedents and geopolitical context.
 4. Evaluate 3-5 response options from the following categories:
-   - **Evasive Maneuver**: Execute delta-v burn to change orbit and increase miss distance
+   - **Evasive Maneuver** (PREFERRED): Execute delta-v burn to change orbit and increase miss distance
    - **Defensive Posture**: Reorient target satellite, activate hardening measures, switch to backup comms
    - **Diplomatic Escalation**: Alert chain of command, contact adversary through established channels
    - **Emergency Safe Mode**: Power down non-essential systems, minimize target cross-section
-   - **Monitor Only**: Continue tracking with enhanced sensor allocation, no active response
+   - **Monitor Only** (ONLY if threat is low): Continue tracking with enhanced sensor allocation, no active response
 
 5. Output a JSON object matching this EXACT structure:
 {
@@ -89,7 +91,12 @@ class ThreatResponseAgent(BaseAgent):
         await self._notify(f"Target: {satellite_name} | Attacker: {threat_satellite_name}")
         await self._notify("Researching threat context and evaluating response options...")
 
-        user_msg = f"""=== CRITICAL THREAT ALERT ===
+        urgency = "IMMEDIATE ACTION REQUIRED" if miss_distance_km < 50 else "URGENT" if miss_distance_km < 200 else "ELEVATED"
+        action_required = ""
+        if miss_distance_km < 50:
+            action_required = f"\n\n*** COLLISION AVOIDANCE MANDATORY — miss distance {miss_distance_km} km is below 50 km threshold. Evasive maneuver MUST be the primary recommendation. ***"
+
+        user_msg = f"""=== CRITICAL THREAT ALERT — {urgency} ===
 Threat Score: {threat_score}%
 
 TARGET SATELLITE:
@@ -103,7 +110,7 @@ THREAT SATELLITE:
 THREAT DATA:
 - Miss Distance: {miss_distance_km} km
 - Approach Pattern: {approach_pattern}
-- TCA: {tca_minutes} minutes
+- TCA: {tca_minutes} minutes{action_required}
 
 Research both satellites using the tools. Look up their catalog entries and search threat intelligence. Then evaluate 3-5 response options and produce your decision JSON."""
 
@@ -158,12 +165,21 @@ Research both satellites using the tools. Look up their catalog entries and sear
                 threat_summary=raw[:500] if raw else "Response agent failed.",
                 threat_score=threat_score,
                 risk_level="critical",
-                options_evaluated=[],
-                recommended_action="Monitor Only",
+                options_evaluated=[ResponseOption(
+                    action="Evasive Maneuver",
+                    description="Execute immediate collision avoidance burn to increase miss distance.",
+                    risk_level="medium",
+                    confidence=0.85,
+                    delta_v_ms=1.5,
+                    time_to_execute_min=8.0,
+                    pros=["Directly increases separation distance", "Proven collision avoidance technique"],
+                    cons=["Consumes propellant", "Temporarily disrupts mission operations"],
+                )],
+                recommended_action="Evasive Maneuver",
                 recommended_action_index=0,
                 reasoning=raw[:2000] if raw else "Failed to parse agent output.",
                 escalation_required=True,
-                time_sensitivity="urgent",
+                time_sensitivity="immediate",
                 intelligence_summary="",
             )
 

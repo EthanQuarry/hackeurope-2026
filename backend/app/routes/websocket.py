@@ -160,7 +160,7 @@ def _sj26_proximity(phase: int, progress: float, now_ms: int) -> dict | None:
         pat, vel, sun = "co-orbital", round(0.8 + progress * 0.7, 2), False
     else:
         sev, pat, vel, sun = "threatened", "co-orbital", round(1.5 + progress * 0.5, 2), True
-    posterior = score_satellite(miss_km, "CIS")
+    posterior = score_satellite(miss_km, "PRC")
     tca_min = max(1, int(20 - phase * 5))
     # Confidence ramps smoothly with phase+progress (0.70 → 0.92)
     conf = round(max(posterior, 0.55 + t * 0.12), 2)

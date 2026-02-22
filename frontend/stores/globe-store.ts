@@ -25,7 +25,7 @@ export const useGlobeStore = create<GlobeState>((set) => ({
   showLabels: true,
   activeDemo: null,
   cinematicActive: false,
-  priorAdversarial: 0.5,
+  priorAdversarial: 0.9,
 
   setSimTime: (t) => set({ simTime: t }),
   setSpeed: (speed) => set({ speed }),

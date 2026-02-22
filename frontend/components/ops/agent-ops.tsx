@@ -38,6 +38,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useAgentOpsStore } from "@/stores/agent-ops-store"
 import { useAgentSimulation } from "@/hooks/use-agent-simulation"
+import { api } from "@/lib/api"
 import type {
   AgentFlowStep,
   AgentFlowStepId,
@@ -773,9 +774,10 @@ const PhaseSection = memo(function PhaseSection({
                   )}
                   onClick={() => {
                     useAgentOpsStore.getState().setIsExecuting(true)
+                    fetch(api.scenarioEvade, { method: "POST" }).catch(() => {})
                   }}
                 >
-                  EXECUTE RESPONSE
+                  EXECUTE MANOEUVRE
                 </button>
               )}
             </div>
@@ -814,6 +816,11 @@ function ExecutionProgress() {
   const [pct, setPct] = useState(0)
   const [done, setDone] = useState(false)
 
+  // Trigger USA-245 evasive maneuver on the backend when execution starts
+  useEffect(() => {
+    fetch(api.scenarioEvade, { method: "POST" }).catch(() => {})
+  }, [])
+
   useEffect(() => {
     let frame: number
     const start = Date.now()
@@ -836,9 +843,14 @@ function ExecutionProgress() {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3">
         <CheckCircle2 className="h-6 w-6 text-emerald-400" />
-        <span className="font-mono text-sm font-bold uppercase tracking-wider text-emerald-300">
-          RESPONSE EXECUTED
-        </span>
+        <div>
+          <span className="font-mono text-sm font-bold uppercase tracking-wider text-emerald-300">
+            MANOEUVRE EXECUTED
+          </span>
+          <p className="font-mono text-[10px] text-emerald-400/70 mt-0.5">
+            Orbit raise +15km and RAAN shift +4° initiated. Trajectory separating.
+          </p>
+        </div>
       </div>
     )
   }
