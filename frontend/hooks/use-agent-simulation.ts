@@ -47,9 +47,14 @@ interface SimulationParams {
 
 const COUNTRY_NAMES: Record<string, string> = {
   CN: "People's Republic of China",
+  PRC: "People's Republic of China",
   RU: "Russian Federation",
+  RUS: "Russian Federation",
+  CIS: "Russian Federation",
   IR: "Islamic Republic of Iran",
+  IRAN: "Islamic Republic of Iran",
   KP: "Democratic People's Republic of Korea",
+  NKOR: "Democratic People's Republic of Korea",
   US: "United States of America",
   IN: "Republic of India",
   FR: "French Republic",

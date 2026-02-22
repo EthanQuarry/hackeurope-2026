@@ -142,11 +142,13 @@ export function useAgentTrigger(): void {
 
       /* Extract threat-data fields */
       const raw = best.raw as unknown as Record<string, unknown>
+      /* Look up the THREAT satellite's country, not the target's */
+      const threatSat = satellites.find((s) => s.id === best.threatSatelliteId)
       const threatData = {
         missDistanceKm: raw.missDistanceKm as number | undefined,
         approachPattern: raw.approachPattern as string | undefined,
         tcaMinutes: raw.tcaInMinutes as number | undefined,
-        countryCode: (raw.countryCode ?? sat.country_code) as string | undefined,
+        countryCode: (threatSat?.country_code ?? raw.countryCode) as string | undefined,
         anomalyType: raw.anomalyType as string | undefined,
       }
 

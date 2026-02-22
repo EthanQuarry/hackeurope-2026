@@ -344,6 +344,7 @@ async def scenario_tick_ws(ws: WebSocket):
         )
         from app.routes.data import get_threats as get_conjunctions
 
+        SJ26_ID = scenario.SJ26_SAT_ID
         SJ26_PROX = {"prox-sj26"}
         SJ26_SIG = {"sig-sj26"}
         SJ26_ANOM = {"anom-sj26-maneuver", "anom-sj26-rf", "anom-sj26-grapple"}
@@ -369,20 +370,21 @@ async def scenario_tick_ws(ws: WebSocket):
                 gen_conj = _wobble_threats(gen_conj, el)
 
                 # Merge: wobbled general (strip SJ-26 dupes) + fresh SJ-26
+                # Filter by both threat ID and satellite ID to catch sequential IDs like "prox-3"
                 sj_tick["proximityThreats"] = (
-                    [t for t in gen_prox if t["id"] not in SJ26_PROX]
+                    [t for t in gen_prox if t["id"] not in SJ26_PROX and t.get("foreignSatId") != SJ26_ID]
                     + sj_tick["proximityThreats"]
                 )
                 sj_tick["signalThreats"] = (
-                    [t for t in gen_sig if t["id"] not in SJ26_SIG]
+                    [t for t in gen_sig if t["id"] not in SJ26_SIG and t.get("interceptorId") != SJ26_ID]
                     + sj_tick["signalThreats"]
                 )
                 sj_tick["anomalyThreats"] = (
-                    [t for t in gen_anom if t["id"] not in SJ26_ANOM]
+                    [t for t in gen_anom if t["id"] not in SJ26_ANOM and t.get("satelliteId") != SJ26_ID]
                     + sj_tick["anomalyThreats"]
                 )
                 sj_tick["threats"] = (
-                    [t for t in gen_conj if t["id"] not in SJ26_CONJ]
+                    [t for t in gen_conj if t["id"] not in SJ26_CONJ and t.get("secondaryId") != SJ26_ID]
                     + sj_tick["threats"]
                 )
 
