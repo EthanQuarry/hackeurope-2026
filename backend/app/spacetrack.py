@@ -160,6 +160,8 @@ def gp_to_satellite(gp: dict, idx: int) -> dict:
         "velocity_kms": round(v_kms, 2),
         "inclination_deg": round(inc_deg, 1),
         "period_min": round(period_min, 1),
+        "eccentricity": round(ecc, 6),
+        "semi_major_axis_km": round(semi_major_km, 1),
         "trajectory": trajectory,
         "health": {
             "power": 70 + (norad_id % 30),

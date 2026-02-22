@@ -15,6 +15,8 @@ from fastapi import APIRouter
 
 from app.bayesian_scorer import score_satellite
 from app.orbital_similarity_scorer import score_orbital_similarity
+from app.geo_us_loiter_detector import assess_all
+from app import scenario, geo_loiter_demo
 
 router = APIRouter()
 
@@ -22,8 +24,16 @@ CACHE_TTL = 30  # seconds
 
 _prox_cache: list[dict] | None = None
 _osim_cache: list[dict] | None = None
+_geo_cache: list[dict] | None = None
 _prox_cache_time: float = 0
 _osim_cache_time: float = 0
+_geo_cache_time: float = 0
+_prox_phase: int = -1
+_sig_phase: int = -1
+_anom_phase: int = -1
+_osim_phase: int = -1
+# Geo cache key includes demo active state so activation/deactivation forces refresh
+_geo_cache_key: tuple = (-1, False)
 
 
 def _get_satellites() -> list[dict]:
@@ -325,3 +335,92 @@ async def get_orbital_similarity_threats():
     _osim_cache = threats[:15]
     _osim_cache_time = now
     return _osim_cache
+
+
+@router.get("/threats/geo-us-loiter")
+async def get_geo_us_loiter_threats():
+    """GeoLoiterThreat[] — Chinese/Russian satellites geostationary or hovering over US territory."""
+    global _geo_cache, _geo_cache_time, _geo_cache_key
+    now = time.time()
+    phase = scenario.current_phase()
+    demo_active = geo_loiter_demo.is_active()
+    elapsed_bucket = int(geo_loiter_demo.elapsed() / 5) if demo_active else 0
+    cache_key = (phase, demo_active, elapsed_bucket)
+
+    if _geo_cache and (now - _geo_cache_time) < CACHE_TTL and _geo_cache_key == cache_key:
+        return _geo_cache
+
+    sats = _get_satellites()
+    results = assess_all(sats)
+
+    threats = []
+    now_ms = int(now * 1000)
+    for r in results:
+        threats.append({
+            "id": f"geo-{r.satellite_id}",
+            "satelliteId": r.satellite_id,
+            "satelliteName": r.satellite_name,
+            "noradId": r.norad_id,
+            "countryCode": r.country_code,
+            "orbitType": r.orbit_type,
+            "subsatelliteLonDeg": r.subsatellite_lon_deg,
+            "subsatelliteLatDeg": r.subsatellite_lat_deg,
+            "altitudeKm": r.altitude_km,
+            "dwellFractionOverUs": r.dwell_fraction_over_us,
+            "severity": r.severity,
+            "threatScore": r.threat_score,
+            "description": r.description,
+            "confidence": round(r.threat_score, 2),
+            "position": {
+                "lat": r.subsatellite_lat_deg,
+                "lon": r.subsatellite_lon_deg,
+                "altKm": r.altitude_km,
+            },
+            "detectedAt": now_ms,
+        })
+
+    # Inject demo threats when active — progressive severity over ~90 seconds
+    if demo_active:
+        demo_configs = geo_loiter_demo.get_demo_threat_config(sats)
+        el = geo_loiter_demo.elapsed()
+        if el < 30:
+            severity = "nominal"
+            threat_score = 0.2
+        elif el < 60:
+            severity = "watched"
+            threat_score = round(0.4 + (el - 30) / 30 * 0.3, 3)
+        else:
+            severity = "threatened"
+            threat_score = round(0.85 + min(0.1, (el - 60) / 30 * 0.1), 3)
+
+        for cfg in demo_configs:
+            threats.append({
+                "id": f"geo-demo-{cfg['id']}",
+                "satelliteId": cfg["id"],
+                "satelliteName": cfg["name"],
+                "noradId": cfg["norad_id"],
+                "countryCode": cfg["country"],
+                "orbitType": "geostationary",
+                "subsatelliteLonDeg": cfg["target_lon"],
+                "subsatelliteLatDeg": cfg["target_lat"],
+                "altitudeKm": 500.0,
+                "dwellFractionOverUs": 1.0,
+                "severity": severity,
+                "threatScore": threat_score,
+                "description": cfg["description"],
+                "confidence": round(threat_score, 2),
+                "position": {
+                    "lat": cfg["target_lat"],
+                    "lon": cfg["target_lon"],
+                    "altKm": 500.0,
+                },
+                "detectedAt": now_ms,
+            })
+
+    severity_order = {"threatened": 0, "watched": 1, "nominal": 2}
+    threats.sort(key=lambda t: (severity_order.get(t["severity"], 3), -t["threatScore"]))
+
+    _geo_cache = threats[:20]
+    _geo_cache_key = cache_key
+    _geo_cache_time = now
+    return _geo_cache

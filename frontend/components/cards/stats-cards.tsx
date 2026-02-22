@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ShieldAlert, Satellite, GitBranch, ChevronDown } from "lucide-react"
+import { ShieldAlert, Satellite, GitBranch, ChevronDown, Globe } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { THREAT_COLORS, type ThreatSeverity } from "@/lib/constants"
@@ -136,6 +136,46 @@ function OrbitalSimilarityPanel() {
 }
 
 /* ═══════════════════════════════════════════════════════
+   GEO-US Loiter Panel — Chinese/Russian sats over US
+   ═══════════════════════════════════════════════════════ */
+
+function GeoLoiterPanel() {
+  const threats = useThreatStore((s) => s.geoUsLoiterThreats)
+  const threatened = threats.filter((t) => t.severity === "threatened").length
+  const watched = threats.filter((t) => t.severity === "watched").length
+  const nominal = threats.filter((t) => t.severity === "nominal").length
+
+  return (
+    <CollapsiblePanel icon={Globe} iconColor="text-orange-400" title="GEO-US Loiter" count={threats.length}>
+      <div className="space-y-2 p-3">
+        <div className="flex items-center gap-3">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+          <span className="flex-1 font-mono text-[10px] text-gray-300">Threatened</span>
+          <span className="font-mono text-xs font-semibold tabular-nums text-gray-200">{threatened}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+          <span className="flex-1 font-mono text-[10px] text-gray-300">Watched</span>
+          <span className="font-mono text-xs font-semibold tabular-nums text-gray-200">{watched}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-gray-500" />
+          <span className="flex-1 font-mono text-[10px] text-gray-300">Nominal</span>
+          <span className="font-mono text-xs font-semibold tabular-nums text-gray-200">{nominal}</span>
+        </div>
+        {threats.length > 0 && (
+          <div className="border-t border-white/5 pt-2 mt-2">
+            <span className="font-mono text-[8px] uppercase tracking-wider text-gray-500">
+              PRC/CIS GEO over US sector
+            </span>
+          </div>
+        )}
+      </div>
+    </CollapsiblePanel>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════
    Fleet Overview Panel
    ═══════════════════════════════════════════════════════ */
 
@@ -190,6 +230,7 @@ export function StatsCards({ className }: { className?: string }) {
     <div className={cn("pointer-events-auto flex flex-col gap-2 w-[280px]", className)}>
       <ActiveThreatsPanel />
       <OrbitalSimilarityPanel />
+      <GeoLoiterPanel />
       <FleetOverviewPanel />
     </div>
   )

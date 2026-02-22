@@ -45,6 +45,7 @@ import type {
   ProximityThreat,
   SignalThreat,
   AnomalyThreat,
+  GeoLoiterThreat,
 } from "@/types";
 
 const SIDEBAR_TABS: { id: ActiveView; icon: typeof Lightbulb; label: string; color: string }[] = [
@@ -90,9 +91,11 @@ export function DashboardShell() {
   const setProximityThreats = useThreatStore((s) => s.setProximityThreats);
   const setSignalThreats = useThreatStore((s) => s.setSignalThreats);
   const setAnomalyThreats = useThreatStore((s) => s.setAnomalyThreats);
+  const setGeoUsLoiterThreats = useThreatStore((s) => s.setGeoUsLoiterThreats);
   const storeProximity = useThreatStore((s) => s.proximityThreats);
   const storeSignal = useThreatStore((s) => s.signalThreats);
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats);
+  const storeGeoLoiter = useThreatStore((s) => s.geoUsLoiterThreats);
 
   // ── WebSocket: sole source for all threat data ──
   // Pushes complete threat arrays (general + SJ-26) every tick.
@@ -130,10 +133,16 @@ export function DashboardShell() {
     intervalMs: THREAT_REFRESH_MS,
     onData: setAnomalyThreats,
   });
+  usePolling<GeoLoiterThreat[]>({
+    url: api.geoUsLoiterThreats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setGeoUsLoiterThreats,
+  });
   // Live data only — no mock fallbacks
   const proximityThreats = storeProximity;
   const signalThreats = storeSignal;
   const anomalyThreats = storeAnomaly;
+  const geoLoiterThreats = storeGeoLoiter;
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -154,6 +163,7 @@ export function DashboardShell() {
               proximity: proximityThreats.length,
               signal: signalThreats.length,
               anomaly: anomalyThreats.length,
+              geoLoiter: geoLoiterThreats.length,
             }}
           />
         </div>

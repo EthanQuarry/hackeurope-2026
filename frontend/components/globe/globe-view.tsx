@@ -27,6 +27,10 @@ import {
   DEMO_USA245_ID,
 } from "@/lib/demo-trajectories";
 import {
+  generateGeoLoiterTrajectory,
+  GEO_US_TARGETS,
+} from "@/lib/demo-geo-loiter";
+import {
   MOCK_SATELLITES,
   generateMockDebris,
   MOCK_THREATS,
@@ -159,6 +163,9 @@ interface GlobeViewProps {
 /* ── Scene: subscribes to threat stores directly so GlobeView doesn't
  *    re-render on every threat/debris poll update.  Wrapped with React.memo
  *    so it also skips re-renders when parent props haven't changed. ──────── */
+/** Stable empty set for the non-demo case — prevents MemoScene re-renders */
+const EMPTY_DEMO_IDS = new Set<string>()
+
 const MemoScene = React.memo(function Scene({
   satellites,
   selectedSatelliteId,
@@ -167,6 +174,7 @@ const MemoScene = React.memo(function Scene({
   speedRef,
   controlsRef,
   onResponseAgentTrigger,
+  geoLoiterDemoIds,
 }: {
   satellites: SatelliteData[];
   selectedSatelliteId: string | null;
@@ -175,6 +183,8 @@ const MemoScene = React.memo(function Scene({
   speedRef: React.RefObject<number>;
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
   onResponseAgentTrigger?: (satelliteId: string, score: number) => void;
+  /** IDs of satellites currently being redirected in the GEO loiter demo */
+  geoLoiterDemoIds: Set<string>;
 }) {
   // Threat store subscriptions live here — only Scene re-renders when these update
   const storeThreats = useThreatStore((s) => s.threats);
@@ -256,6 +266,8 @@ const MemoScene = React.memo(function Scene({
         const threatPercent =
           liveScore != null && liveScore > 0 ? liveScore : undefined;
 
+        const isGeoLoiterDemo = geoLoiterDemoIds.has(sat.id);
+
         const showFull =
           sat.id === "sat-6" ||
           sat.id === "sat-25" ||
@@ -275,6 +287,8 @@ const MemoScene = React.memo(function Scene({
             threatScore={satScores[sat.id] ?? 0}
             showFullOrbit={showFull}
             maneuverArc={sat.maneuverArc}
+            loop={!isGeoLoiterDemo}
+            useProgressiveThreat={isGeoLoiterDemo}
           />
         );
       })}
@@ -350,28 +364,58 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
     [allSatellites],
   );
   const activeDemo = useGlobeStore((s) => s.activeDemo);
-  const demoSatellites = useMemo(() => {
-    if (activeDemo !== "malicious-manoeuvre") return satellites;
 
-    const sj26 = satellites.find((s) => s.id === DEMO_SJ26_ID);
-    const usa245 = satellites.find((s) => s.id === DEMO_USA245_ID);
-    if (!sj26 || !usa245) return satellites;
+  // Compute modified satellite list and the set of demo satellite IDs together
+  // so both values stay in sync from a single memo pass.
+  const { demoSatellites, geoLoiterDemoIds } = useMemo(() => {
+    if (activeDemo === "malicious-manoeuvre") {
+      const sj26 = satellites.find((s) => s.id === DEMO_SJ26_ID);
+      const usa245 = satellites.find((s) => s.id === DEMO_USA245_ID);
+      if (!sj26 || !usa245) return { demoSatellites: satellites, geoLoiterDemoIds: EMPTY_DEMO_IDS };
 
-    const interceptTrajectory = generateInterceptTrajectory(
-      sj26.trajectory,
-      usa245.trajectory,
-    );
+      const interceptTrajectory = generateInterceptTrajectory(
+        sj26.trajectory,
+        usa245.trajectory,
+      );
 
-    return satellites.map((s) => {
-      if (s.id === DEMO_SJ26_ID) {
-        return {
-          ...s,
-          trajectory: interceptTrajectory,
-          // Status comes from the backend scenario engine + detection system
-        };
+      return {
+        demoSatellites: satellites.map((s) =>
+          s.id === DEMO_SJ26_ID ? { ...s, trajectory: interceptTrajectory } : s,
+        ),
+        geoLoiterDemoIds: EMPTY_DEMO_IDS,
+      };
+    }
+
+    if (activeDemo === "geo-us-loiter") {
+      // Pick up to 6 watched (adversarial) satellites, preferring lower altitudes
+      // so we get the LEO Chinese/Russian sats that orbit visibly fast.
+      const watched = satellites
+        .filter((s) => s.status === "watched")
+        .sort((a, b) => a.altitude_km - b.altitude_km)
+        .slice(0, GEO_US_TARGETS.length)
+
+      if (watched.length === 0) {
+        return { demoSatellites: satellites, geoLoiterDemoIds: EMPTY_DEMO_IDS };
       }
-      return s;
-    });
+
+      const demoIds = new Set(watched.map((s) => s.id));
+
+      const modified = satellites.map((sat) => {
+        const demoIdx = watched.findIndex((w) => w.id === sat.id);
+        if (demoIdx === -1) return sat;
+        const target = GEO_US_TARGETS[demoIdx] ?? GEO_US_TARGETS[0];
+        return {
+          ...sat,
+          trajectory: generateGeoLoiterTrajectory(sat.trajectory, target.lat, target.lon),
+          // Base status watched — SatelliteMarker with useProgressiveThreat escalates to threatened as they approach US
+          status: "watched" as const,
+        };
+      });
+
+      return { demoSatellites: modified, geoLoiterDemoIds: demoIds };
+    }
+
+    return { demoSatellites: satellites, geoLoiterDemoIds: EMPTY_DEMO_IDS };
   }, [activeDemo, satellites]);
 
   const handleSelectSatellite = useCallback(
@@ -445,6 +489,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
           speedRef={speedRef}
           controlsRef={controlsRef}
           onResponseAgentTrigger={handleResponseAgentTrigger}
+          geoLoiterDemoIds={geoLoiterDemoIds}
         />
       </Canvas>
     </div>

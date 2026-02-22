@@ -5,6 +5,7 @@ import { Play, Square, ChevronDown, Swords } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useGlobeStore } from "@/stores/globe-store"
+import { api } from "@/lib/api"
 
 interface Demo {
   id: string
@@ -18,7 +19,24 @@ const DEMOS: Demo[] = [
     label: "Malicious Manoeuvre",
     description: "SJ-26 executes covert orbital transfer toward USA-245 reconnaissance asset",
   },
+  {
+    id: "geo-us-loiter",
+    label: "GEO US Loiter",
+    description:
+      "6 Chinese & Russian satellites ascend from LEO and station-keep geostationary over US territory — triggers GEO loiter detection system",
+  },
 ]
+
+/** Call the backend to activate/deactivate the GEO loiter demo state */
+async function notifyBackendGeoLoiter(active: boolean): Promise<void> {
+  try {
+    await fetch(active ? api.demoGeoLoiterStart : api.demoGeoLoiterStop, {
+      method: "POST",
+    })
+  } catch {
+    // Backend unavailable — visual demo still runs on the frontend
+  }
+}
 
 export function DemoSelector({ className }: { className?: string }) {
   const [open, setOpen] = useState(false)
@@ -38,14 +56,20 @@ export function DemoSelector({ className }: { className?: string }) {
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
 
-  function handleSelect(demo: Demo) {
+  async function handleSelect(demo: Demo) {
     // Reset scenario clock so it starts fresh
     fetch("/api/backend/scenario/reset", { method: "POST" }).catch(() => {})
     setActiveDemo(demo.id)
     setOpen(false)
+    if (demo.id === "geo-us-loiter") {
+      await notifyBackendGeoLoiter(true)
+    }
   }
 
-  function handleStop() {
+  async function handleStop() {
+    if (activeDemo === "geo-us-loiter") {
+      await notifyBackendGeoLoiter(false)
+    }
     setActiveDemo(null)
   }
 
