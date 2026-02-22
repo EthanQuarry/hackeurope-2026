@@ -39,6 +39,8 @@ export function DemoSelector({ className }: { className?: string }) {
   }, [])
 
   function handleSelect(demo: Demo) {
+    // Reset scenario clock so it starts fresh
+    fetch("/api/backend/scenario/reset", { method: "POST" }).catch(() => {})
     setActiveDemo(demo.id)
     setOpen(false)
   }

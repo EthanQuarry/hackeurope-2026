@@ -354,17 +354,11 @@ export function SatelliteDetailPage() {
       data: ProximityThreat | OrbitalSimilarityThreat | SignalThreat | AnomalyThreat,
     ) => {
       let sev = severity
-      if (sev === "watched") {
+      // Use the satellite's existing status from backend (already accounts for country)
+      if (sev === "watched" || sev === "nominal") {
         const cp = satellites.find((s) => s.id === id)
-        if (!cp || !THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")) {
-          sev = "threatened"
-        }
-      }
-      if (sev === "nominal" && id !== "__self") {
-        const cp = satellites.find((s) => s.id === id)
-        if (cp && THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")) {
-          sev = "threat"
-        }
+        if (cp?.status === "threatened") sev = "threatened"
+        else if (cp?.status === "watched" && sev === "nominal") sev = "watched"
       }
       const existing = map.get(id)
       const entry = { type, data }
@@ -386,7 +380,7 @@ export function SatelliteDetailPage() {
       const cp = satellites.find((s) => s.id === cpId)
       const sev = isThreatActor
         ? "threatened"
-        : counterpartyIsActor && cp && THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")
+        : counterpartyIsActor && cp && (cp.status === "watched" || cp.status === "threatened")
           ? "threat"
           : t.severity
       add(cpId, cpName, sev, "proximity", t)
@@ -398,7 +392,7 @@ export function SatelliteDetailPage() {
       const cp = satellites.find((s) => s.id === cpId)
       const sev = isThreatActor
         ? "threatened"
-        : counterpartyIsActor && cp && THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")
+        : counterpartyIsActor && cp && (cp.status === "watched" || cp.status === "threatened")
           ? "threat"
           : t.severity
       add(cpId, cpName, sev, "orbital", t)
@@ -410,7 +404,7 @@ export function SatelliteDetailPage() {
       const cp = satellites.find((s) => s.id === cpId)
       const sev = isThreatActor
         ? "threatened"
-        : counterpartyIsActor && cp && THREAT_ACTOR_COUNTRIES.has(cp.country_code ?? "")
+        : counterpartyIsActor && cp && (cp.status === "watched" || cp.status === "threatened")
           ? "threat"
           : t.severity
       add(cpId, cpName, sev, "signal", t)

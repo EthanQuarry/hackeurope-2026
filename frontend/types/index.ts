@@ -14,7 +14,6 @@ export interface SatelliteData {
   name: string
   noradId: number
   status: ThreatSeverity
-  /** Space-Track country code (PRC, RUS, CIS, USA, etc.) */
   country_code?: string
   altitude_km: number
   velocity_kms: number

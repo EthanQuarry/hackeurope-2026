@@ -18,21 +18,21 @@ export const DISPLAY_DEBRIS_LIMIT = 2500
 /** Bayesian posterior threshold above which a satellite is visually flagged */
 export const PROXIMITY_FLAG_THRESHOLD = 0.3
 
-/** Proximity reference thresholds (km) — for display context */
+/** Distance thresholds for proximity threat classification (km) */
 export const PROXIMITY_THREAT_KM = 50
-export const PROXIMITY_NOMINAL_KM = 200
+export const PROXIMITY_NOMINAL_KM = 500
 
-/** Signal interception reference (0–1) — threat >40%, nominal <10% */
-export const SIGNAL_THREAT_PCT = 0.4
-export const SIGNAL_NOMINAL_PCT = 0.1
+/** Interception probability thresholds for signal threat classification (%) */
+export const SIGNAL_THREAT_PCT = 40
+export const SIGNAL_NOMINAL_PCT = 15
 
-/** Threat severity colors — friendly=green, watched=blue, threatened=orange+pulse, threat=red */
+/** Threat severity colors — tech/military palette */
 export const THREAT_COLORS = {
-  allied: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
-  nominal: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
-  friendly: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
+  allied: { text: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40", hex: "#4488ff" },
+  nominal: { text: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/40", hex: "#00e5ff" },
   watched: { text: "text-yellow-400", bg: "bg-yellow-500/15", border: "border-yellow-500/40", hex: "#ffc800" },
-  threatened: { text: "text-amber-400", bg: "bg-amber-500/15", border: "border-amber-500/40", hex: "#ff9100" },
+  threatened: { text: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", hex: "#ff1744" },
+  friendly: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
   threat: { text: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", hex: "#ff1744" },
 } as const
 

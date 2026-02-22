@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Line, Html } from "@react-three/drei";
+import { Line } from "@react-three/drei";
 import * as THREE from "three";
 
 import { geodeticToSceneVec3 } from "@/lib/geo";
@@ -123,7 +123,7 @@ function SpriteLabel({
             ? "rgba(255,68,102,0.9)"   // red — high risk
             : (threatPercent ?? 0) >= 40
               ? "rgba(255,145,0,0.8)"  // orange — medium risk
-              : "rgba(255,200,0,0.75)", // yellow — low risk
+              : "rgba(100,200,255,0.8)", // blue — low risk
       })
     }
 
@@ -249,8 +249,8 @@ export function SatelliteMarker({
   // Trail vertex colors — fades from dim tail to bright head
   const trailColors = useMemo(() => {
     const baseOpacity =
-      status === "threatened" || status === "threat" ? 0.85 : status === "watched" ? 0.55 : 0.35
-    const colors: [number, number, number][] = []
+      status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35;
+    const colors: [number, number, number][] = [];
     for (let i = 0; i < trailLen; i++) {
       const t = i / Math.max(1, trailLen - 1);
       const fade = Math.pow(t, 2.5);
@@ -269,7 +269,7 @@ export function SatelliteMarker({
     if (!geo?.setColors) return;
     const flat: number[] = [];
     const baseOpacity =
-      status === "threatened" || status === "threat" ? 0.85 : status === "watched" ? 0.55 : 0.35
+      status === "threatened" ? 0.85 : status === "watched" ? 0.55 : 0.35;
     for (let i = 0; i < trailLen; i++) {
       const t = i / Math.max(1, trailLen - 1);
       const fade = Math.pow(t, 2.5);
@@ -359,28 +359,51 @@ export function SatelliteMarker({
 
       geo.setPositions(flat);
     }
-  })
+  });
 
-  const labelsEnabled = useGlobeStore((s) => s.showLabels)
-  const showLabel = selected || threatPercent != null || (labelsEnabled && (status === "threatened" || status === "threat" || status === "watched"))
-  const markerSize = status === "threatened" || status === "threat" ? size * 1.3 : size
+  const labelsEnabled = useGlobeStore((s) => s.showLabels);
+  const showLabel =
+    selected ||
+    threatPercent != null ||
+    (labelsEnabled && (status === "threatened" || status === "watched"));
+  const markerSize = status === "threatened" ? size * 1.3 : size;
 
-  // Cached Three.js geometries & materials
-  const markerGeo = useMemo(() => new THREE.SphereGeometry(markerSize, 12, 12), [markerSize])
-  const markerMat = useMemo(() => new THREE.MeshBasicMaterial({ color: threeColor }), [threeColor])
-  const glowGeo = useMemo(() => new THREE.SphereGeometry(markerSize * 2.5, 12, 12), [markerSize])
+  // Cached Three.js geometries & materials — avoids recreation every render
+  const markerGeo = useMemo(
+    () => new THREE.SphereGeometry(markerSize, 12, 12),
+    [markerSize],
+  );
+  const markerMat = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: threeColor }),
+    [threeColor],
+  );
+  const glowGeo = useMemo(
+    () => new THREE.SphereGeometry(markerSize * 2.5, 12, 12),
+    [markerSize],
+  );
   const glowMat = useMemo(
-    () => new THREE.MeshBasicMaterial({
-      color: threeColor, transparent: true,
-      opacity: selected ? 0.4 : status === "threatened" || status === "threat" ? 0.25 : 0.12,
-    }),
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: threeColor,
+        transparent: true,
+        opacity: selected ? 0.4 : status === "threatened" ? 0.25 : 0.12,
+      }),
     [threeColor, selected, status],
-  )
-  const flagGeo = useMemo(() => new THREE.SphereGeometry(markerSize, 16, 16), [markerSize])
+  );
+  const flagGeo = useMemo(
+    () => new THREE.SphereGeometry(markerSize, 16, 16),
+    [markerSize],
+  );
   const flagMat = useMemo(
-    () => new THREE.MeshBasicMaterial({ color: new THREE.Color("#ffcc00"), transparent: true, opacity: 0.5, depthWrite: false }),
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#ffcc00"),
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+      }),
     [],
-  )
+  );
 
   // Full orbit ring — clean closed loop (no maneuver splice)
   const fullOrbitRing = useMemo(() => {
@@ -404,17 +427,6 @@ export function SatelliteMarker({
         />
       )}
 
-      {/* Maneuver arc overlay — separate curved transfer path (pre-computed xyz from backend) */}
-      {maneuverArc && maneuverArc.length > 1 && (
-        <Line
-          points={maneuverArc}
-          color={status === "threat" ? "#ff1744" : status === "watched" ? "#4488ff" : "#ff9100"}
-          transparent
-          opacity={0.7}
-          lineWidth={2.0}
-        />
-      )}
-
       {/* Orbit trail — positions updated every frame in useFrame */}
       <Line
         ref={lineRef}
@@ -422,7 +434,9 @@ export function SatelliteMarker({
         vertexColors={trailColors}
         transparent
         opacity={1}
-        lineWidth={status === "threatened" || status === "threat" ? 1.8 : status === "watched" ? 1.4 : 1.0}
+        lineWidth={
+          status === "threatened" ? 1.8 : status === "watched" ? 1.4 : 1.0
+        }
       />
 
       {/* Satellite dot */}
@@ -434,54 +448,18 @@ export function SatelliteMarker({
           e.stopPropagation();
           onSelect?.(id);
         }}
-      >
-        <sphereGeometry args={[markerSize, 12, 12]} />
-        <meshBasicMaterial color={threeColor} />
+      />
 
-        {/* Floating label with threat % and name */}
-        {showLabel && name && (
-          <Html
-            center
-            distanceFactor={6}
-            style={{ pointerEvents: "none", userSelect: "none" }}
-          >
-            <div
-              style={{
-                transform: "translateY(-14px)",
-                whiteSpace: "nowrap",
-                textAlign: "center",
-              }}
-            >
-              {threatPercent != null && (
-                <div
-                  style={{
-                    fontSize: "8px",
-                    fontWeight: 600,
-                    fontFamily: "monospace",
-                    color:
-                      (threatPercent ?? 0) >= 70
-                        ? "rgba(255,68,102,0.8)"
-                        : (threatPercent ?? 0) >= 40
-                          ? "rgba(255,145,0,0.8)"
-                          : "rgba(255,200,0,0.75)",
-                  }}
-                >
-                  {threatPercent}%
-                </div>
-              )}
-              <div
-                style={{
-                  fontSize: "6px",
-                  fontFamily: "monospace",
-                  color: "rgba(200,220,255,0.45)",
-                }}
-              >
-                {name}
-              </div>
-            </div>
-          </Html>
-        )}
-      </mesh>
+      {/* Sprite label — pure GPU, no DOM overhead */}
+      {showLabel && name && (
+        <SpriteLabel
+          meshRef={meshRef}
+          name={name}
+          threatPercent={threatPercent}
+          status={status}
+          size={markerSize}
+        />
+      )}
 
       {/* Glow */}
       <mesh ref={glowRef} geometry={glowGeo} material={glowMat} />

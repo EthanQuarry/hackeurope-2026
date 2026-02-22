@@ -69,7 +69,7 @@ function ActiveThreatsPanel() {
     <CollapsiblePanel icon={ShieldAlert} iconColor="text-red-400" title="Active Threats" count={threats.length}>
       <div className="space-y-2 p-3">
         {SEVERITY_ORDER.map((sev) => {
-          const colors = THREAT_COLORS[sev]
+          const colors = THREAT_COLORS[sev] ?? THREAT_COLORS.nominal
           return (
             <div key={sev} className="flex items-center gap-3">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colors.hex }} />
@@ -139,13 +139,12 @@ function OrbitalSimilarityPanel() {
    Fleet Overview Panel
    ═══════════════════════════════════════════════════════ */
 
-type FleetCategory = "friendly" | "nominal" | "watched" | "threat" | "threatened"
+type FleetCategory = "friendly" | "nominal" | "watched" | "threatened"
 
 const FLEET_CATEGORIES: { label: string; key: FleetCategory }[] = [
   { label: "Friendly", key: "friendly" },
   { label: "Nominal", key: "nominal" },
   { label: "Watched", key: "watched" },
-  { label: "Threat", key: "threat" },
   { label: "Threatened", key: "threatened" },
 ]
 
@@ -164,7 +163,7 @@ function FleetOverviewPanel() {
         {FLEET_CATEGORIES.map(({ label, key }) => {
           const count = counts[key] ?? 0
           const pct = total > 0 ? (count / total) * 100 : 0
-          const colors = THREAT_COLORS[key]
+          const colors = THREAT_COLORS[key] ?? THREAT_COLORS.nominal
           return (
             <div key={key} className="space-y-1">
               <div className="flex items-center justify-between">
