@@ -1,10 +1,11 @@
 "use client"
 
-import { useMemo, useRef, useState, useEffect, memo } from "react"
+import { useMemo, useRef, useState, useEffect, memo, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { useFleetRiskStore, type RiskSnapshot } from "@/stores/fleet-risk-store"
+import { useUIStore } from "@/stores/ui-store"
 import { computeFleetRisk } from "@/lib/fleet-risk"
 import { THREAT_COLORS } from "@/lib/constants"
 
@@ -117,6 +118,8 @@ const MiniSparkline = memo(function MiniSparkline({
 
 export function TrackedSatellitesBar() {
   const satellites = useFleetStore((s) => s.satellites)
+  const selectSatellite = useFleetStore((s) => s.selectSatellite)
+  const setActiveView = useUIStore((s) => s.setActiveView)
   const timelines = useFleetRiskStore((s) => s.timelines)
 
   const proximityThreats = useThreatStore((s) => s.proximityThreats)
@@ -174,9 +177,14 @@ export function TrackedSatellitesBar() {
         const statusColors = THREAT_COLORS[sat.status] ?? THREAT_COLORS.nominal
 
         return (
-          <div
+          <button
             key={sat.id}
-            className="flex shrink-0 items-center gap-2 rounded-lg border border-border/30 bg-secondary/10 px-2.5 py-1.5"
+            type="button"
+            onClick={() => {
+              selectSatellite(sat.id)
+              setActiveView("comms")
+            }}
+            className="flex shrink-0 items-center gap-2 rounded-lg border border-border/30 bg-secondary/10 px-2.5 py-1.5 transition-colors hover:border-border/60 hover:bg-secondary/25 cursor-pointer"
           >
             {/* Satellite name + risk % */}
             <div className="flex flex-col justify-center min-w-[70px]">
@@ -199,7 +207,7 @@ export function TrackedSatellitesBar() {
 
             {/* Mini sparkline */}
             <MiniSparkline snapshots={snapshots} width={100} height={28} />
-          </div>
+          </button>
         )
       })}
     </div>
