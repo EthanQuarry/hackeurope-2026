@@ -29,7 +29,6 @@ import { CommsTranscriptionView } from "@/components/ops/comms-transcription-vie
 import { ThreatResponseView } from "@/components/ops/threat-response-view"
 import { useResponseStore } from "@/stores/response-store"
 import { api } from "@/lib/api"
-import { MOCK_SATELLITES } from "@/lib/mock-data"
 import type { CommsChatMessage, CommsChatResponse, ParsedIntent, SatelliteData } from "@/types"
 
 /* ═══════════════════════════════════════════════════════ */
@@ -158,7 +157,7 @@ export function CommsOps() {
   const history = useCommsStore((s) => s.history)
   const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId)
   const storeSats = useFleetStore((s) => s.satellites)
-  const satellites = storeSats.length > 0 ? storeSats : MOCK_SATELLITES
+  const satellites = storeSats
 
   const [phase, setPhase] = useState<Phase>("idle")
   const [pendingIntent, setPendingIntent] = useState<ParsedIntent | null>(null)

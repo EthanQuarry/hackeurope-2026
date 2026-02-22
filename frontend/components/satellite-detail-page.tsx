@@ -22,7 +22,6 @@ import {
 
 import { cn } from "@/lib/utils"
 import { THREAT_COLORS, PROXIMITY_THREAT_KM, PROXIMITY_NOMINAL_KM, SIGNAL_THREAT_PCT, SIGNAL_NOMINAL_PCT } from "@/lib/constants"
-import { MOCK_SATELLITES } from "@/lib/mock-data"
 import { useUIStore } from "@/stores/ui-store"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
@@ -311,7 +310,7 @@ export function SatelliteDetailPage() {
 
   /* ── Fleet ── */
   const selectedId = useFleetStore((s) => s.selectedSatelliteId)
-  const satellites = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
+  const satellites = useSatellitesWithDerivedStatus()
   const satellite = satellites.find((s) => s.id === selectedId)
 
   /* ── Threats filtered for this satellite ── */

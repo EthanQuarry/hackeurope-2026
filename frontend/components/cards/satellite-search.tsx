@@ -10,7 +10,6 @@ import { useThreatStore } from "@/stores/threat-store"
 import { useUIStore } from "@/stores/ui-store"
 import { useSatellitesWithDerivedStatus } from "@/hooks/use-derived-status"
 import { useGlobeStore } from "@/stores/globe-store"
-import { MOCK_SATELLITES, MOCK_PROXIMITY_THREATS } from "@/lib/mock-data"
 
 export function SatelliteSearch({ className }: { className?: string }) {
   const [query, setQuery] = useState("")
@@ -25,9 +24,9 @@ export function SatelliteSearch({ className }: { className?: string }) {
   const showLabels = useGlobeStore((s) => s.showLabels)
   const toggleLabels = useGlobeStore((s) => s.toggleLabels)
 
-  const satellitesWithDerivedStatus = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
+  const satellitesWithDerivedStatus = useSatellitesWithDerivedStatus()
   const satellites = satellitesWithDerivedStatus
-  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
+  const proximityThreats = storeProximity
 
   const satScores = useMemo(() => {
     const scores: Record<string, number> = {}
