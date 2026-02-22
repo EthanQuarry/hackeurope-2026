@@ -46,10 +46,11 @@ _speed: float = 1.0
 _usa245_evading: bool = False
 _usa245_evasion_start: float = 0.0
 
-# Evasion orbital parameters — USA-245 raises altitude and shifts RAAN to separate
-USA245_EVADE_ALT_BOOST = 15.0    # km altitude raise
-USA245_EVADE_RAAN_SHIFT = 4.0    # degrees RAAN shift
-USA245_EVADE_DURATION = 90.0     # scenario-seconds for maneuver to complete
+# Evasion orbital parameters — dramatic shift so viewers clearly see the manoeuvre
+USA245_EVADE_ALT_BOOST = 50.0     # km altitude raise (500→550km)
+USA245_EVADE_RAAN_SHIFT = 30.0    # degrees RAAN shift — huge visible plane change
+USA245_EVADE_INC_SHIFT = 8.0      # degrees inclination shift for extra visual separation
+USA245_EVADE_DURATION = 60.0      # scenario-seconds (faster so it's obvious during demo)
 
 
 def trigger_usa245_evasion() -> None:
@@ -85,6 +86,13 @@ def usa245_raan_offset() -> float:
     if not _usa245_evading:
         return 0.0
     return USA245_EVADE_RAAN_SHIFT * _smoothstep(usa245_evasion_progress())
+
+
+def usa245_inclination_offset() -> float:
+    """Inclination shift from evasion (degrees). 0 when not evading."""
+    if not _usa245_evading:
+        return 0.0
+    return USA245_EVADE_INC_SHIFT * _smoothstep(usa245_evasion_progress())
 
 
 def reset() -> None:
