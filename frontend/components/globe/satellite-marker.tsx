@@ -55,7 +55,7 @@ export function SatelliteMarker({
   name,
   trajectory,
   status,
-  size = 0.014,
+  size = 0.008,
   selected = false,
   onSelect,
   simTimeRef,
@@ -219,10 +219,8 @@ export function SatelliteMarker({
     }
   })
 
-  const labelsEnabled = useGlobeStore((s) => s.showLabels)
-  // Show label when globally enabled, or always for selected satellite
-  const showLabel = selected || (labelsEnabled && (status === "threatened" || status === "watched"))
-  const markerSize = status === "threatened" ? size * 1.5 : size
+  const showLabel = selected || status === "threatened"
+  const markerSize = status === "threatened" ? size * 1.3 : size
 
   // Full orbit ring — clean closed loop (no maneuver splice)
   const fullOrbitRing = useMemo(() => {
@@ -275,54 +273,13 @@ export function SatelliteMarker({
           onSelect?.(id)
         }}
       >
-        <sphereGeometry args={[markerSize, 32, 32]} />
+        <sphereGeometry args={[markerSize, 12, 12]} />
         <meshBasicMaterial color={threeColor} />
-
-        {showLabel && name && (
-          <Html
-            center
-            distanceFactor={6}
-            style={{ pointerEvents: "none", userSelect: "none" }}
-          >
-            <div
-              style={{
-                transform: "translateY(-14px)",
-                whiteSpace: "nowrap",
-                textAlign: "center",
-              }}
-            >
-              {threatPercent != null && (
-                <div
-                  style={{
-                    fontSize: "8px",
-                    fontWeight: 600,
-                    fontFamily: "monospace",
-                    color:
-                      status === "threatened"
-                        ? "rgba(255,68,102,0.7)"
-                        : "rgba(255,145,0,0.6)",
-                  }}
-                >
-                  {threatPercent}%
-                </div>
-              )}
-              <div
-                style={{
-                  fontSize: "6px",
-                  fontFamily: "monospace",
-                  color: "rgba(200,220,255,0.45)",
-                }}
-              >
-                {name}
-              </div>
-            </div>
-          </Html>
-        )}
       </mesh>
 
       {/* Glow */}
       <mesh ref={glowRef}>
-        <sphereGeometry args={[markerSize * 2.5, 32, 32]} />
+        <sphereGeometry args={[markerSize * 2.5, 12, 12]} />
         <meshBasicMaterial
           color={threeColor}
           transparent

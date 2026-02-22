@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-export type ActiveView = "overview" | "proximity" | "signal" | "anomaly" | "orbital" | "comms"
+export type ActiveView = "overview" | "proximity" | "signal" | "anomaly" | "orbital" | "comms" | "satellite-detail"
 export type Planet = "earth" | "moon" | "mars"
 
 interface UIState {
