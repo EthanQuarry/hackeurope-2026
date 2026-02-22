@@ -89,8 +89,9 @@ function computeOrbitCamera(
 }
 
 export function CameraFocus({ controlsRef, simTimeRef }: CameraFocusProps) {
-  const { camera } = useThree()
+  const { camera, gl } = useThree()
   const focusTarget = useThreatStore((s) => s.focusTarget)
+  const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
   const satellites = useFleetStore((s) => s.satellites)
 
   // Refs so useFrame always has fresh data without closure staleness
@@ -106,6 +107,23 @@ export function CameraFocus({ controlsRef, simTimeRef }: CameraFocusProps) {
   const startPosRef = useRef(new THREE.Vector3())
   const startTargetRef = useRef(new THREE.Vector3())
   const prevKeyRef = useRef<string | null>(null)
+
+  // Break out of tracking when user interacts with the globe (drag, scroll, etc.)
+  useEffect(() => {
+    const canvas = gl.domElement
+    const breakTracking = () => {
+      if (trackingRef.current && !flyingRef.current) {
+        trackingRef.current = false
+        setFocusTarget(null)
+      }
+    }
+    canvas.addEventListener("pointerdown", breakTracking)
+    canvas.addEventListener("wheel", breakTracking)
+    return () => {
+      canvas.removeEventListener("pointerdown", breakTracking)
+      canvas.removeEventListener("wheel", breakTracking)
+    }
+  }, [gl, setFocusTarget])
 
   // Start fly-in when focusTarget changes
   useEffect(() => {

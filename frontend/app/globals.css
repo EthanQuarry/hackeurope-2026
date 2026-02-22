@@ -173,3 +173,19 @@
                 inset 0 1px 0 oklch(1 0 0 / 0.05);
   }
 }
+
+/* Beam interception animation keyframes */
+@keyframes beam-flow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -28; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes signal-pulse {
+  0% { r: 4; opacity: 0.8; }
+  100% { r: 12; opacity: 0; }
+}
