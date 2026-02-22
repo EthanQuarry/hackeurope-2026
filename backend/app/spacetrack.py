@@ -132,7 +132,7 @@ def gp_to_satellite(gp: dict, idx: int) -> dict:
 
     # Determine status: allied (ours), friendly (neutral), watched (adversary)
     ALLIED_COUNTRIES = {"USA", "UK", "FR", "GBR", "CA", "ESA", "EU", "JPN", "AUS", "NZ", "DE", "IT", "NOR"}
-    ADVERSARY_COUNTRIES = {"PRC", "RUS", "CIS", "PRK", "IRN"}
+    ADVERSARY_COUNTRIES = {"PRC", "RUS", "CIS", "PRK", "IRN", "NKOR", "IRAN"}
 
     if country in ALLIED_COUNTRIES:
         status = "allied"

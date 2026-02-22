@@ -1,21 +1,21 @@
-import { create } from "zustand"
+import { create } from "zustand";
 
 interface GlobeState {
-  simTime: number
-  speed: number
-  playing: boolean
-  showLabels: boolean
-  activeDemo: string | null
-  cinematicActive: boolean
-  priorAdversarial: number
+  simTime: number;
+  speed: number;
+  playing: boolean;
+  showLabels: boolean;
+  activeDemo: string | null;
+  cinematicActive: boolean;
+  priorAdversarial: number;
 
-  setSimTime: (t: number) => void
-  setSpeed: (speed: number) => void
-  togglePlaying: () => void
-  toggleLabels: () => void
-  setActiveDemo: (id: string | null) => void
-  setCinematicActive: (active: boolean) => void
-  setPriorAdversarial: (v: number) => void
+  setSimTime: (t: number) => void;
+  setSpeed: (speed: number) => void;
+  togglePlaying: () => void;
+  toggleLabels: () => void;
+  setActiveDemo: (id: string | null) => void;
+  setCinematicActive: (active: boolean) => void;
+  setPriorAdversarial: (v: number) => void;
 }
 
 export const useGlobeStore = create<GlobeState>((set) => ({
@@ -25,7 +25,7 @@ export const useGlobeStore = create<GlobeState>((set) => ({
   showLabels: true,
   activeDemo: null,
   cinematicActive: false,
-  priorAdversarial: 0.9,
+  priorAdversarial: 0.5,
 
   setSimTime: (t) => set({ simTime: t }),
   setSpeed: (speed) => set({ speed }),
@@ -34,4 +34,4 @@ export const useGlobeStore = create<GlobeState>((set) => ({
   setActiveDemo: (id) => set({ activeDemo: id }),
   setCinematicActive: (active) => set({ cinematicActive: active }),
   setPriorAdversarial: (v) => set({ priorAdversarial: v }),
-}))
+}));

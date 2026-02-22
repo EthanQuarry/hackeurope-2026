@@ -441,6 +441,9 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         ? { lat: targetSat.trajectory[0].lat, lon: targetSat.trajectory[0].lon, altKm: targetSat.altitude_km }
         : threat.secondaryPosition;
 
+      // Only lock camera for the malicious manoeuvre demo (SJ-26 → USA-245)
+      const isMaliciousDemo = activeDemo === "malicious-manoeuvre" && satelliteId === DEMO_USA245_ID;
+
       triggerResponse({
         satelliteId,
         satelliteName: threat.targetAssetName,
@@ -451,9 +454,10 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         approachPattern: threat.approachPattern,
         tcaMinutes: threat.tcaInMinutes,
         focusPosition: focusPos,
+        lockCamera: isMaliciousDemo,
       });
     },
-    [proximityThreats, allSatellites, triggerResponse],
+    [proximityThreats, allSatellites, triggerResponse, activeDemo],
   );
 
   const handlePointerMissed = useCallback(() => {

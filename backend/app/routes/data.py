@@ -21,132 +21,62 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Well-known NORAD IDs — key satellites across all orbit types
+# Well-known NORAD IDs — curated fleet (~40 satellites + 2 injected scenario sats)
 FLEET_NORAD_IDS = [
-    # --- Crewed / Space Stations ---
+    # --- Allied: Space Stations ---
     25544,  # ISS (ZARYA)
-    49260,  # TIANHE (Chinese Space Station)
-    # --- Earth Observation ---
-    43013,  # NOAA-20
-    27424,  # AQUA
-    25994,  # TERRA
-    36508,  # CRYOSAT-2
-    41240,  # SENTINEL-2A
-    39084,  # LANDSAT 8
-    43602,  # SENTINEL-3B
-    43600,  # ICEYE-X1
-    # --- Military / Reconnaissance ---
+    # --- Allied: US Military / Reconnaissance ---
     43232,  # USA-281 (NRO)
     28884,  # USA-184 (NROL)
-    40258,  # ASTRA 2G (comms near military)
-    # --- Navigation (MEO) ---
-    28474,  # GPS IIR-M 3
-    32260,  # GPS IIF-1
-    40534,  # GPS III-1
-    36585,  # GLONASS-M
-    38857,  # GALILEO-IOV PFM
-    44204,  # BEIDOU-3 M17
-    # --- Communications (GEO & LEO) ---
-    41866,  # INTELSAT 36
+    55263,  # USA 342 (US military GEO)
+    # --- Allied: US Military SATCOM ---
     43435,  # WGS-10 (US mil SATCOM)
+    39533,  # WGS-6 (US mil SATCOM)
+    44481,  # AEHF-5 (US mil protected comms)
     40874,  # MUOS-4 (US Navy)
-    # --- Starlink constellation (sample) ---
-    44238,  # STARLINK-1007
-    44240,  # STARLINK-1008
-    44914,  # STARLINK-1032
-    45044,  # STARLINK-1180
-    45189,  # STARLINK-1305
-    45386,  # STARLINK-1436
-    45535,  # STARLINK-1564
-    45715,  # STARLINK-1680
-    46080,  # STARLINK-1902
-    47181,  # STARLINK-2415
-    48601,  # STARLINK-2737
-    # --- OneWeb ---
-    56700,  # ONEWEB-0453
-    49445,  # ONEWEB-0198
-    48078,  # ONEWEB-0131
-    # --- Science ---
-    20580,  # HUBBLE SPACE TELESCOPE
-    27386,  # ENVISAT (defunct, large debris risk)
-    43205,  # TESS (exoplanet hunter)
-    # --- Weather ---
-    29155,  # GOES 13
-    35491,  # GOES 14
-    36411,  # GOES 15
+    # --- Allied: Navigation ---
+    28474,  # GPS IIR-M 3
+    40534,  # GPS III-1
+    38857,  # GALILEO-IOV PFM (ESA)
+    # --- Allied: Weather ---
     41882,  # GOES 16
     43226,  # GOES 17
-    # --- Russian military ---
-    41032,  # COSMOS-2510
-    43063,  # COSMOS-2524
-    44398,  # COSMOS-2535
-    47719,  # COSMOS-2551
+    # --- Allied: Earth Observation ---
+    39084,  # LANDSAT 8
+    43013,  # NOAA-20
+    41240,  # SENTINEL-2A (ESA)
+    # --- Allied: Starlink ---
+    44238,  # STARLINK-1007
+    45189,  # STARLINK-1305
+    45715,  # STARLINK-1680
+    # --- Allied: International Partners ---
+    43065,  # GCOM-C (Japan)
+    39766,  # ALOS 2 (Japan SAR)
+    40930,  # ASTROSAT (India)
+    # --- Adversarial: Russian Military ---
     48274,  # COSMOS-2558 (Russian inspector)
-    # --- Chinese military / dual-use ---
-    49492,  # YAOGAN-34
-    50258,  # YAOGAN-35C
-    41838,  # TIANLIAN-1-04
-    # --- Chinese GEO (threat: loiter over Americas) ---
-    40402,   # SHIJIAN-13 (Chinese GEO tech demo)
-    42836,   # CHINASAT-16
-    54066,   # CHINASAT-6E
-    # --- Russian GEO (threat: Luch/Olymp approach pattern) ---
-    55841,   # LUCH (OLYMP) 2 — approaches Western GEO sats
-    40391,   # LUCH-5A
-    37763,   # LUCH-5V
-    # --- Other notable ---
-    28654,  # IRIDIUM 33 (collision remnant)
-    22675,  # COSMOS 2251 (collision remnant)
-    # --- Additional allied military SATCOM ---
-    39533,  # WGS-6 (US mil SATCOM)
-    41471,  # WGS-8 (US mil SATCOM)
-    42741,  # WGS-9 (US mil SATCOM)
-    44481,  # AEHF-5 (US mil protected comms)
-    43689,  # AEHF-6 (US mil protected comms)
-    # --- Additional Russian adversarial ---
-    44547,  # COSMOS-2536 (ELINT)
-    49808,  # COSMOS-2553 (inspector)
-    # --- Additional Chinese adversarial ---
-    49481,  # YAOGAN-33 (PRC recon)
-    54216,  # YAOGAN-36C (PRC SAR)
-    # --- Additional ISR ---
-    26900,  # USA-160 (NOSS 3-2, naval ocean surveillance)
-    # --- North Korean ---
-    58400,  # MALLIGYONG-1 (NKOR spy satellite)
-    # --- Iranian ---
-    53370,  # KHAYYAM (IRAN remote sensing)
-    61072,  # CHAMRAN-1 (IRAN military)
-    # --- Recent Russian military ---
-    55978,  # COSMOS 2567 (CIS LEO military)
-    59773,  # COSMOS 2576 (CIS LEO military)
-    62902,  # COSMOS 2581 (CIS military, 82° inc)
-    # --- Additional Chinese military ---
-    53316,  # YAOGAN-35 03A (PRC military constellation)
+    44547,  # COSMOS-2536 (Russian ELINT)
+    49808,  # COSMOS-2553 (Russian inspector)
+    55978,  # COSMOS 2567 (Russian LEO military)
+    59773,  # COSMOS 2576 (Russian LEO military)
+    58148,  # COSMOS 2570 (Russian ELINT, Liana)
+    # --- Adversarial: Russian GEO ---
+    55841,  # LUCH (OLYMP) 2 (GEO stalker)
+    40391,  # LUCH-5A
+    # --- Adversarial: Chinese Military ---
+    49492,  # YAOGAN-34 (PRC recon)
+    50258,  # YAOGAN-35C (PRC military)
+    53316,  # YAOGAN-35 03A (PRC constellation)
     53943,  # YAOGAN-36 01A (PRC SAR recon)
-    53239,  # CSS WENTIAN (PRC space station module)
-    53698,  # YAOGAN-33 02 (PRC military recon)
-    # --- Allied: US military ---
-    55263,  # USA 342 (US military GEO)
-    62756,  # USA 485 (US military LEO, 2025)
-    # --- Allied: Iridium NEXT ---
-    41917,  # IRIDIUM 106
-    41918,  # IRIDIUM 103
-    # --- Allied: European navigation ---
-    40889,  # GALILEO 9 (205) (ESA MEO)
-    # --- Allied: Japanese ---
-    43065,  # GCOM-C (JPN Earth observation)
-    39766,  # ALOS 2 (JPN SAR)
-    43672,  # GOSAT 2 (JPN greenhouse gas monitoring)
-    # --- Allied: Indian ---
-    40930,  # ASTROSAT (IND X-ray astronomy)
-    40269,  # IRNSS 1C (IND navigation GEO)
-    # --- GLONASS navigation (MEO) ---
-    57517,  # COSMOS 2569 / GLONASS (CIS MEO)
-    52984,  # COSMOS 2557 / GLONASS (CIS MEO)
-    # --- Allied: ESA Earth observation ---
-    40697,  # SENTINEL 2A (ESA Copernicus)
-    # --- Russian ISR (Liana ELINT) ---
-    58148,  # COSMOS 2570 (CIS 905 km LEO ELINT)
+    49481,  # YAOGAN-33 (PRC recon)
+    # --- Adversarial: Chinese GEO ---
+    40402,  # SHIJIAN-13 (Chinese GEO tech demo)
+    42836,  # CHINASAT-16
+    # --- Adversarial: North Korean ---
+    58400,  # MALLIGYONG-1 (NKOR spy satellite)
+    # --- Adversarial: Iranian ---
+    53370,  # KHAYYAM (Iranian remote sensing)
+    # 61072,  # CHAMRAN-1 (Iranian military)
 ]
 
 # Cached results — set time to 0 to force a fresh fetch on next request
