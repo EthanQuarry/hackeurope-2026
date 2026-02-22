@@ -97,9 +97,10 @@ def _build_usa245_satellite(idx: int) -> dict:
 
     alt_offset = scenario.usa245_altitude_offset()
     raan_offset = scenario.usa245_raan_offset()
+    inc_offset = scenario.usa245_inclination_offset()
 
     alt_km = base_alt + alt_offset
-    inc_deg = base_inc
+    inc_deg = base_inc + inc_offset
     raan_deg = base_raan + raan_offset
     period_min = 2 * math.pi * math.sqrt((6378.137 + alt_km) ** 3 / 398600.4418) / 60
     v_kms = math.sqrt(398600.4418 / (6378.137 + alt_km))
