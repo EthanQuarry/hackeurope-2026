@@ -424,23 +424,6 @@ export function SatelliteMarker({
         />
       )}
 
-      {/* Maneuver arc overlay — separate curved transfer path (pre-computed xyz from backend) */}
-      {maneuverArc && maneuverArc.length > 1 && (
-        <Line
-          points={maneuverArc}
-          color={
-            status === "threatened"
-              ? "#ff2244"
-              : status === "watched"
-                ? "#ff9100"
-                : "#ffcc00"
-          }
-          transparent
-          opacity={0.7}
-          lineWidth={2.0}
-        />
-      )}
-
       {/* Orbit trail — positions updated every frame in useFrame */}
       <Line
         ref={lineRef}

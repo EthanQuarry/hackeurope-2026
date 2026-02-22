@@ -1,112 +1,129 @@
-"use client"
+"use client";
 
-import { useMemo, useCallback, lazy, Suspense } from "react"
+import { useEffect, useMemo, useCallback, lazy, Suspense } from "react";
+import { api } from "@/lib/api";
 
-import { GlobeView } from "@/components/globe/globe-view"
-import { DashboardHeader } from "@/components/dashboard-header"
-import { InsightsCard } from "@/components/cards/insights-card"
-import { SatelliteCard } from "@/components/cards/satellite-card"
-import { AiChatBar } from "@/components/cards/ai-chat-bar"
-import { StatsCards } from "@/components/cards/stats-cards"
-import { SatelliteSearch } from "@/components/cards/satellite-search"
-import { DemoSelector } from "@/components/cards/demo-selector"
-import { ProximityOps } from "@/components/ops/proximity-ops"
-import { SignalOps } from "@/components/ops/signal-ops"
-import { AnomalyOps } from "@/components/ops/anomaly-ops"
-import { CommsOps } from "@/components/ops/comms-ops"
+import { GlobeView } from "@/components/globe/globe-view";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { InsightsCard } from "@/components/cards/insights-card";
+import { SatelliteCard } from "@/components/cards/satellite-card";
+import { AiChatBar } from "@/components/cards/ai-chat-bar";
+import { StatsCards } from "@/components/cards/stats-cards";
+import { SatelliteSearch } from "@/components/cards/satellite-search";
+import { DemoSelector } from "@/components/cards/demo-selector";
+import { ProximityOps } from "@/components/ops/proximity-ops";
+import { SignalOps } from "@/components/ops/signal-ops";
+import { AnomalyOps } from "@/components/ops/anomaly-ops";
+import { CommsOps } from "@/components/ops/comms-ops";
 const SatelliteDetailPage = lazy(() =>
   import("@/components/satellite-detail-page").then((m) => ({
     default: m.SatelliteDetailPage,
   })),
-)
-import { useUIStore } from "@/stores/ui-store"
-import { useGlobeStore } from "@/stores/globe-store"
-import { useFleetStore } from "@/stores/fleet-store"
-import { useThreatStore } from "@/stores/threat-store"
-import { usePolling } from "@/hooks/use-polling"
-import { useScenarioSocket } from "@/hooks/use-scenario-socket"
-import { api } from "@/lib/api"
+);
+import { useUIStore } from "@/stores/ui-store";
+import { useGlobeStore } from "@/stores/globe-store";
+import { useFleetStore } from "@/stores/fleet-store";
+import { useThreatStore } from "@/stores/threat-store";
+import { usePolling } from "@/hooks/use-polling";
+import { useScenarioSocket } from "@/hooks/use-scenario-socket";
 import {
   MOCK_THREATS,
   MOCK_SATELLITES,
   MOCK_PROXIMITY_THREATS,
   MOCK_SIGNAL_THREATS,
   MOCK_ANOMALY_THREATS,
-} from "@/lib/mock-data"
-import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants"
-import type { SatelliteData, ThreatData, DebrisData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
+} from "@/lib/mock-data";
+import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants";
+import type {
+  SatelliteData,
+  ThreatData,
+  DebrisData,
+  ProximityThreat,
+  SignalThreat,
+  AnomalyThreat,
+} from "@/types";
 
 export function DashboardShell() {
-  const activeView = useUIStore((s) => s.activeView)
-  const setActiveView = useUIStore((s) => s.setActiveView)
-  const terminalOpen = useUIStore((s) => s.terminalOpen)
+  // Reset SJ-26 scenario on page load/refresh
+  useEffect(() => {
+    fetch(`${api.satellites.replace("/satellites", "/scenario/reset")}`, {
+      method: "POST",
+    }).catch(() => {});
+  }, []);
+
+  const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const terminalOpen = useUIStore((s) => s.terminalOpen);
 
   const handleOpsBackdropClick = useCallback(
     (e: React.MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (target.closest("[data-ops-panel]")) return
-      setActiveView("overview")
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-ops-panel]")) return;
+      setActiveView("overview");
     },
     [setActiveView],
-  )
+  );
 
-  const speed = useGlobeStore((s) => s.speed)
-  const playing = useGlobeStore((s) => s.playing)
-  const simTime = useGlobeStore((s) => s.simTime)
-  const setSpeed = useGlobeStore((s) => s.setSpeed)
-  const togglePlaying = useGlobeStore((s) => s.togglePlaying)
+  const speed = useGlobeStore((s) => s.speed);
+  const playing = useGlobeStore((s) => s.playing);
+  const simTime = useGlobeStore((s) => s.simTime);
+  const setSpeed = useGlobeStore((s) => s.setSpeed);
+  const togglePlaying = useGlobeStore((s) => s.togglePlaying);
 
-  const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId)
-  const setSatellites = useFleetStore((s) => s.setSatellites)
-  const setThreats = useThreatStore((s) => s.setThreats)
-  const setDebris = useThreatStore((s) => s.setDebris)
-  const setProximityThreats = useThreatStore((s) => s.setProximityThreats)
-  const setSignalThreats = useThreatStore((s) => s.setSignalThreats)
-  const setAnomalyThreats = useThreatStore((s) => s.setAnomalyThreats)
-  const storeProximity = useThreatStore((s) => s.proximityThreats)
-  const storeSignal = useThreatStore((s) => s.signalThreats)
-  const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
+  const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId);
+  const setSatellites = useFleetStore((s) => s.setSatellites);
+  const setThreats = useThreatStore((s) => s.setThreats);
+  const setDebris = useThreatStore((s) => s.setDebris);
+  const setProximityThreats = useThreatStore((s) => s.setProximityThreats);
+  const setSignalThreats = useThreatStore((s) => s.setSignalThreats);
+  const setAnomalyThreats = useThreatStore((s) => s.setAnomalyThreats);
+  const storeProximity = useThreatStore((s) => s.proximityThreats);
+  const storeSignal = useThreatStore((s) => s.signalThreats);
+  const storeAnomaly = useThreatStore((s) => s.anomalyThreats);
 
   // ── WebSocket: sole source for all threat data ──
   // Pushes complete threat arrays (general + SJ-26) every tick.
   // Tick rate scales with sim speed. No REST polling for threats.
-  useScenarioSocket()
+  useScenarioSocket();
 
   // ── REST polling: satellites + debris only (large payloads, infrequent) ──
-  const orbitInterval = Math.max(1000, Math.round(10_000 / speed))
-  const debrisInterval = Math.max(2000, Math.round(DEBRIS_REFRESH_MS / speed))
+  const orbitInterval = Math.max(1000, Math.round(10_000 / speed));
+  const debrisInterval = Math.max(2000, Math.round(DEBRIS_REFRESH_MS / speed));
 
   usePolling<SatelliteData[]>({
     url: `${api.satellites}?speed=${speed}`,
     intervalMs: orbitInterval,
     onData: setSatellites,
-  })
+  });
   usePolling<DebrisData[]>({
     url: api.debris,
     intervalMs: debrisInterval,
     onData: setDebris,
-  })
+  });
 
   // Poll ops-level threat endpoints
   usePolling<ProximityThreat[]>({
     url: api.proximityThreats,
     intervalMs: THREAT_REFRESH_MS,
     onData: setProximityThreats,
-  })
+  });
   usePolling<SignalThreat[]>({
     url: api.signalThreats,
     intervalMs: THREAT_REFRESH_MS,
     onData: setSignalThreats,
-  })
+  });
   usePolling<AnomalyThreat[]>({
     url: api.anomalyThreats,
     intervalMs: THREAT_REFRESH_MS,
     onData: setAnomalyThreats,
-  })
+  });
   // Use live data when available, fall back to mocks
-  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
-  const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
-  const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+  const proximityThreats =
+    storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS;
+  const signalThreats =
+    storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS;
+  const anomalyThreats =
+    storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS;
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -166,9 +183,7 @@ export function DashboardShell() {
             {activeView === "proximity" && (
               <ProximityOps threats={proximityThreats} />
             )}
-            {activeView === "signal" && (
-              <SignalOps threats={signalThreats} />
-            )}
+            {activeView === "signal" && <SignalOps threats={signalThreats} />}
             {activeView === "anomaly" && (
               <AnomalyOps threats={anomalyThreats} />
             )}
@@ -188,5 +203,5 @@ export function DashboardShell() {
         )}
       </div>
     </main>
-  )
+  );
 }

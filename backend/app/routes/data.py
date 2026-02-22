@@ -185,25 +185,21 @@ def _build_sj26_satellite(idx: int) -> dict:
     # SJ-26 always orbits on its own ring
     trajectory = _generate_trajectory(SJ_INC, SJ_ALT, SJ_RAAN, SJ_MA, period_min)
 
-    # Maneuver arc: SJ-26 arcs from its own orbit into USA-245's orbit
+    # Maneuver arc: only appears in phase 2+ (when threat is actually detected)
+    # Phase 0-1: no arc — SJ-26 is just being watched, no confirmed hostile maneuver yet
+    # Phase 2+: arc shows the projected collision course from SJ-26's orbit to USA-245's
     maneuver_arc = None
-    if phase >= 1:
-        # P0: point on SJ-26's orbit (where it departs)
-        ta_depart = math.radians(SJ_MA + 30)  # 30° ahead of start position
+    if phase >= 2:
+        ta_depart = math.radians(SJ_MA + 30)
         p0 = _orbit_xyz(SJ_ALT, SJ_INC, SJ_RAAN, ta_depart)
 
-        # P2: point on USA-245's orbit (where it arrives — the collision point)
-        # This is on USA-245's ring, ahead of where USA-245 currently is
-        ta_arrive = math.radians(45 + 15)  # USA-245 at 45°, collision point at 60°
+        ta_arrive = math.radians(45 + 15)
         p2 = _orbit_xyz(TGT_ALT, TGT_INC, TGT_RAAN, ta_arrive)
 
-        # Control point: between the two orbits, bulging outward
-        # Midpoint of P0 and P2, pushed outward from Earth for visible curve
         mx = (p0[0] + p2[0]) / 2
         my = (p0[1] + p2[1]) / 2
         mz = (p0[2] + p2[2]) / 2
         m_len = math.sqrt(mx*mx + my*my + mz*mz)
-        # Push outward by 0.08 scene units (~500 km) for visible arc
         bulge = 0.08
         p1 = (
             mx + (mx / m_len) * bulge,
@@ -211,11 +207,9 @@ def _build_sj26_satellite(idx: int) -> dict:
             mz + (mz / m_len) * bulge,
         )
 
-        # Sample quadratic Bezier
         arc_points = []
-        num_samples = 100
-        for i in range(num_samples + 1):
-            u = i / num_samples
+        for i in range(101):
+            u = i / 100
             w0 = (1 - u) ** 2
             w1 = 2 * (1 - u) * u
             w2 = u * u
@@ -312,6 +306,13 @@ async def get_satellites(speed: float = 1.0):
     _satellites_cache_time = now
     _scenario_phase_at_cache = phase
     return sats
+
+
+@router.post("/scenario/reset")
+async def reset_scenario():
+    """Reset the SJ-26 scenario clock back to phase 0."""
+    scenario.reset()
+    return {"status": "reset", "phase": 0}
 
 
 @router.get("/scenario/sj26")
