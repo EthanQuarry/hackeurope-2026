@@ -111,10 +111,16 @@ export function DashboardHeader({
     <header className="flex min-w-max items-center gap-4 rounded-2xl border border-white/10 bg-card/60 px-6 py-3 shadow-2xl backdrop-blur-xl">
       {/* Left: Logo + branding + planet selector */}
       <div className="flex items-center gap-3">
-        <Shield className="h-5 w-5 text-primary" />
-        <h1 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground whitespace-nowrap">
-          Orbital Shield
-        </h1>
+        <button
+          type="button"
+          onClick={() => setActiveView("overview")}
+          className="flex items-center gap-3 transition-colors hover:opacity-80"
+        >
+          <Shield className="h-5 w-5 text-primary" />
+          <h1 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground whitespace-nowrap">
+            Orbital Shield
+          </h1>
+        </button>
         <PlanetSelector />
       </div>
 

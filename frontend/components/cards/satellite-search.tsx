@@ -75,7 +75,7 @@ export function SatelliteSearch({ className }: { className?: string }) {
   const LabelIcon = showLabels ? Tag : TagsIcon
 
   return (
-    <div ref={containerRef} className={cn("pointer-events-auto relative w-[280px]", className)}>
+    <div ref={containerRef} className={cn("pointer-events-auto relative", className)}>
       {/* Search input + labels toggle */}
       <div className="flex items-center gap-2">
         <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-card/60 px-3 py-2 backdrop-blur-xl shadow-2xl">

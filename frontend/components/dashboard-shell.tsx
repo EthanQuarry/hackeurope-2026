@@ -1,31 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useCallback, lazy, Suspense } from "react";
-import { api } from "@/lib/api";
+import { useEffect, useMemo, useCallback, useState, lazy, Suspense } from "react"
+import { Brain, ChevronLeft, ChevronRight, GitBranch, Lightbulb, Satellite, Target } from "lucide-react"
+import { api } from "@/lib/api"
 
-import { GlobeView } from "@/components/globe/globe-view";
-import { DashboardHeader } from "@/components/dashboard-header";
-import { InsightsCard } from "@/components/cards/insights-card";
-import { SatelliteCard } from "@/components/cards/satellite-card";
-import { AiChatBar } from "@/components/cards/ai-chat-bar";
-import { StatsCards } from "@/components/cards/stats-cards";
-import { SatelliteSearch } from "@/components/cards/satellite-search";
-import { DemoSelector } from "@/components/cards/demo-selector";
-import { ProximityOps } from "@/components/ops/proximity-ops";
-import { SignalOps } from "@/components/ops/signal-ops";
-import { AnomalyOps } from "@/components/ops/anomaly-ops";
-import { CommsOps } from "@/components/ops/comms-ops";
+import { GlobeView } from "@/components/globe/globe-view"
+import { DashboardHeader } from "@/components/dashboard-header"
+import { InsightsCard } from "@/components/cards/insights-card"
+import { SatelliteCard } from "@/components/cards/satellite-card"
+import { AiChatBar } from "@/components/cards/ai-chat-bar"
+import { StatsCards } from "@/components/cards/stats-cards"
+import { SatelliteSearch } from "@/components/cards/satellite-search"
+import { DemoSelector } from "@/components/cards/demo-selector"
+import { ProximityOps } from "@/components/ops/proximity-ops"
+import { SignalOps } from "@/components/ops/signal-ops"
+import { AnomalyOps } from "@/components/ops/anomaly-ops"
+import { CommsOps } from "@/components/ops/comms-ops"
+import { OrbitalOps } from "@/components/ops/orbital-ops"
+import { AdversaryOps } from "@/components/ops/adversary-ops"
 const SatelliteDetailPage = lazy(() =>
   import("@/components/satellite-detail-page").then((m) => ({
     default: m.SatelliteDetailPage,
   })),
-);
-import { useUIStore } from "@/stores/ui-store";
-import { useGlobeStore } from "@/stores/globe-store";
-import { useFleetStore } from "@/stores/fleet-store";
-import { useThreatStore } from "@/stores/threat-store";
-import { usePolling } from "@/hooks/use-polling";
-import { useScenarioSocket } from "@/hooks/use-scenario-socket";
+)
+import { useUIStore, type ActiveView } from "@/stores/ui-store"
+import { cn } from "@/lib/utils"
+import { useGlobeStore } from "@/stores/globe-store"
+import { useFleetStore } from "@/stores/fleet-store"
+import { useThreatStore } from "@/stores/threat-store"
+import { usePolling } from "@/hooks/use-polling"
+import { useScenarioSocket } from "@/hooks/use-scenario-socket"
 import {
   MOCK_THREATS,
   MOCK_SATELLITES,
@@ -43,17 +47,26 @@ import type {
   AnomalyThreat,
 } from "@/types";
 
+const SIDEBAR_TABS: { id: ActiveView; icon: typeof Lightbulb; label: string; color: string }[] = [
+  { id: "overview", icon: Lightbulb, label: "Insights", color: "text-muted-foreground" },
+  { id: "orbital", icon: GitBranch, label: "Orbital", color: "text-muted-foreground" },
+  { id: "comms", icon: Satellite, label: "Comms", color: "text-muted-foreground" },
+  { id: "adversary-detail", icon: Target, label: "Adversary", color: "text-red-400/70" },
+]
+
 export function DashboardShell() {
   // Reset SJ-26 scenario on page load/refresh
   useEffect(() => {
     fetch(`${api.satellites.replace("/satellites", "/scenario/reset")}`, {
       method: "POST",
-    }).catch(() => {});
-  }, []);
+    }).catch(() => {})
+  }, [])
 
-  const activeView = useUIStore((s) => s.activeView);
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const terminalOpen = useUIStore((s) => s.terminalOpen);
+  const activeView = useUIStore((s) => s.activeView)
+  const setActiveView = useUIStore((s) => s.setActiveView)
+  const terminalOpen = useUIStore((s) => s.terminalOpen)
+  const leftPanelCollapsed = useUIStore((s) => s.leftPanelCollapsed)
+  const toggleLeftPanel = useUIStore((s) => s.toggleLeftPanel)
 
   const handleOpsBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -151,23 +164,113 @@ export function DashboardShell() {
 
       {/* Content area — switches based on activeView */}
       <div
-        className={`absolute inset-0 z-10 px-6 pt-24 pb-6 ${activeView === "overview" ? "pointer-events-none" : "pointer-events-auto cursor-pointer"}`}
+        className={`absolute inset-0 z-10 px-6 pt-24 pb-6 pointer-events-none`}
         onClick={activeView !== "overview" ? handleOpsBackdropClick : undefined}
       >
+        {/* Persistent sidebar — always visible */}
+        <div
+          data-ops-panel
+          className="pointer-events-auto absolute left-6 top-24 bottom-24 z-30 flex"
+        >
+          {/* Icon strip */}
+          <div
+            className={cn(
+              "flex w-[48px] flex-col items-center gap-1 border border-white/10 bg-card/60 py-3 backdrop-blur-xl",
+              activeView === "overview" && !leftPanelCollapsed
+                ? "rounded-l-2xl border-r-0"
+                : "rounded-2xl"
+            )}
+          >
+            {SIDEBAR_TABS.map((tab) => {
+              const Icon = tab.icon
+              const isActive = activeView === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    if (tab.id === "overview") {
+                      setActiveView("overview")
+                      if (leftPanelCollapsed) toggleLeftPanel()
+                    } else {
+                      setActiveView(tab.id)
+                    }
+                  }}
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                    isActive
+                      ? tab.id === "adversary-detail"
+                        ? "bg-red-500/10 text-red-400"
+                        : "bg-white/[0.10] text-foreground"
+                      : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
+                  )}
+                  title={tab.label}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              )
+            })}
+
+            {/* Collapse/expand toggle (overview only) */}
+            {activeView === "overview" && (
+              <button
+                type="button"
+                onClick={toggleLeftPanel}
+                className="mt-auto flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                aria-label={leftPanelCollapsed ? "Expand panel" : "Collapse panel"}
+              >
+                {leftPanelCollapsed ? (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Expanded content panel (overview + expanded only) */}
+          {activeView === "overview" && !leftPanelCollapsed && (
+            <div className="flex w-[232px] flex-col rounded-r-2xl border border-l-0 border-white/10 bg-card/60 backdrop-blur-xl overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5">
+                <Brain className="h-4 w-4 shrink-0 text-cyan-400" />
+                <span className="truncate text-[11px] font-semibold uppercase tracking-wider text-gray-300">
+                  Intel Panel
+                </span>
+              </div>
+              {/* Search + demo */}
+              <div className="shrink-0 px-3 pt-2 pb-1 overflow-hidden">
+                <div className="flex items-center gap-2 min-w-0">
+                  <SatelliteSearch className="min-w-0 flex-1" />
+                  <DemoSelector className="shrink-0" />
+                </div>
+              </div>
+              {/* Insights */}
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <InsightsCard className="h-full w-full rounded-none border-0 bg-transparent shadow-none backdrop-blur-none" />
+              </div>
+              {/* Adversary Tracker link */}
+              <button
+                type="button"
+                onClick={() => setActiveView("adversary-detail")}
+                className="mx-3 mb-3 flex items-center gap-2.5 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-left transition-all hover:bg-red-500/10 hover:border-red-500/30"
+              >
+                <Target className="h-4 w-4 shrink-0 text-red-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold text-foreground">Adversary Tracker</p>
+                  <p className="text-[9px] text-muted-foreground">5 threats monitored</p>
+                </div>
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+              </button>
+            </div>
+          )}
+        </div>
+
         {activeView === "overview" ? (
           /* Overview: Floating glass cards over the globe */
           <div className="relative mx-auto h-full w-full max-w-[1600px]">
-            {/* Left: Demos + Search + AI Insights */}
-            <div className="absolute left-0 top-0 bottom-20 flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <SatelliteSearch className="flex-1" />
-                <DemoSelector />
-              </div>
-              <InsightsCard className="min-h-0 flex-1" />
-            </div>
-
             {/* Right: Stats panels (stacked, collapsible) + satellite card when selected */}
-            <div className="absolute right-0 top-0 bottom-20 flex flex-col gap-2 overflow-y-auto">
+            <div className="absolute right-0 top-4 bottom-20 flex flex-col gap-2 overflow-y-auto pointer-events-auto scrollbar-none">
               {selectedSatelliteId && <SatelliteCard />}
               <StatsCards />
             </div>
@@ -179,7 +282,7 @@ export function DashboardShell() {
           </div>
         ) : (
           /* Ops pages: full mission view */
-          <div className="h-full w-full">
+          <div className="h-full w-full pl-[60px]">
             {activeView === "proximity" && (
               <ProximityOps threats={proximityThreats} />
             )}
@@ -199,6 +302,7 @@ export function DashboardShell() {
                 <SatelliteDetailPage />
               </Suspense>
             )}
+            {activeView === "adversary-detail" && <AdversaryOps />}
           </div>
         )}
       </div>

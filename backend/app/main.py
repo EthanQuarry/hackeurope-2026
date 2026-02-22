@@ -15,6 +15,7 @@ from app.routes.data import router as data_router
 from app.routes.stream import router as stream_router
 from app.routes.threats import router as threats_router
 from app.routes.comms import router as comms_router
+from agents.adversary_routes import router as adversary_router
 
 # Load .env before anything else
 load_dotenv()
@@ -53,6 +54,7 @@ app.include_router(data_router)
 app.include_router(stream_router)
 app.include_router(threats_router)
 app.include_router(comms_router)
+app.include_router(adversary_router)
 
 
 @app.get("/api/health", response_model=HealthResponse)

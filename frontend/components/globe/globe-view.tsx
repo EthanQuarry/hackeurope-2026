@@ -381,6 +381,11 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
     [selectSatellite, setActiveView],
   );
 
+  const handlePointerMissed = useCallback(() => {
+    const view = useUIStore.getState().activeView
+    if (view !== "overview") setActiveView("overview")
+  }, [setActiveView])
+
   return (
     <div
       className={cn(
@@ -393,6 +398,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         gl={{ antialias: true, alpha: false }}
         style={{ background: "#000006" }}
         dpr={[1, 2]}
+        onPointerMissed={handlePointerMissed}
       >
         <MemoScene
           satellites={demoSatellites}

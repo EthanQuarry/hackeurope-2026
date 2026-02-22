@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { Target } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ThreatBadge } from "@/components/shared/threat-badge"
 import { cn } from "@/lib/utils"
 import { useThreatStore } from "@/stores/threat-store"
+import { useUIStore } from "@/stores/ui-store"
 import type { ProximityThreat } from "@/types"
 
 interface ProximityOpsProps {
@@ -63,6 +65,7 @@ function DataRow({ label, value, alert }: { label: string; value: string | numbe
 export function ProximityOps({ threats }: ProximityOpsProps) {
   const [selectedId, setSelectedId] = useState<string | null>(threats[0]?.id ?? null)
   const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
+  const openAdversaryDetail = useUIStore((s) => s.openAdversaryDetail)
 
   const handleSelect = useCallback((threat: ProximityThreat) => {
     setSelectedId(threat.id)
@@ -211,6 +214,16 @@ export function ProximityOps({ threats }: ProximityOpsProps) {
                   style={{ width: `${selected.confidence * 100}%` }}
                 />
               </div>
+
+              {/* Investigate button */}
+              <button
+                type="button"
+                onClick={() => openAdversaryDetail(selected.foreignSatId)}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-red-400 transition-all hover:bg-red-500/20"
+              >
+                <Target className="h-3.5 w-3.5" />
+                Investigate {selected.foreignSatName}
+              </button>
             </div>
           </ScrollArea>
         ) : (
