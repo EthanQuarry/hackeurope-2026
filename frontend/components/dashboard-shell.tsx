@@ -145,6 +145,7 @@ export function DashboardShell() {
   const togglePlaying = useGlobeStore((s) => s.togglePlaying);
 
   const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId);
+  const selectSatellite = useFleetStore((s) => s.selectSatellite);
   const setSatellites = useFleetStore((s) => s.setSatellites);
   const setThreats = useThreatStore((s) => s.setThreats);
   const setDebris = useThreatStore((s) => s.setDebris);
@@ -291,7 +292,10 @@ export function DashboardShell() {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setActiveView(tab.id)}
+                      onClick={() => {
+                        if (tab.id === "comms") selectSatellite(null)
+                        setActiveView(tab.id)
+                      }}
                       className={cn(
                         "relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
                         isActive
@@ -386,7 +390,8 @@ export function DashboardShell() {
                         setActiveView("overview");
                         if (leftPanelCollapsed) toggleLeftPanel();
                       } else {
-                        setActiveView(tab.id);
+                        if (tab.id === "comms") selectSatellite(null)
+                        setActiveView(tab.id)
                       }
                     }}
                     className={cn(

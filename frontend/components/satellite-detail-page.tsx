@@ -543,19 +543,41 @@ export function SatelliteDetailPage() {
 
   const canBuilderSend = !!satellite && !!cmdType && phase === "idle"
 
-  /* ── Null guard ── */
+  /* ── Null guard — show satellite picker ── */
   if (!satellite) {
     return (
       <div data-ops-panel className="flex h-full w-full items-center justify-center">
-        <div className="rounded-xl border border-border/60 bg-card/80 px-8 py-6 backdrop-blur-lg">
-          <p className="font-mono text-sm text-muted-foreground">No satellite selected</p>
-          <button
-            type="button"
-            onClick={() => setActiveView("overview")}
-            className="mt-3 font-mono text-[10px] text-primary underline underline-offset-2 hover:text-primary/80"
-          >
-            Return to overview
-          </button>
+        <div className="w-full max-w-md rounded-xl border border-border/60 bg-card/80 px-6 py-5 backdrop-blur-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <Satellite className="h-4 w-4 text-primary/60" />
+            <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-foreground">Select a Satellite</h2>
+          </div>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-1 pr-2">
+              {satellites.map((sat) => {
+                const colors = THREAT_COLORS[sat.status]
+                return (
+                  <button
+                    key={sat.id}
+                    type="button"
+                    onClick={() => selectSatellite(sat.id)}
+                    className="w-full flex items-center gap-3 rounded-lg border border-border/30 bg-secondary/10 px-3 py-2.5 text-left transition-colors hover:border-border/60 hover:bg-secondary/25"
+                  >
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colors.hex }} />
+                    <div className="flex-1 min-w-0">
+                      <span className="block font-mono text-[11px] font-medium text-foreground truncate">{sat.name}</span>
+                      <span className="block font-mono text-[9px] text-muted-foreground">
+                        NORAD {sat.noradId} · {sat.altitude_km.toFixed(0)} km · {getOrbitType(sat.inclination_deg)}
+                      </span>
+                    </div>
+                    <span className={cn("shrink-0 rounded-full px-2 py-0.5 font-mono text-[8px] uppercase", colors.bg, colors.text)}>
+                      {sat.status}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </ScrollArea>
         </div>
       </div>
     )
