@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { ShieldAlert, Satellite, GitBranch, ChevronDown, Globe } from "lucide-react"
+import { ShieldAlert, Satellite, GitBranch, ChevronDown, Globe, SlidersHorizontal } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { THREAT_COLORS, type ThreatSeverity } from "@/lib/constants"
 import { MOCK_SATELLITES, MOCK_ORBITAL_SIMILARITY_THREATS } from "@/lib/mock-data"
+import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { useSatellitesWithDerivedStatus } from "@/hooks/use-derived-status"
@@ -176,6 +177,57 @@ function GeoLoiterPanel() {
 }
 
 /* ═══════════════════════════════════════════════════════
+   Bayesian Prior Panel — real-time sensitivity slider
+   ═══════════════════════════════════════════════════════ */
+
+function BayesianPriorPanel() {
+  const prior = useGlobeStore((s) => s.priorAdversarial)
+  const setPrior = useGlobeStore((s) => s.setPriorAdversarial)
+
+  const pct = Math.round(prior * 100)
+  const barColor = prior > 0.7 ? "#ff1744" : prior > 0.4 ? "#ffcc00" : "#00e676"
+
+  return (
+    <CollapsiblePanel
+      icon={SlidersHorizontal}
+      iconColor="text-violet-400"
+      title="Bayesian Prior"
+      count={`${pct}%`}
+      defaultOpen={true}
+    >
+      <div className="space-y-2 p-3">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[8px] uppercase tracking-wider text-gray-500">Adversarial Prior</span>
+          <span className="font-mono text-xs font-semibold tabular-nums text-gray-200">{prior.toFixed(2)}</span>
+        </div>
+        <input
+          type="range"
+          min={0.01}
+          max={0.99}
+          step={0.01}
+          value={prior}
+          onChange={(e) => setPrior(parseFloat(e.target.value))}
+          className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-white/10 accent-violet-500"
+        />
+        <div className="flex items-center justify-between font-mono text-[8px] text-gray-500">
+          <span>1%</span>
+          <span>99%</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full transition-all"
+            style={{ width: `${pct}%`, backgroundColor: barColor }}
+          />
+        </div>
+        <p className="font-mono text-[8px] text-gray-500 leading-tight">
+          Controls base threat probability for adversarial nations. Higher = more sensitive scoring.
+        </p>
+      </div>
+    </CollapsiblePanel>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════
    Fleet Overview Panel
    ═══════════════════════════════════════════════════════ */
 
@@ -229,6 +281,7 @@ export function StatsCards({ className }: { className?: string }) {
   return (
     <div className={cn("pointer-events-auto flex flex-col gap-2 w-[280px]", className)}>
       <ActiveThreatsPanel />
+      <BayesianPriorPanel />
       <OrbitalSimilarityPanel />
       <GeoLoiterPanel />
       <FleetOverviewPanel />

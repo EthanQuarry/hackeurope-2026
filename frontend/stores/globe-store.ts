@@ -7,6 +7,7 @@ interface GlobeState {
   showLabels: boolean
   activeDemo: string | null
   cinematicActive: boolean
+  priorAdversarial: number
 
   setSimTime: (t: number) => void
   setSpeed: (speed: number) => void
@@ -14,6 +15,7 @@ interface GlobeState {
   toggleLabels: () => void
   setActiveDemo: (id: string | null) => void
   setCinematicActive: (active: boolean) => void
+  setPriorAdversarial: (v: number) => void
 }
 
 export const useGlobeStore = create<GlobeState>((set) => ({
@@ -23,6 +25,7 @@ export const useGlobeStore = create<GlobeState>((set) => ({
   showLabels: true,
   activeDemo: null,
   cinematicActive: false,
+  priorAdversarial: 0.9,
 
   setSimTime: (t) => set({ simTime: t }),
   setSpeed: (speed) => set({ speed }),
@@ -30,4 +33,5 @@ export const useGlobeStore = create<GlobeState>((set) => ({
   toggleLabels: () => set((s) => ({ showLabels: !s.showLabels })),
   setActiveDemo: (id) => set({ activeDemo: id }),
   setCinematicActive: (active) => set({ cinematicActive: active }),
+  setPriorAdversarial: (v) => set({ priorAdversarial: v }),
 }))

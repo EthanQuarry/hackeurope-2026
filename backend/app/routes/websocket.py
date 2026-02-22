@@ -14,7 +14,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.models import SatelliteData, WSMessage, WSMessageType
 from app.agents.pipeline import run_pipeline
 from app import scenario
-from app.bayesian_scorer import score_satellite
+from app.bayesian_scorer import score_satellite, set_prior_adversarial
 
 logger = logging.getLogger(__name__)
 
@@ -417,6 +417,12 @@ async def scenario_tick_ws(ws: WebSocket):
                     new_speed = float(msg["speed"])
                     scenario.set_speed(new_speed)
                     logger.info("Scenario WS: speed set to %.1fx", new_speed)
+                if "prior_adversarial" in msg:
+                    new_prior = float(msg["prior_adversarial"])
+                    set_prior_adversarial(new_prior)
+                    from app.routes.threats import reset_caches
+                    reset_caches()
+                    logger.info("Scenario WS: prior_adversarial set to %.4f", new_prior)
             except (json.JSONDecodeError, ValueError):
                 pass
     except WebSocketDisconnect:

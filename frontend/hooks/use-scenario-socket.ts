@@ -32,6 +32,7 @@ export function useScenarioSocket() {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
   const speedRef = useRef(useGlobeStore.getState().speed)
+  const priorRef = useRef(useGlobeStore.getState().priorAdversarial)
 
   // Store setters (stable references)
   const setProximity = useThreatStore((s) => s.setProximityThreats)
@@ -138,4 +139,14 @@ export function useScenarioSocket() {
       ws.send(JSON.stringify({ speed }))
     }
   }, [speed])
+
+  // Send prior changes
+  const priorAdversarial = useGlobeStore((s) => s.priorAdversarial)
+  useEffect(() => {
+    priorRef.current = priorAdversarial
+    const ws = wsRef.current
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ prior_adversarial: priorAdversarial }))
+    }
+  }, [priorAdversarial])
 }

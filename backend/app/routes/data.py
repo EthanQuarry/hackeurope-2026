@@ -7,11 +7,15 @@ import math
 import random
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from app.spacetrack import get_client, gp_to_satellite, gp_to_debris
 from app import scenario, geo_loiter_demo
+from app.bayesian_scorer import (
+    get_prior_adversarial, set_prior_adversarial,
+    get_prior_benign, set_prior_benign,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +111,43 @@ FLEET_NORAD_IDS = [
     54216,  # YAOGAN-36C (PRC SAR)
     # --- Additional ISR ---
     26900,  # USA-160 (NOSS 3-2, naval ocean surveillance)
+    # --- North Korean ---
+    58400,  # MALLIGYONG-1 (NKOR spy satellite)
+    # --- Iranian ---
+    53370,  # KHAYYAM (IRAN remote sensing)
+    58817,  # SORAYA (IRAN orbital launch)
+    61072,  # CHAMRAN-1 (IRAN military)
+    # --- Recent Russian military ---
+    55978,  # COSMOS 2567 (CIS LEO military)
+    59773,  # COSMOS 2576 (CIS LEO military)
+    62902,  # COSMOS 2581 (CIS military, 82° inc)
+    # --- Additional Chinese military ---
+    53316,  # YAOGAN-35 03A (PRC military constellation)
+    53943,  # YAOGAN-36 01A (PRC SAR recon)
+    53239,  # CSS WENTIAN (PRC space station module)
+    53698,  # YAOGAN-33 02 (PRC military recon)
+    # --- Allied: US military ---
+    55263,  # USA 342 (US military GEO)
+    62756,  # USA 485 (US military LEO, 2025)
+    # --- Allied: Iridium NEXT ---
+    41917,  # IRIDIUM 106
+    41918,  # IRIDIUM 103
+    # --- Allied: European navigation ---
+    40889,  # GALILEO 9 (205) (ESA MEO)
+    # --- Allied: Japanese ---
+    43065,  # GCOM-C (JPN Earth observation)
+    39766,  # ALOS 2 (JPN SAR)
+    43672,  # GOSAT 2 (JPN greenhouse gas monitoring)
+    # --- Allied: Indian ---
+    40930,  # ASTROSAT (IND X-ray astronomy)
+    40269,  # IRNSS 1C (IND navigation GEO)
+    # --- GLONASS navigation (MEO) ---
+    57517,  # COSMOS 2569 / GLONASS (CIS MEO)
+    52984,  # COSMOS 2557 / GLONASS (CIS MEO)
+    # --- Allied: ESA Earth observation ---
+    40697,  # SENTINEL 2A (ESA Copernicus)
+    # --- Russian ISR (Liana ELINT) ---
+    58148,  # COSMOS 2570 (CIS 905 km LEO ELINT)
 ]
 
 # Cached results — set time to 0 to force a fresh fetch on next request
@@ -329,6 +370,43 @@ async def reset_scenario():
     _satellites_cache_time = 0
     logger.info("Scenario reset — phase 0, cache cleared")
     return {"status": "reset", "phase": 0}
+
+
+@router.get("/config/priors")
+async def get_priors():
+    """Return current Bayesian prior values."""
+    return {
+        "adversarial": get_prior_adversarial(),
+        "benign": get_prior_benign(),
+    }
+
+
+@router.post("/config/priors")
+async def set_priors(request: Request):
+    """Update Bayesian prior values and invalidate all threat caches."""
+    global _satellites_cache_time
+    body = await request.json()
+
+    if "adversarial" in body:
+        set_prior_adversarial(float(body["adversarial"]))
+    if "benign" in body:
+        set_prior_benign(float(body["benign"]))
+
+    # Invalidate satellite cache
+    _satellites_cache_time = 0
+
+    # Invalidate threat caches
+    from app.routes.threats import reset_caches
+    reset_caches()
+
+    logger.info(
+        "Priors updated: adversarial=%.4f benign=%.6f",
+        get_prior_adversarial(), get_prior_benign(),
+    )
+    return {
+        "adversarial": get_prior_adversarial(),
+        "benign": get_prior_benign(),
+    }
 
 
 @router.get("/scenario/debug")

@@ -24,9 +24,11 @@ CACHE_TTL = 30  # seconds
 
 _prox_cache: list[dict] | None = None
 _osim_cache: list[dict] | None = None
+_anom_cache: list[dict] | None = None
 _geo_cache: list[dict] | None = None
 _prox_cache_time: float = 0
 _osim_cache_time: float = 0
+_anom_cache_time: float = 0
 _geo_cache_time: float = 0
 _prox_phase: int = -1
 _sig_phase: int = -1
@@ -36,12 +38,21 @@ _osim_phase: int = -1
 _geo_cache_key: tuple = (-1, False)
 
 
+def reset_caches() -> None:
+    """Zero all threat cache timestamps so new prior values take effect immediately."""
+    global _prox_cache_time, _osim_cache_time, _anom_cache_time, _geo_cache_time
+    _prox_cache_time = 0
+    _osim_cache_time = 0
+    _anom_cache_time = 0
+    _geo_cache_time = 0
+
+
 def _get_satellites() -> list[dict]:
     from app.routes.data import _satellites_cache, _generate_fallback_satellites
     return _satellites_cache or _generate_fallback_satellites()
 
 
-THREAT_ACTOR_COUNTRIES = {"PRC", "RUS", "CIS"}
+THREAT_ACTOR_COUNTRIES = {"PRC", "RUS", "CIS", "NKOR", "IRAN"}
 
 FRIENDLY_FORCE_EXCLUDE_NORAD = {25544}  # ISS (international, never a threat actor)
 FRIENDLY_FORCE_EXCLUDE_NAMES = ("ISS",)
@@ -263,8 +274,178 @@ async def get_signal_threats():
 
 @router.get("/threats/anomaly")
 async def get_anomaly_threats():
-    """AnomalyThreat[] — satellites exhibiting anomalous behavior."""
-    return []
+    """AnomalyThreat[] — satellites exhibiting anomalous behavior.
+
+    Synthesises anomalies from proximity analysis and orbital similarity scoring.
+    Each adversarial satellite that scores above a Bayesian posterior threshold
+    gets an anomaly entry describing the nature of the detected behavior.
+    """
+    global _anom_cache, _anom_cache_time
+    now = time.time()
+    if _anom_cache and (now - _anom_cache_time) < CACHE_TTL:
+        return _anom_cache
+
+    sats = _get_satellites()
+    adversarial, allied = _get_adversarial_and_allied(sats)
+    now_ms = int(now * 1000)
+    threats: list[dict] = []
+
+    # Track best threat per adversarial satellite (avoid duplicates)
+    best_per_foreign: dict[str, dict] = {}
+
+    for foreign in adversarial:
+        f_traj = foreign.get("trajectory", [])
+        f_pos = (
+            {"lat": f_traj[0]["lat"], "lon": f_traj[0]["lon"], "altKm": foreign["altitude_km"]}
+            if f_traj else {"lat": 0.0, "lon": 0.0, "altKm": foreign["altitude_km"]}
+        )
+        f_cc = foreign.get("country_code", "UNK")
+        f_id = foreign["id"]
+
+        for target in allied:
+            t_traj = target.get("trajectory", [])
+            if not f_traj or not t_traj:
+                continue
+
+            # --- Proximity-based anomaly ---
+            miss_km, rel_vel, tca_min = _find_tca(f_traj, t_traj)
+            if miss_km > 500:
+                continue
+
+            posterior = score_satellite(miss_km, f_cc)
+            if posterior < 0.05:
+                continue
+
+            # Classify anomaly type from approach geometry
+            alt_diff = abs(foreign["altitude_km"] - target["altitude_km"])
+            inc_diff = abs(foreign["inclination_deg"] - target["inclination_deg"])
+
+            if miss_km < 50 and alt_diff < 30 and inc_diff < 5:
+                anomaly_type = "unexpected-maneuver"
+                desc = (
+                    f"{foreign['name']} executed anomalous maneuver reducing miss distance "
+                    f"with {target['name']} to {miss_km:.1f} km. "
+                    f"Approach velocity {rel_vel:.2f} km/s, co-orbital pattern."
+                )
+            elif miss_km < 50 and posterior > 0.5:
+                anomaly_type = "rf-emission"
+                desc = (
+                    f"{foreign['name']} within {miss_km:.1f} km of {target['name']}. "
+                    f"Active sensor sweep probable at this range. "
+                    f"Bayesian threat posterior {posterior:.0%}."
+                )
+            elif alt_diff > 50:
+                if foreign["altitude_km"] > target["altitude_km"]:
+                    anomaly_type = "orbit-lower"
+                    desc = (
+                        f"{foreign['name']} lowering orbit toward {target['name']} shell. "
+                        f"Altitude differential {alt_diff:.0f} km, miss distance {miss_km:.1f} km."
+                    )
+                else:
+                    anomaly_type = "orbit-raise"
+                    desc = (
+                        f"{foreign['name']} raising orbit toward {target['name']} shell. "
+                        f"Altitude differential {alt_diff:.0f} km, miss distance {miss_km:.1f} km."
+                    )
+            else:
+                anomaly_type = "pointing-change"
+                desc = (
+                    f"{foreign['name']} orbital plane converging with {target['name']}. "
+                    f"Inclination offset {inc_diff:.1f}°, miss distance {miss_km:.1f} km."
+                )
+
+            # Severity from posterior
+            if posterior > 0.3:
+                severity = "threatened"
+            elif posterior > 0.1:
+                severity = "watched"
+            else:
+                severity = "nominal"
+
+            entry = {
+                "id": f"anom-{f_id}-{target['id']}",
+                "satelliteId": f_id,
+                "satelliteName": foreign["name"],
+                "severity": severity,
+                "anomalyType": anomaly_type,
+                "baselineDeviation": round(min(posterior, 0.99), 2),
+                "description": desc,
+                "detectedAt": now_ms - int(random.uniform(60, 3600) * 1000),
+                "confidence": round(posterior, 2),
+                "position": f_pos,
+            }
+
+            # Keep only the highest-scoring entry per adversarial satellite
+            prev = best_per_foreign.get(f_id)
+            if prev is None or entry["baselineDeviation"] > prev["baselineDeviation"]:
+                best_per_foreign[f_id] = entry
+
+    threats = list(best_per_foreign.values())
+
+    # Also check orbital similarity for adversarial sats not already captured
+    for foreign in adversarial:
+        f_id = foreign["id"]
+        if f_id in best_per_foreign:
+            continue  # already have a proximity-based entry
+
+        f_traj = foreign.get("trajectory", [])
+        f_pos = (
+            {"lat": f_traj[0]["lat"], "lon": f_traj[0]["lon"], "altKm": foreign["altitude_km"]}
+            if f_traj else {"lat": 0.0, "lon": 0.0, "altKm": foreign["altitude_km"]}
+        )
+        f_cc = foreign.get("country_code", "UNK")
+
+        best_div = 999.0
+        best_post = 0.0
+        best_target = None
+
+        for target in allied:
+            div, post = score_orbital_similarity(
+                foreign["altitude_km"], foreign["inclination_deg"],
+                target["altitude_km"], target["inclination_deg"],
+                f_cc,
+            )
+            if post > best_post:
+                best_div = div
+                best_post = post
+                best_target = target
+
+        if best_post < 0.05 or best_target is None:
+            continue
+
+        if best_post > 0.3:
+            severity = "threatened"
+        elif best_post > 0.1:
+            severity = "watched"
+        else:
+            severity = "nominal"
+
+        d_inc = abs(foreign["inclination_deg"] - best_target["inclination_deg"])
+        d_alt = abs(foreign["altitude_km"] - best_target["altitude_km"])
+
+        threats.append({
+            "id": f"anom-osim-{f_id}",
+            "satelliteId": f_id,
+            "satelliteName": foreign["name"],
+            "severity": severity,
+            "anomalyType": "pointing-change",
+            "baselineDeviation": round(min(best_post, 0.99), 2),
+            "description": (
+                f"{foreign['name']} orbital plane shadowing {best_target['name']}. "
+                f"Inclination offset {d_inc:.1f}°, altitude offset {d_alt:.0f} km, "
+                f"divergence score {best_div:.3f}."
+            ),
+            "detectedAt": now_ms - int(random.uniform(300, 7200) * 1000),
+            "confidence": round(best_post, 2),
+            "position": f_pos,
+        })
+
+    severity_order = {"threatened": 0, "watched": 1, "nominal": 2}
+    threats.sort(key=lambda t: (severity_order.get(t["severity"], 3), -t["baselineDeviation"]))
+
+    _anom_cache = threats[:15]
+    _anom_cache_time = now
+    return _anom_cache
 
 
 @router.get("/threats/orbital-similarity")

@@ -18,11 +18,29 @@ BENIGN_SIGMA = 1.369
 THREAT_MU = 3.5
 THREAT_SIGMA = 1.2
 
-# Priors
-PRIOR_ADVERSARIAL = 0.001
-PRIOR_BENIGN = 0.00005
-ADVERSARIAL_COUNTRIES = {"PRC", "CIS", "RUS"}
+# Mutable priors — adjustable via /config/priors endpoint and WebSocket
+_prior_adversarial: float = 0.9
+_prior_benign: float = 0.00005
+ADVERSARIAL_COUNTRIES = {"PRC", "CIS", "RUS", "NKOR", "IRAN"}
 SMALL_RCS_MULTIPLIER = 1.5
+
+
+def get_prior_adversarial() -> float:
+    return _prior_adversarial
+
+
+def set_prior_adversarial(v: float) -> None:
+    global _prior_adversarial
+    _prior_adversarial = max(0.001, min(0.999, v))
+
+
+def get_prior_benign() -> float:
+    return _prior_benign
+
+
+def set_prior_benign(v: float) -> None:
+    global _prior_benign
+    _prior_benign = max(0.0000001, min(0.999, v))
 
 
 def _lognormal_pdf(x: float, mu: float, sigma: float) -> float:
@@ -45,7 +63,7 @@ def likelihood_ratio(min_sep_km: float) -> float:
 
 def compute_prior(country_code: str, rcs_size: str = "") -> float:
     """Compute prior P(threat) from country and RCS."""
-    base = PRIOR_ADVERSARIAL if country_code in ADVERSARIAL_COUNTRIES else PRIOR_BENIGN
+    base = _prior_adversarial if country_code in ADVERSARIAL_COUNTRIES else _prior_benign
     if rcs_size == "SMALL":
         base = min(base * SMALL_RCS_MULTIPLIER, 1.0)
     return base

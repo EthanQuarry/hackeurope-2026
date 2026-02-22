@@ -22,6 +22,7 @@ export const api = {
   adversaryChat: `${BASE}/api/adversary/chat`,
   demoGeoLoiterStart: `${BASE}/demo/geo-loiter/start`,
   demoGeoLoiterStop: `${BASE}/demo/geo-loiter/stop`,
+  configPriors: `${BASE}/config/priors`,
 } as const
 
 /** Typed fetch with AbortController support */

@@ -255,14 +255,17 @@ export function SatelliteMarker({
     : threatScore;
   const isFlagged = displayThreatScore > PROXIMITY_FLAG_THRESHOLD;
 
-  // Friendly/allied sats: green when safe, lerp to red when threatened
   const isFriendly = displayStatus === "allied" || displayStatus === "friendly" || displayStatus === "nominal";
   const color = useMemo(() => {
-    if (isFriendly && threatPercent != null && threatPercent > 0) {
-      const t = Math.min(1, threatPercent / 100);
-      const green = new THREE.Color("#00e676");
-      const red = new THREE.Color("#ff1744");
-      return "#" + green.lerp(red, t).getHexString();
+    // Adversary (watched) satellites are always orange/yellow regardless of threat proximity
+    if (displayStatus === "watched") return THREAT_COLORS.watched.hex;
+    // Already classified as threatened
+    if (displayStatus === "threatened") return THREAT_COLORS.threatened.hex;
+    // Friendly/allied/nominal: red if live threat score is high, green otherwise
+    if (isFriendly) {
+      return threatPercent != null && threatPercent >= 70
+        ? THREAT_COLORS.threatened.hex
+        : THREAT_COLORS.friendly.hex;
     }
     return THREAT_COLORS[displayStatus]?.hex ?? "#00e676";
   }, [displayStatus, isFriendly, threatPercent]);
