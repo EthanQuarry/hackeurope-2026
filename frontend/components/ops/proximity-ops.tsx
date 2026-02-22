@@ -161,12 +161,37 @@ export function ProximityOps({ threats }: ProximityOpsProps) {
         {selected ? (
           <ScrollArea className="min-h-0 flex-1">
             <div className="p-4">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between">
                 <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
                   Threat Detail
                 </span>
                 <ThreatBadge severity={selected.severity} />
               </div>
+
+              {/* Contextual explanation */}
+              {(() => {
+                const miss = formatDistance(selected.missDistanceKm)
+                const tca = formatTCA(selected.tcaInMinutes)
+                const vel = `${selected.approachVelocityKms.toFixed(1)} km/s`
+                const target = selected.targetAssetName
+                const explanations: Record<string, string> = {
+                  "co-orbital": `${selected.foreignSatName} is tracking in the same orbital plane as ${target} at ${miss} separation. Co-orbital positioning requires deliberate delta-V to establish and is a known precursor to rendezvous, inspection, or grappling operations.`,
+                  "drift": `${selected.foreignSatName} is executing a passive drift approach toward ${target}. An altitude differential causes continuous separation closure without thruster burns — making intentional approach difficult to distinguish from normal orbital drift. Closest pass ${tca} at ${miss}.`,
+                  "direct": `${selected.foreignSatName} is on a crossing trajectory with ${target} at ${vel} relative velocity. High relative velocity on a converging geometry is consistent with an intercept profile rather than a surveillance posture.`,
+                  "sun-hiding": `${selected.foreignSatName} is approaching ${target} from the solar direction (${miss} at ${tca}). Sun-hiding exploits limits of passive electro-optical sensors — targets inbound from the sun direction cannot be imaged until very close range.`,
+                }
+                const base = explanations[selected.approachPattern] ?? `${selected.foreignSatName} conducting ${selected.approachPattern.replace(/-/g, " ")} approach toward ${target}. Closest pass ${tca} at ${miss}.`
+                const coda = selected.severity === "threatened"
+                  ? ` Miss distance of ${miss} is within collision-hazard threshold — immediate assessment required.`
+                  : selected.severity === "watched"
+                  ? " Within proximity operations range — continued monitoring required."
+                  : ""
+                return (
+                  <p className="mb-4 rounded-md border border-border/30 bg-secondary/20 px-3 py-2.5 font-mono text-[9px] leading-relaxed text-foreground/70">
+                    {base}{coda}
+                  </p>
+                )
+              })()}
 
               <div className="space-y-0">
                 <DataRow label="Foreign Asset" value={selected.foreignSatName} />

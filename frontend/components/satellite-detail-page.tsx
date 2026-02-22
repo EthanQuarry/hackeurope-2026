@@ -716,11 +716,26 @@ export function SatelliteDetailPage() {
                         if (entry.type === "proximity") {
                           const t = entry.data as ProximityThreat
                           const patternLabel = t.approachPattern.replace(/-/g, " ")
-                          const summary = `Conducting ${patternLabel} approach — closest pass ${formatTCA(t.tcaInMinutes)} at ${formatDistance(t.missDistanceKm)}.`
+                          const miss = formatDistance(t.missDistanceKm)
+                          const tca = formatTCA(t.tcaInMinutes)
+                          const vel = `${t.approachVelocityKms.toFixed(1)} km/s`
+                          const target = t.targetAssetName
+                          const patternExplanations: Record<string, string> = {
+                            "co-orbital": `Tracking in the same orbital plane as ${target} at ${miss} separation. Co-orbital positioning is a known precursor to rendezvous, inspection, or grappling operations — it requires deliberate delta-V to establish and maintain.`,
+                            "drift": `Executing a passive drift approach toward ${target}. An altitude differential causes slow, continuous separation closure without thruster burns — making it difficult to classify as intentional. Closest pass ${tca} at ${miss}.`,
+                            "direct": `On a crossing trajectory with ${target} at ${vel} relative velocity. High relative velocity on a converging geometry is consistent with an intercept profile rather than a surveillance or shadowing posture.`,
+                            "sun-hiding": `Approaching ${target} from the solar direction (${miss} at ${tca}). Sun-hiding is a deliberate evasion technique — passive electro-optical sensors cannot image targets inbound from the sun direction, masking the approach until very close range.`,
+                          }
+                          const summary = patternExplanations[t.approachPattern] ?? `Conducting ${patternLabel} approach toward ${target} — closest pass ${tca} at ${miss}.`
+                          const severityCoda = t.severity === "threatened"
+                            ? ` Miss distance of ${miss} is within collision-hazard and close-inspection threshold.`
+                            : t.severity === "watched"
+                            ? " Continued monitoring required — within proximity operations range."
+                            : ""
                           return (
                             <div key={i} className="space-y-1.5 border-t border-border/20 pt-2 first:border-t-0 first:pt-0">
                               <div className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/60">Proximity</div>
-                              <p className="font-mono text-[9px] text-foreground/70 leading-relaxed">{summary}{t.sunHidingDetected && " Sun-hiding manoeuvre detected."}</p>
+                              <p className="font-mono text-[9px] text-foreground/70 leading-relaxed">{summary}{severityCoda}{t.sunHidingDetected && t.approachPattern !== "sun-hiding" && " Sun-hiding manoeuvre also detected."}</p>
                               <div className="space-y-1 mt-1">
                                 <ThreatDetailRow label="Miss dist" value={formatDistance(t.missDistanceKm)} />
                                 <ThreatDetailRow label="TCA" value={formatTCA(t.tcaInMinutes)} />
@@ -733,9 +748,15 @@ export function SatelliteDetailPage() {
                         }
                         if (entry.type === "orbital") {
                           const t = entry.data as OrbitalSimilarityThreat
-                          const similarityLabel = t.divergenceScore < 0.1 ? "very similar orbit" : t.divergenceScore < 0.3 ? "similar orbit" : "moderate match"
                           const patternLabel = t.pattern.replace(/-/g, " ")
-                          const summary = `Orbital plane match consistent with ${patternLabel} shadowing. Divergence score ${t.divergenceScore.toFixed(3)} — ${similarityLabel}.`
+                          const target = t.targetAssetName
+                          const orbPatternExplanations: Record<string, string> = {
+                            "co-planar": `Orbital planes are nearly co-planar with ${target} (Δi ${t.inclinationDiffDeg.toFixed(1)}°, Δalt ${t.altitudeDiffKm.toFixed(0)} km). Achieving plane alignment requires significant delta-V investment — this is deliberate positioning, not coincidence.`,
+                            "co-altitude": `Matching altitude shell of ${target} (Δalt ${t.altitudeDiffKm.toFixed(0)} km) without full plane alignment. Station-keeping at the same altitude while drifting in RAAN is a common precursor to a future rendezvous window.`,
+                            "co-inclination": `Inclination closely matches ${target} (Δi ${t.inclinationDiffDeg.toFixed(1)}°). With matching inclination, natural RAAN drift over weeks will periodically bring the orbital planes into conjunction without further burns.`,
+                            "shadowing": `Orbital parameters closely mirror ${target} across both altitude (Δ${t.altitudeDiffKm.toFixed(0)} km) and inclination (Δ${t.inclinationDiffDeg.toFixed(1)}°). Divergence score ${t.divergenceScore.toFixed(3)} — the degree of similarity is inconsistent with an independent mission profile.`,
+                          }
+                          const summary = orbPatternExplanations[t.pattern] ?? `Orbital plane match consistent with ${patternLabel} shadowing of ${target}. Divergence score ${t.divergenceScore.toFixed(3)}.`
                           return (
                             <div key={i} className="space-y-1.5 border-t border-border/20 pt-2 first:border-t-0 first:pt-0">
                               <div className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/60">Orbital Similarity</div>
@@ -753,7 +774,8 @@ export function SatelliteDetailPage() {
                         if (entry.type === "signal") {
                           const t = entry.data as SignalThreat
                           const pct = (t.interceptionProbability * 100).toFixed(0)
-                          const summary = `Intercepting ${t.commWindowsAtRisk} of ${t.totalCommWindows} comm windows at ${pct}% probability via ${t.groundStationName}.`
+                          const riskLevel = t.interceptionProbability > 0.4 ? "high" : t.interceptionProbability > 0.15 ? "moderate" : "low"
+                          const summary = `In geometry to intercept ${t.commWindowsAtRisk} of ${t.totalCommWindows} uplink/downlink windows between ${t.targetLinkAssetName} and ${t.groundStationName}. Signal path angle ${t.signalPathAngleDeg.toFixed(1)}° gives a ${riskLevel} intercept probability (${pct}%). At this angle the satellite can passively collect command and telemetry without active jamming.`
                           return (
                             <div key={i} className="space-y-1.5 border-t border-border/20 pt-2 first:border-t-0 first:pt-0">
                               <div className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/60">Signal Interception</div>

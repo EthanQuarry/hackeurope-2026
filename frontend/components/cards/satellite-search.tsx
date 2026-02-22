@@ -26,10 +26,7 @@ export function SatelliteSearch({ className }: { className?: string }) {
   const toggleLabels = useGlobeStore((s) => s.toggleLabels)
 
   const satellitesWithDerivedStatus = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
-  const satellites = useMemo(
-    () => satellitesWithDerivedStatus.filter((s) => s.status !== "allied" || s.id === "sat-6"),
-    [satellitesWithDerivedStatus]
-  )
+  const satellites = satellitesWithDerivedStatus
   const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
 
   const satScores = useMemo(() => {

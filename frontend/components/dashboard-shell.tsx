@@ -20,14 +20,11 @@ import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { usePolling } from "@/hooks/use-polling"
-import { useScenarioSocket } from "@/hooks/use-scenario-socket"
 import { api } from "@/lib/api"
 import {
   MOCK_THREATS,
   MOCK_SATELLITES,
   MOCK_PROXIMITY_THREATS,
-  MOCK_SIGNAL_THREATS,
-  MOCK_ANOMALY_THREATS,
   MOCK_ORBITAL_SIMILARITY_THREATS,
 } from "@/lib/mock-data"
 import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants"
@@ -67,19 +64,19 @@ export function DashboardShell() {
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
   const storeOrbital = useThreatStore((s) => s.orbitalSimilarityThreats)
 
-  // ── WebSocket: sole source for all threat data ──
-  // Pushes complete threat arrays (general + SJ-26) every tick.
-  // Tick rate scales with sim speed. No REST polling for threats.
-  useScenarioSocket()
-
-  // ── REST polling: satellites + debris only (large payloads, infrequent) ──
+  // ── REST polling ──
   const orbitInterval = Math.max(1000, Math.round(10_000 / speed))
   const debrisInterval = Math.max(2000, Math.round(DEBRIS_REFRESH_MS / speed))
 
   usePolling<SatelliteData[]>({
-    url: `${api.satellites}?speed=${speed}`,
+    url: api.satellites,
     intervalMs: orbitInterval,
     onData: setSatellites,
+  })
+  usePolling<ThreatData[]>({
+    url: api.threats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setThreats,
   })
   usePolling<DebrisData[]>({
     url: api.debris,
@@ -111,8 +108,8 @@ export function DashboardShell() {
 
   // Use live data when available, fall back to mocks
   const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
-  const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
-  const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+  const signalThreats = storeSignal
+  const anomalyThreats = storeAnomaly
   const orbitalThreats = storeOrbital.length > 0 ? storeOrbital : MOCK_ORBITAL_SIMILARITY_THREATS
 
   return (

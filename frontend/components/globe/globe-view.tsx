@@ -24,8 +24,6 @@ import {
   generateMockDebris,
   MOCK_THREATS,
   MOCK_PROXIMITY_THREATS,
-  MOCK_SIGNAL_THREATS,
-  MOCK_ANOMALY_THREATS,
 } from "@/lib/mock-data"
 import type { DebrisData, SatelliteData, ThreatData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
 import type { ThreatSeverity } from "@/lib/constants"
@@ -149,7 +147,7 @@ function Scene({
         const liveScore = threatScores.get(sat.id)
         const threatPercent = liveScore != null && liveScore > 0 ? liveScore : undefined
 
-        const showFull = sat.id === "sat-6" || sat.id === "sat-25" || sat.id === selectedSatelliteId
+        const showFull = sat.id === selectedSatelliteId
 
         return (
           <SatelliteMarker
@@ -239,18 +237,13 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const fallbackDebris = useMemo(() => generateMockDebris(2500), [])
 
   // Use store data (populated by polling), fall back to mocks; derived status applied in hook
-  // Filter out allied satellites except scenario-critical ones (USA-245)
-  const allSatellites = satellitesWithDerivedStatus
-  const satellites = useMemo(
-    () => allSatellites.filter((s) => s.status !== "allied" || s.id === "sat-6"),
-    [allSatellites]
-  )
+  const satellites = satellitesWithDerivedStatus
   const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris
   const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS
 
   const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
-  const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
-  const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+  const signalThreats = storeSignal
+  const anomalyThreats = storeAnomaly
 
   // Live threat scores from ops-level data — updates every poll cycle
   const threatScores = useMemo(
