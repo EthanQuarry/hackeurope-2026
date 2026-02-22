@@ -29,6 +29,7 @@ interface ResponseState {
   close: () => void
   markTriggered: (satelliteId: string) => void
   hasTriggered: (satelliteId: string) => boolean
+  resetTriggered: () => void
 }
 
 export const useResponseStore = create<ResponseState>((set, get) => ({
@@ -90,4 +91,6 @@ export const useResponseStore = create<ResponseState>((set, get) => ({
     }),
 
   hasTriggered: (satelliteId) => get().triggeredSatelliteIds.has(satelliteId),
+
+  resetTriggered: () => set({ triggeredSatelliteIds: new Set() }),
 }))
