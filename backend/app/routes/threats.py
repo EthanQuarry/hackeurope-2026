@@ -179,9 +179,14 @@ async def get_proximity_threats():
             if snap_dist > 3000:
                 continue
 
-            # Projected TCA miss distance
-            miss_km = round(snap_dist * (0.002 + random.random() * 0.08), 2)
-            miss_km = max(0.05, miss_km)
+            # For SJ-26 vs USA-245: use the real scenario miss distance
+            if foreign.get("id") == "sat-25" and target.get("id") == "sat-6":
+                from app import scenario as sc
+                miss_km = round(sc.sj26_miss_distance_km(), 2)
+            else:
+                # Projected TCA miss distance — realistic fraction of snapshot
+                miss_km = round(snap_dist * (0.1 + random.random() * 0.5), 2)
+                miss_km = max(1.0, miss_km)
 
             # Only surface operationally relevant conjunctions
             if miss_km > 500:
