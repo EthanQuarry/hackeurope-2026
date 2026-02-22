@@ -361,6 +361,9 @@ export function DashboardShell() {
           <DemoSelector />
         </div>
       </div>
+
+      {/* Threat Response Agent overlay — streams AI analysis when threat crosses threshold */}
+      <ThreatResponseOverlay />
     </main>
   );
 }

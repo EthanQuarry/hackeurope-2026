@@ -26,8 +26,8 @@ export function ThreatResponseOverlay() {
   if (!isOpen) return null
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-red-500/30 bg-black/90 shadow-[0_0_80px_rgba(255,0,0,0.15)]">
+    <div className="pointer-events-auto fixed bottom-6 right-6 z-50 w-[420px]">
+      <div className="relative overflow-hidden rounded-2xl border border-red-500/30 bg-black/90 shadow-[0_0_80px_rgba(255,0,0,0.15)] backdrop-blur-xl">
 
         {/* Scanning line animation */}
         {isStreaming && (
@@ -77,7 +77,7 @@ export function ThreatResponseOverlay() {
         </div>
 
         {/* Reasoning stream */}
-        <div ref={scrollRef} className="max-h-[300px] min-h-[200px] overflow-y-auto px-5 py-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+        <div ref={scrollRef} className="max-h-[200px] min-h-[120px] overflow-y-auto px-5 py-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
           {reasoningLog.length === 0 && isStreaming && (
             <div className="flex items-center gap-2 py-8">
               <Cpu className="h-4 w-4 animate-spin text-cyan-400" />
@@ -176,15 +176,15 @@ export function ThreatResponseOverlay() {
             </div>
           )}
         </div>
-      </div>
 
-      {/* CSS for scanning line */}
-      <style jsx>{`
-        @keyframes scan {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(400%); }
-        }
-      `}</style>
+        {/* CSS for scanning line */}
+        <style jsx>{`
+          @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+          }
+        `}</style>
+      </div>
     </div>
   )
 }
