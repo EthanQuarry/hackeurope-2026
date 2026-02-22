@@ -17,7 +17,7 @@ interface GlobeState {
 }
 
 export const useGlobeStore = create<GlobeState>((set) => ({
-  simTime: 0,
+  simTime: typeof window !== "undefined" ? Date.now() : 0,
   speed: 1,
   playing: true,
   showLabels: true,
