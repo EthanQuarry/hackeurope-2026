@@ -18,6 +18,8 @@ import { CameraFocus } from "@/components/globe/camera-focus"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { useUIStore } from "@/stores/ui-store"
+import { useGlobeStore } from "@/stores/globe-store"
+import { generateInterceptTrajectory, DEMO_SJ26_ID, DEMO_USA245_ID } from "@/lib/demo-trajectories"
 import {
   MOCK_SATELLITES,
   generateMockDebris,
@@ -268,8 +270,24 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
     () => allSatellites.filter((s) => s.status !== "allied" || s.id === "sat-6"),
     [allSatellites]
   )
+  const activeDemo = useGlobeStore((s) => s.activeDemo)
+  const demoSatellites = useMemo(() => {
+    if (activeDemo !== "malicious-manoeuvre") return satellites
 
-  // Select satellite immediately, defer the heavier view transition to next frame
+    const sj26 = satellites.find((s) => s.id === DEMO_SJ26_ID)
+    const usa245 = satellites.find((s) => s.id === DEMO_USA245_ID)
+    if (!sj26 || !usa245) return satellites
+
+    const interceptTrajectory = generateInterceptTrajectory(sj26.trajectory, usa245.trajectory)
+
+    return satellites.map((s) => {
+      if (s.id === DEMO_SJ26_ID) {
+        return { ...s, trajectory: interceptTrajectory, status: "threatened" as const }
+      }
+      return s
+    })
+  }, [activeDemo, satellites])
+
   const handleSelectSatellite = useCallback((id: string) => {
     selectSatellite(id)
     requestAnimationFrame(() => {
@@ -291,7 +309,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         dpr={[1, 2]}
       >
         <MemoScene
-          satellites={satellites}
+          satellites={demoSatellites}
           selectedSatelliteId={selectedSatelliteId}
           onSelectSatellite={handleSelectSatellite}
           simTimeRef={simTimeRef}

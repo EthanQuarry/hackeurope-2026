@@ -9,6 +9,7 @@ import { SatelliteCard } from "@/components/cards/satellite-card"
 import { AiChatBar } from "@/components/cards/ai-chat-bar"
 import { StatsCards } from "@/components/cards/stats-cards"
 import { SatelliteSearch } from "@/components/cards/satellite-search"
+import { DemoSelector } from "@/components/cards/demo-selector"
 import { ProximityOps } from "@/components/ops/proximity-ops"
 import { SignalOps } from "@/components/ops/signal-ops"
 import { AnomalyOps } from "@/components/ops/anomaly-ops"
@@ -152,9 +153,12 @@ export function DashboardShell() {
         {activeView === "overview" ? (
           /* Overview: Floating glass cards over the globe */
           <div className="relative mx-auto h-full w-full max-w-[1600px]">
-            {/* Left: Search + AI Insights */}
+            {/* Left: Demos + Search + AI Insights */}
             <div className="absolute left-0 top-0 bottom-20 flex flex-col gap-3">
-              <SatelliteSearch />
+              <div className="flex items-center gap-2">
+                <SatelliteSearch className="flex-1" />
+                <DemoSelector />
+              </div>
               <InsightsCard className="min-h-0 flex-1" />
             </div>
 
