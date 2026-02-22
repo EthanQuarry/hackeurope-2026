@@ -8,6 +8,7 @@ import { THREAT_COLORS } from "@/lib/constants"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { useUIStore } from "@/stores/ui-store"
+import { useGlobeStore } from "@/stores/globe-store"
 import { MOCK_SATELLITES, MOCK_PROXIMITY_THREATS } from "@/lib/mock-data"
 
 export function SatelliteSearch({ className }: { className?: string }) {
@@ -21,6 +22,8 @@ export function SatelliteSearch({ className }: { className?: string }) {
   const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
   const storeProximity = useThreatStore((s) => s.proximityThreats)
   const setActiveView = useUIStore((s) => s.setActiveView)
+  const showLabels = useGlobeStore((s) => s.showLabels)
+  const toggleLabels = useGlobeStore((s) => s.toggleLabels)
 
   const allSatellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
   const satellites = useMemo(

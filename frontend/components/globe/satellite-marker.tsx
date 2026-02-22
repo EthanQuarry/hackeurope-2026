@@ -219,7 +219,8 @@ export function SatelliteMarker({
     }
   })
 
-  const showLabel = selected || status === "threatened"
+  const labelsEnabled = useGlobeStore((s) => s.showLabels)
+  const showLabel = selected || (labelsEnabled && (status === "threatened" || status === "watched"))
   const markerSize = status === "threatened" ? size * 1.3 : size
 
   // Full orbit ring — clean closed loop (no maneuver splice)
@@ -275,6 +276,48 @@ export function SatelliteMarker({
       >
         <sphereGeometry args={[markerSize, 12, 12]} />
         <meshBasicMaterial color={threeColor} />
+
+        {/* Floating label with threat % and name */}
+        {showLabel && name && (
+          <Html
+            center
+            distanceFactor={6}
+            style={{ pointerEvents: "none", userSelect: "none" }}
+          >
+            <div
+              style={{
+                transform: "translateY(-14px)",
+                whiteSpace: "nowrap",
+                textAlign: "center",
+              }}
+            >
+              {threatPercent != null && (
+                <div
+                  style={{
+                    fontSize: "8px",
+                    fontWeight: 600,
+                    fontFamily: "monospace",
+                    color:
+                      status === "threatened"
+                        ? "rgba(255,68,102,0.7)"
+                        : "rgba(255,145,0,0.6)",
+                  }}
+                >
+                  {threatPercent}%
+                </div>
+              )}
+              <div
+                style={{
+                  fontSize: "6px",
+                  fontFamily: "monospace",
+                  color: "rgba(200,220,255,0.45)",
+                }}
+              >
+                {name}
+              </div>
+            </div>
+          </Html>
+        )}
       </mesh>
 
       {/* Glow */}
