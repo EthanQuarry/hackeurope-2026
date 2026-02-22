@@ -252,83 +252,15 @@ def _build_sj26_satellite(idx: int) -> dict:
 
 
 def _generate_fallback_satellites() -> list[dict]:
-    """Fallback mock data if Space-Track is unavailable.
+    """Fallback when Space-Track is unavailable.
 
-    Uses seeded RNG for deterministic orbits across cache rebuilds.
-    USA-245 (sat-6) has a fixed orbit.  SJ-26 (sat-25) is generated
-    dynamically from the scenario engine.
+    Only generates scenario-critical satellites (USA-245 + SJ-26).
+    Real satellite data should come from Space-Track.
     """
-    from app.mock_data import SATELLITE_CATALOG
-    rng = random.Random(42)
-    base_t = time.time()
-    sats = []
-    for idx, (sat_id, entry) in enumerate(SATELLITE_CATALOG.items()):
-        # --- SJ-26: skip here, appended via _build_sj26_satellite after the loop ---
-        if sat_id == scenario.SJ26_CATALOG_ID:
-            continue
-        # --- USA-245: fixed deterministic orbit ---
-        elif sat_id == scenario.TARGET_CATALOG_ID:
-            alt_km = scenario.TARGET_ALT_KM
-            inc_deg = scenario.TARGET_INC_DEG
-            raan_deg = scenario.TARGET_RAAN_DEG
-            nation = entry.get("nation", "Unknown")
-            status = "friendly"
-            if "Russia" in nation or "China" in nation:
-                status = "watched"
-            if entry.get("suspicious"):
-                status = "threatened"
-        else:
-            alt_km = {
-                "LEO": 400 + rng.random() * 400,
-                "MEO": 2000 + rng.random() * 18000,
-                "GEO": 35786,
-            }.get(entry.get("orbit_type", "LEO"), 500)
-            inc_deg = 51.6 + rng.random() * 40
-            raan_deg = rng.random() * 360
-            nation = entry.get("nation", "Unknown")
-            status = "friendly"
-            if "Russia" in nation or "China" in nation:
-                status = "watched"
-            if entry.get("suspicious"):
-                status = "threatened"
-
-        period_min = 2 * math.pi * math.sqrt((6378.137 + alt_km) ** 3 / 398600.4418) / 60
-        v_kms = math.sqrt(398600.4418 / (6378.137 + alt_km))
-
-        trajectory = []
-        period_sec = period_min * 60
-        inc_rad = math.radians(inc_deg)
-        raan_rad = math.radians(raan_deg)
-        for i in range(180):
-            step = period_sec / 180
-            t = base_t + i * step
-            ta = (2 * math.pi / period_sec) * (i * step)
-            x, y = math.cos(ta), math.sin(ta)
-            xe = x * math.cos(raan_rad) - y * math.cos(inc_rad) * math.sin(raan_rad)
-            ye = x * math.sin(raan_rad) + y * math.cos(inc_rad) * math.cos(raan_rad)
-            ze = y * math.sin(inc_rad)
-            lat = math.degrees(math.asin(max(-1, min(1, ze))))
-            lon = math.degrees(math.atan2(ye, xe))
-            trajectory.append({"t": t, "lat": round(lat, 2), "lon": round(lon, 2), "alt_km": round(alt_km, 1)})
-
-        sats.append({
-            "id": f"sat-{sat_id}",
-            "name": entry.get("name", f"SAT-{sat_id}"),
-            "noradId": entry.get("norad_id", 99000 + idx),
-            "status": status,
-            "altitude_km": round(alt_km, 1),
-            "velocity_kms": round(v_kms, 2),
-            "inclination_deg": round(inc_deg, 1),
-            "period_min": round(period_min, 1),
-            "trajectory": trajectory,
-            "health": {
-                "power": 60 + (sat_id * 7) % 35,
-                "comms": 70 + (sat_id * 11) % 30,
-                "propellant": 20 + (sat_id * 13) % 70,
-            },
-        })
-    # Append SJ-26 via the shared builder (same as Space-Track path)
-    sats.append(_build_sj26_satellite(len(sats)))
+    sats = [
+        _build_usa245_satellite(0),
+        _build_sj26_satellite(1),
+    ]
     return sats
 
 

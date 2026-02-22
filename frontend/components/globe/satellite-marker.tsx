@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react"
 import { useFrame } from "@react-three/fiber"
-import { Line, Html } from "@react-three/drei"
+import { Line } from "@react-three/drei"
 import * as THREE from "three"
 
 import { geodeticToSceneVec3 } from "@/lib/geo"
@@ -34,10 +34,125 @@ function catmull(points: THREE.Vector3[], closed = false, samples = 600): THREE.
   return curve.getPoints(samples)
 }
 
+/** Render text to a canvas texture for use as a billboard sprite.
+ *  Returns { texture, width, height } — dispose texture when done. */
+function makeTextSprite(
+  lines: { text: string; color: string; fontSize: number }[],
+): { texture: THREE.CanvasTexture; width: number; height: number } {
+  const canvas = document.createElement("canvas")
+  const ctx = canvas.getContext("2d")!
+  const dpr = 2 // crisp on retina
+  const padding = 4
+
+  // Measure
+  let maxW = 0
+  let totalH = padding
+  const measured: { text: string; color: string; fontSize: number; w: number }[] = []
+  for (const line of lines) {
+    ctx.font = `${line.fontSize * dpr}px monospace`
+    const m = ctx.measureText(line.text)
+    const w = m.width
+    maxW = Math.max(maxW, w)
+    measured.push({ ...line, w })
+    totalH += line.fontSize * dpr + 2
+  }
+  totalH += padding
+
+  canvas.width = Math.ceil(maxW + padding * 2)
+  canvas.height = Math.ceil(totalH)
+
+  // Draw
+  let y = padding
+  for (const line of measured) {
+    ctx.font = `${line.fontSize * dpr}px monospace`
+    ctx.fillStyle = line.color
+    ctx.textAlign = "center"
+    ctx.textBaseline = "top"
+    ctx.fillText(line.text, canvas.width / 2, y)
+    y += line.fontSize * dpr + 2
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.minFilter = THREE.LinearFilter
+  texture.magFilter = THREE.LinearFilter
+  texture.needsUpdate = true
+
+  return { texture, width: canvas.width / dpr, height: canvas.height / dpr }
+}
+
 const TRAIL_FRACTION = 0.20
 const MIN_TRAIL_POINTS = 10
 const MAX_TRAIL_POINTS = 800
 const MARKER_DAMPING = 0.08
+
+/** Billboard sprite label that follows a mesh — zero DOM, pure GPU */
+function SpriteLabel({
+  meshRef,
+  name,
+  threatPercent,
+  status,
+  size,
+}: {
+  meshRef: React.RefObject<THREE.Mesh | null>
+  name: string
+  threatPercent?: number
+  status: ThreatSeverity
+  size: number
+}) {
+  const spriteRef = useRef<THREE.Sprite>(null)
+
+  const { spriteMat, spriteScale } = useMemo(() => {
+    const lines: { text: string; color: string; fontSize: number }[] = []
+
+    if (threatPercent != null) {
+      lines.push({
+        text: `${threatPercent}%`,
+        fontSize: 10,
+        color: status === "threatened" ? "rgba(255,68,102,0.85)" : "rgba(255,145,0,0.75)",
+      })
+    }
+
+    lines.push({
+      text: name.length > 16 ? name.slice(0, 15) + "…" : name,
+      fontSize: 8,
+      color: "rgba(200,220,255,0.55)",
+    })
+
+    const { texture, width, height } = makeTextSprite(lines)
+
+    const mat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      sizeAttenuation: true,
+    })
+
+    // Scale sprite to reasonable world-space size
+    const aspect = width / Math.max(height, 1)
+    const h = size * 6
+    const w = h * aspect
+
+    return { spriteMat: mat, spriteScale: new THREE.Vector3(w, h, 1) }
+  }, [name, threatPercent, status, size])
+
+  // Dispose texture on unmount
+  useEffect(() => {
+    return () => {
+      spriteMat.map?.dispose()
+      spriteMat.dispose()
+    }
+  }, [spriteMat])
+
+  // Follow the satellite mesh position
+  useFrame(() => {
+    if (spriteRef.current && meshRef.current) {
+      spriteRef.current.position.copy(meshRef.current.position)
+      spriteRef.current.position.y += size * 4 // offset above
+    }
+  })
+
+  return <sprite ref={spriteRef} material={spriteMat} scale={spriteScale} />
+}
 
 function findTimeIndex(trajectory: TrajectoryPoint[], targetTime: number): number {
   let lo = 0
@@ -300,49 +415,16 @@ export function SatelliteMarker({
           e.stopPropagation()
           onSelect?.(id)
         }}
-      >
-        {/* Floating label with threat % and name */}
-        {showLabel && name && (
-          <Html
-            center
-            distanceFactor={6}
-            style={{ pointerEvents: "none", userSelect: "none" }}
-          >
-            <div
-              style={{
-                transform: "translateY(-14px)",
-                whiteSpace: "nowrap",
-                textAlign: "center",
-              }}
-            >
-              {threatPercent != null && (
-                <div
-                  style={{
-                    fontSize: "8px",
-                    fontWeight: 600,
-                    fontFamily: "monospace",
-                    color:
-                      status === "threatened"
-                        ? "rgba(255,68,102,0.7)"
-                        : "rgba(255,145,0,0.6)",
-                  }}
-                >
-                  {threatPercent}%
-                </div>
-              )}
-              <div
-                style={{
-                  fontSize: "6px",
-                  fontFamily: "monospace",
-                  color: "rgba(200,220,255,0.45)",
-                }}
-              >
-                {name}
-              </div>
-            </div>
-          </Html>
-        )}
-      </mesh>
+      />
+
+      {/* Sprite label — pure GPU, no DOM overhead */}
+      {showLabel && name && <SpriteLabel
+        meshRef={meshRef}
+        name={name}
+        threatPercent={threatPercent}
+        status={status}
+        size={markerSize}
+      />}
 
       {/* Glow */}
       <mesh ref={glowRef} geometry={glowGeo} material={glowMat} />
