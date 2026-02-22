@@ -16,16 +16,16 @@ interface ThreatIndicatorProps {
 
 /* ── Smooth color interpolation based on distance ────────────────────── */
 
-const _blue = new THREE.Color("#44aaff")
-const _orange = new THREE.Color("#ff9100")
+const _yellow = new THREE.Color("#ffc800")
+const _orange = new THREE.Color("#ff6600")
 const _red = new THREE.Color("#ff2244")
 const _tmp = new THREE.Color()
 
 function getThreatColorHex(distanceKm: number): string {
-  // Smooth: blue (>100km) → orange (~25km) → red (<5km)
+  // Smooth: yellow (>100km) → orange (~25km) → red (<5km)
   const t = Math.max(0, Math.min(1, 1 - distanceKm / 100))
   if (t < 0.5) {
-    _tmp.copy(_blue).lerp(_orange, t * 2)
+    _tmp.copy(_yellow).lerp(_orange, t * 2)
   } else {
     _tmp.copy(_orange).lerp(_red, (t - 0.5) * 2)
   }

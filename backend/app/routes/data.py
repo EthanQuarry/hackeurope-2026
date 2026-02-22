@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.spacetrack import get_client, gp_to_satellite, gp_to_debris
+from app import scenario
 
 logger = logging.getLogger(__name__)
 
@@ -297,6 +298,11 @@ async def get_satellites():
     except Exception as exc:
         logger.warning("Space-Track fetch failed, using fallback: %s", exc)
         sats = _generate_fallback_satellites()
+
+    # Inject classified/scenario satellites not in public Space-Track data
+    sats = [s for s in sats if s["id"] not in (scenario.SJ26_SAT_ID, scenario.TARGET_SAT_ID)]
+    sats.append(_build_usa245_satellite(len(sats)))
+    sats.append(_build_sj26_satellite(len(sats)))
 
     _satellites_cache = sats
     _satellites_cache_time = now

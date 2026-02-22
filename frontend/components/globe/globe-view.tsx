@@ -1,33 +1,45 @@
-"use client"
+"use client";
 
-import { useCallback, useMemo, useRef } from "react"
-import { Canvas } from "@react-three/fiber"
-import { OrbitControls } from "@react-three/drei"
-import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
+import { useCallback, useMemo, useRef } from "react";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
-import { cn } from "@/lib/utils"
-import { Earth } from "@/components/globe/earth"
-import { DebrisCloud } from "@/components/globe/debris-cloud"
-import { SatelliteMarker } from "@/components/globe/satellite-marker"
-import { HostileMarker } from "@/components/globe/hostile-marker"
-import { AnimationDriver } from "@/components/globe/animation-driver"
-import { ThreatIndicator } from "@/components/globe/threat-indicator"
-import { CollisionEffect } from "@/components/globe/collision-effect"
-import { Starfield } from "@/components/globe/starfield"
-import { CameraFocus } from "@/components/globe/camera-focus"
-import { useFleetStore } from "@/stores/fleet-store"
-import { useThreatStore } from "@/stores/threat-store"
-import { useSatellitesWithDerivedStatus } from "@/hooks/use-derived-status"
-import { useUIStore } from "@/stores/ui-store"
+import { cn } from "@/lib/utils";
+import { Earth } from "@/components/globe/earth";
+import { DebrisCloud } from "@/components/globe/debris-cloud";
+import { SatelliteMarker } from "@/components/globe/satellite-marker";
+import { HostileMarker } from "@/components/globe/hostile-marker";
+import { AnimationDriver } from "@/components/globe/animation-driver";
+import { ThreatIndicator } from "@/components/globe/threat-indicator";
+import { CollisionEffect } from "@/components/globe/collision-effect";
+import { Starfield } from "@/components/globe/starfield";
+import { CameraFocus } from "@/components/globe/camera-focus";
+import { useFleetStore } from "@/stores/fleet-store";
+import { useThreatStore } from "@/stores/threat-store";
+import { useSatellitesWithDerivedStatus } from "@/hooks/use-derived-status";
+import { useUIStore } from "@/stores/ui-store";
+import { useGlobeStore } from "@/stores/globe-store";
+import { generateInterceptTrajectory, DEMO_SJ26_ID, DEMO_USA245_ID } from "@/lib/demo-trajectories";
 import {
   MOCK_SATELLITES,
   generateMockDebris,
   MOCK_THREATS,
   MOCK_PROXIMITY_THREATS,
-} from "@/lib/mock-data"
-import type { DebrisData, SatelliteData, ThreatData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
-import type { ThreatSeverity } from "@/lib/constants"
-import { PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants"
+} from "@/lib/mock-data";
+import type {
+  DebrisData,
+  SatelliteData,
+  ThreatData,
+  ProximityThreat,
+  SignalThreat,
+  AnomalyThreat,
+} from "@/types";
+import type { ThreatSeverity } from "@/lib/constants";
+import { PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants";
+import React from "react";
+
+const THREAT_ALERT_THRESHOLD = 70
 
 /** Compute live threat score (0-100) per satellite from ops-level threat data.
  *  Aggregates the highest signal across proximity, signal, and anomaly threats. */
@@ -71,14 +83,14 @@ function checkThresholdTriggers(
   current: Map<string, number>,
   previous: Map<string, number>,
 ): string[] {
-  const triggered: string[] = []
+  const triggered: string[] = [];
   for (const [id, score] of current) {
-    const prev = previous.get(id) ?? 0
-    if (score >= THREAT_ALERT_THRESHOLD && prev < THREAT_ALERT_THRESHOLD) {
-      triggered.push(id)
+    const prev = previous.get(id) ?? 0;
+    if (score >= PROXIMITY_FLAG_THRESHOLD && prev < PROXIMITY_FLAG_THRESHOLD) {
+      triggered.push(id);
     }
   }
-  return triggered
+  return triggered;
 }
 
 // TODO: Replace with actual agent call when ready
@@ -174,24 +186,26 @@ const MemoScene = React.memo(function Scene({
   const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS;
   const proximityThreats =
     storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS;
-  const signalThreats =
-    storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS;
-  const anomalyThreats =
-    storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS;
+  const signalThreats = storeSignal;
+  const anomalyThreats = storeAnomaly;
 
   // Live risk scores on OUR satellites — updates every poll cycle
-  const prevScoresRef = useRef(new Map<string, number>())
+  const prevScoresRef = useRef(new Map<string, number>());
   const threatScores = useMemo(() => {
-    const scores = buildThreatScores(proximityThreats, signalThreats, anomalyThreats)
+    const scores = buildThreatScores(
+      proximityThreats,
+      signalThreats,
+      anomalyThreats,
+    );
 
     // Check for threshold crossings
-    const triggered = checkThresholdTriggers(scores, prevScoresRef.current)
+    const triggered = checkThresholdTriggers(scores, prevScoresRef.current);
     if (triggered.length > 0) {
-      onThreatAlertTriggered(triggered)
+      onThreatAlertTriggered(triggered);
     }
-    prevScoresRef.current = scores
+    prevScoresRef.current = scores;
 
-    return scores
+    return scores;
   }, [proximityThreats, signalThreats, anomalyThreats]);
 
   // Derive hostile markers, excluding IDs that already exist as fleet satellites
@@ -237,7 +251,7 @@ const MemoScene = React.memo(function Scene({
         const threatPercent =
           liveScore != null && liveScore > 0 ? liveScore : undefined;
 
-        const showFull = sat.id === selectedSatelliteId
+        const showFull = sat.id === selectedSatelliteId;
 
         return (
           <SatelliteMarker
@@ -309,59 +323,92 @@ const MemoScene = React.memo(function Scene({
 });
 
 export function GlobeView({ compacted = false }: GlobeViewProps) {
-  const simTimeRef = useRef(Date.now())
-  const speedRef = useRef(1)
-  const controlsRef = useRef<OrbitControlsImpl | null>(null)
+  const simTimeRef = useRef(Date.now());
+  const speedRef = useRef(1);
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
 
-  const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId)
-  const selectSatellite = useFleetStore((s) => s.selectSatellite)
-  const setActiveView = useUIStore((s) => s.setActiveView)
-  const storeThreats = useThreatStore((s) => s.threats)
-  const storeDebris = useThreatStore((s) => s.debris)
-  const storeProximity = useThreatStore((s) => s.proximityThreats)
-  const storeSignal = useThreatStore((s) => s.signalThreats)
-  const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
+  const selectedSatelliteId = useFleetStore((s) => s.selectedSatelliteId);
+  const selectSatellite = useFleetStore((s) => s.selectSatellite);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const storeThreats = useThreatStore((s) => s.threats);
+  const storeDebris = useThreatStore((s) => s.debris);
+  const storeProximity = useThreatStore((s) => s.proximityThreats);
+  const storeSignal = useThreatStore((s) => s.signalThreats);
+  const storeAnomaly = useThreatStore((s) => s.anomalyThreats);
 
-  const satellitesWithDerivedStatus = useSatellitesWithDerivedStatus(MOCK_SATELLITES)
-  const fallbackDebris = useMemo(() => generateMockDebris(2500), [])
+  const satellitesWithDerivedStatus =
+    useSatellitesWithDerivedStatus(MOCK_SATELLITES);
+  const fallbackDebris = useMemo(() => generateMockDebris(2500), []);
 
   // Use store data (populated by polling), fall back to mocks; derived status applied in hook
-  const satellites = satellitesWithDerivedStatus
-  const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris
-  const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS
+  const activeDemo = useGlobeStore((s) => s.activeDemo)
+  const baseSatellites = satellitesWithDerivedStatus
 
-  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
-  const signalThreats = storeSignal
-  const anomalyThreats = storeAnomaly
+  // When malicious manoeuvre demo is active, replace SJ-26's trajectory with intercept path
+  const satellites = useMemo(() => {
+    if (activeDemo !== "malicious-manoeuvre") return baseSatellites
+
+    const sj26 = baseSatellites.find((s) => s.id === DEMO_SJ26_ID)
+    const usa245 = baseSatellites.find((s) => s.id === DEMO_USA245_ID)
+    if (!sj26 || !usa245) return baseSatellites
+
+    const interceptTrajectory = generateInterceptTrajectory(sj26.trajectory, usa245.trajectory)
+
+    return baseSatellites.map((s) => {
+      if (s.id === DEMO_SJ26_ID) {
+        return { ...s, trajectory: interceptTrajectory }
+      }
+      return s
+    })
+  }, [activeDemo, baseSatellites]);
+  const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris;
+  const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS;
+
+  const proximityThreats =
+    storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS;
+  const signalThreats = storeSignal;
+  const anomalyThreats = storeAnomaly;
 
   // Live threat scores from ops-level data — updates every poll cycle
   const threatScores = useMemo(
     () => buildThreatScores(proximityThreats, signalThreats, anomalyThreats),
     [proximityThreats, signalThreats, anomalyThreats],
-  )
+  );
 
   // Select satellite AND open detail page on globe click
-  const handleSelectSatellite = useCallback((id: string) => {
-    selectSatellite(id)
-    setActiveView("satellite-detail")
-  }, [selectSatellite, setActiveView])
+  const handleSelectSatellite = useCallback(
+    (id: string) => {
+      selectSatellite(id);
+      setActiveView("satellite-detail");
+    },
+    [selectSatellite, setActiveView],
+  );
 
   // Derive hostile markers, excluding IDs that already exist as fleet satellites
   const hostileMarkers = useMemo(() => {
-    const fleetIds = new Set(satellites.map((s) => s.id))
-    return deriveHostileMarkers(proximityThreats, signalThreats, anomalyThreats)
-      .filter((h) => !fleetIds.has(h.id))
-  }, [satellites, proximityThreats, signalThreats, anomalyThreats])
+    const fleetIds = new Set(satellites.map((s) => s.id));
+    return deriveHostileMarkers(
+      proximityThreats,
+      signalThreats,
+      anomalyThreats,
+    ).filter((h) => !fleetIds.has(h.id));
+  }, [satellites, proximityThreats, signalThreats, anomalyThreats]);
 
   // Derive per-satellite max Bayesian posterior from proximity threats
   const satScores = useMemo(() => {
-    const scores: Record<string, number> = {}
+    const scores: Record<string, number> = {};
     for (const threat of proximityThreats) {
-      scores[threat.foreignSatId] = Math.max(scores[threat.foreignSatId] ?? 0, threat.confidence)
-      scores[threat.targetAssetId] = Math.max(scores[threat.targetAssetId] ?? 0, threat.confidence)
+      scores[threat.foreignSatId] = Math.max(
+        scores[threat.foreignSatId] ?? 0,
+        threat.confidence,
+      );
+      scores[threat.targetAssetId] = Math.max(
+        scores[threat.targetAssetId] ?? 0,
+        threat.confidence,
+      );
     }
-    return scores
-  }, [proximityThreats])
+    return scores;
+  }, [proximityThreats]);
 
   return (
     <div
@@ -377,7 +424,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         dpr={[1, 2]}
       >
         <MemoScene
-          satellites={demoSatellites}
+          satellites={satellites}
           selectedSatelliteId={selectedSatelliteId}
           onSelectSatellite={handleSelectSatellite}
           simTimeRef={simTimeRef}

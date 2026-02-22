@@ -180,7 +180,7 @@ async def get_proximity_threats():
                 continue
 
             # Projected TCA miss distance
-            miss_km = round(dist * (0.002 + random.random() * 0.08), 2)
+            miss_km = round(snap_dist * (0.002 + random.random() * 0.08), 2)
             miss_km = max(0.05, miss_km)
 
             # Only surface operationally relevant conjunctions
@@ -206,6 +206,10 @@ async def get_proximity_threats():
                 pattern = "drift"
             else:
                 pattern = "co-orbital"
+
+            # TCA estimate and approach velocity
+            tca_min = int(5 + random.random() * 175)
+            approach_vel = round(0.1 + random.random() * 2.5, 2)
 
             # Bayesian posterior using the real TCA miss distance for confidence
             posterior = score_satellite(miss_km, foreign.get("country_code", "UNK"))

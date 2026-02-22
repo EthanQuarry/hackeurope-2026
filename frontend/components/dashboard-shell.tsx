@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useCallback } from "react"
+import { useEffect, useMemo, useCallback, lazy, Suspense } from "react"
 
 import { GlobeView } from "@/components/globe/globe-view"
 import { DashboardHeader } from "@/components/dashboard-header"
@@ -67,6 +67,7 @@ export function DashboardShell() {
   const storeProximity = useThreatStore((s) => s.proximityThreats);
   const storeSignal = useThreatStore((s) => s.signalThreats);
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats);
+  const storeOrbital = useThreatStore((s) => s.orbitalSimilarityThreats);
 
   // ── REST polling ──
   const orbitInterval = Math.max(1000, Math.round(10_000 / speed))
@@ -146,7 +147,6 @@ export function DashboardShell() {
             <div className="absolute left-0 top-0 bottom-20 flex flex-col gap-3">
               <div className="flex items-center gap-2">
                 <SatelliteSearch className="flex-1" />
-                <DemoSelector />
               </div>
               <InsightsCard className="min-h-0 flex-1" />
             </div>

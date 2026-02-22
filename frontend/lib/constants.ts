@@ -31,7 +31,7 @@ export const THREAT_COLORS = {
   allied: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
   nominal: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
   friendly: { text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/40", hex: "#00e676" },
-  watched: { text: "text-blue-400", bg: "bg-blue-500/15", border: "border-blue-500/40", hex: "#4488ff" },
+  watched: { text: "text-yellow-400", bg: "bg-yellow-500/15", border: "border-yellow-500/40", hex: "#ffc800" },
   threatened: { text: "text-amber-400", bg: "bg-amber-500/15", border: "border-amber-500/40", hex: "#ff9100" },
   threat: { text: "text-red-400", bg: "bg-red-500/15", border: "border-red-500/40", hex: "#ff1744" },
 } as const
