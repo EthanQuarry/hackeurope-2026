@@ -23,6 +23,7 @@ const NAV_TABS: { id: ActiveView; label: string; icon: typeof LayoutGrid }[] = [
   { id: "proximity", label: "PROXIMITY", icon: Crosshair },
   { id: "signal", label: "SIGNAL", icon: Radio },
   { id: "anomaly", label: "ANOMALY", icon: AlertTriangle },
+  { id: "comms", label: "COMMS", icon: Satellite },
 ]
 
 function formatSimTime(ms: number): string {

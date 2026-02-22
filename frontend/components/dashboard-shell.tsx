@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useCallback, useState, lazy, Suspense } from "react"
-import { Brain, ChevronLeft, ChevronRight, GitBranch, Lightbulb, Satellite, Target, Video } from "lucide-react"
+import { Activity, Brain, ChevronLeft, ChevronRight, GitBranch, Lightbulb, Satellite, Target, Video } from "lucide-react"
 import { api } from "@/lib/api"
 
 import { GlobeView } from "@/components/globe/globe-view"
@@ -12,13 +12,14 @@ import { AiChatBar } from "@/components/cards/ai-chat-bar"
 import { StatsCards } from "@/components/cards/stats-cards"
 import { SatelliteSearch } from "@/components/cards/satellite-search"
 import { DemoSelector } from "@/components/cards/demo-selector"
-import { ThreatResponseOverlay } from "@/components/threat-response-overlay"
 import { ProximityOps } from "@/components/ops/proximity-ops"
 import { SignalOps } from "@/components/ops/signal-ops"
 import { AnomalyOps } from "@/components/ops/anomaly-ops"
 import { CommsOps } from "@/components/ops/comms-ops"
 import { OrbitalOps } from "@/components/ops/orbital-ops"
 import { AdversaryOps } from "@/components/ops/adversary-ops"
+import { FleetRiskOps } from "@/components/ops/fleet-risk-ops"
+import { useFleetRiskAccumulator } from "@/hooks/use-fleet-risk-accumulator"
 const SatelliteDetailPage = lazy(() =>
   import("@/components/satellite-detail-page").then((m) => ({
     default: m.SatelliteDetailPage,
@@ -47,12 +48,14 @@ import type {
   SignalThreat,
   AnomalyThreat,
   GeoLoiterThreat,
+  OrbitalSimilarityThreat,
 } from "@/types";
 
 const SIDEBAR_TABS: { id: ActiveView; icon: typeof Lightbulb; label: string; color: string }[] = [
   { id: "overview", icon: Lightbulb, label: "Insights", color: "text-muted-foreground" },
   { id: "orbital", icon: GitBranch, label: "Orbital", color: "text-muted-foreground" },
   { id: "comms", icon: Satellite, label: "Comms", color: "text-muted-foreground" },
+  { id: "fleet-risk", icon: Activity, label: "Fleet Risk", color: "text-cyan-400/70" },
   { id: "adversary-detail", icon: Target, label: "Adversary", color: "text-red-400/70" },
 ]
 
@@ -64,19 +67,24 @@ export function DashboardShell() {
     }).catch(() => {})
   }, [])
 
+  useFleetRiskAccumulator()
+
   const activeView = useUIStore((s) => s.activeView)
   const setActiveView = useUIStore((s) => s.setActiveView)
   const terminalOpen = useUIStore((s) => s.terminalOpen)
   const leftPanelCollapsed = useUIStore((s) => s.leftPanelCollapsed)
   const toggleLeftPanel = useUIStore((s) => s.toggleLeftPanel)
 
+  const setFocusTarget = useThreatStore((s) => s.setFocusTarget)
+
   const handleOpsBackdropClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest("[data-ops-panel]")) return;
+      setFocusTarget(null);
       setActiveView("overview");
     },
-    [setActiveView],
+    [setActiveView, setFocusTarget],
   );
 
   const speed = useGlobeStore((s) => s.speed);
@@ -93,10 +101,12 @@ export function DashboardShell() {
   const setSignalThreats = useThreatStore((s) => s.setSignalThreats);
   const setAnomalyThreats = useThreatStore((s) => s.setAnomalyThreats);
   const setGeoUsLoiterThreats = useThreatStore((s) => s.setGeoUsLoiterThreats);
+  const setOrbitalSimilarityThreats = useThreatStore((s) => s.setOrbitalSimilarityThreats);
   const storeProximity = useThreatStore((s) => s.proximityThreats);
   const storeSignal = useThreatStore((s) => s.signalThreats);
   const storeAnomaly = useThreatStore((s) => s.anomalyThreats);
   const storeGeoLoiter = useThreatStore((s) => s.geoUsLoiterThreats);
+  const storeOrbital = useThreatStore((s) => s.orbitalSimilarityThreats);
 
   // ── WebSocket: sole source for all threat data ──
   // Pushes complete threat arrays (general + SJ-26) every tick.
@@ -139,11 +149,17 @@ export function DashboardShell() {
     intervalMs: THREAT_REFRESH_MS,
     onData: setGeoUsLoiterThreats,
   });
+  usePolling<OrbitalSimilarityThreat[]>({
+    url: api.orbitalSimilarityThreats,
+    intervalMs: THREAT_REFRESH_MS,
+    onData: setOrbitalSimilarityThreats,
+  });
   // Live data only — no mock fallbacks
   const proximityThreats = storeProximity;
   const signalThreats = storeSignal;
   const anomalyThreats = storeAnomaly;
   const geoLoiterThreats = storeGeoLoiter;
+  const orbitalThreats = storeOrbital;
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -172,92 +188,22 @@ export function DashboardShell() {
 
       {/* Content area — switches based on activeView */}
       <div
-        className={`absolute inset-0 z-10 px-6 pt-24 pb-6 pointer-events-none`}
+        className={`absolute inset-0 z-10 px-6 pt-24 pb-6 ${activeView !== "overview" ? "pointer-events-auto" : "pointer-events-none"}`}
         onClick={activeView !== "overview" ? handleOpsBackdropClick : undefined}
       >
-        {/* Persistent sidebar — single container, always visible */}
+        {/* Persistent sidebar — invisible positioning wrapper, always full height */}
         <div
           data-ops-panel
           className={cn(
-            "pointer-events-auto absolute left-6 top-24 bottom-24 z-30 flex flex-col rounded-2xl border border-white/10 bg-card/60 backdrop-blur-xl overflow-hidden transition-all duration-300 ease-in-out",
-            activeView === "overview" && !leftPanelCollapsed ? "w-[280px]" : "w-[48px]"
+            "pointer-events-auto absolute left-6 top-24 bottom-24 z-30",
+            activeView === "overview" && !leftPanelCollapsed ? "w-[280px]" : "w-[48px] flex items-center"
           )}
         >
           {activeView === "overview" && !leftPanelCollapsed ? (
-            /* ── Expanded: header + icon gutter / content side-by-side ── */
-            <>
-              {/* Header bar */}
-              <div className="flex shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2">
-                <Brain className="h-4 w-4 shrink-0 text-cyan-400" />
-                <span className="truncate flex-1 text-[11px] font-semibold uppercase tracking-wider text-gray-300">
-                  Intel Panel
-                </span>
-                <button
-                  type="button"
-                  onClick={toggleLeftPanel}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
-                  aria-label="Collapse panel"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              {/* Body: icon gutter + content */}
-              <div className="flex min-h-0 flex-1">
-                {/* Icon gutter */}
-                <div className="flex w-[48px] shrink-0 flex-col items-center gap-1 border-r border-white/5 py-3">
-                  {SIDEBAR_TABS.map((tab) => {
-                    const Icon = tab.icon
-                    const isActive = activeView === tab.id
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setActiveView(tab.id)}
-                        className={cn(
-                          "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
-                          isActive
-                            ? tab.id === "adversary-detail"
-                              ? "bg-red-500/10 text-red-400"
-                              : "bg-white/[0.10] text-foreground"
-                            : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
-                        )}
-                        title={tab.label}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {/* Content column */}
-                <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                  <div className="shrink-0 px-3 pt-2 pb-1 overflow-hidden">
-                    <SatelliteSearch className="min-w-0" />
-                  </div>
-                  <div className="min-h-0 flex-1 overflow-hidden">
-                    <InsightsCard className="h-full w-full rounded-none border-0 bg-transparent shadow-none backdrop-blur-none" />
-                  </div>
-                  {/* Adversary Tracker link */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveView("adversary-detail")}
-                    className="mx-3 mb-3 flex items-center gap-2.5 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-left transition-all hover:bg-red-500/10 hover:border-red-500/30"
-                  >
-                    <Target className="h-4 w-4 shrink-0 text-red-400" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-semibold text-foreground">Adversary Tracker</p>
-                      <p className="text-[9px] text-muted-foreground">5 threats monitored</p>
-                    </div>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            /* ── Collapsed: just icon strip ── */
-            <>
-              <div className="flex flex-1 flex-col items-center justify-center gap-1 py-3">
+            /* ── Expanded: full-height styled panel ── */
+            <div className="flex h-full flex-row rounded-2xl border border-white/10 bg-card/60 backdrop-blur-xl overflow-hidden">
+              {/* Icon gutter — spans full panel height so centering matches collapsed */}
+              <div className="flex w-[48px] shrink-0 flex-col items-center justify-center gap-1 border-r border-white/5">
                 {SIDEBAR_TABS.map((tab) => {
                   const Icon = tab.icon
                   const isActive = activeView === tab.id
@@ -265,14 +211,7 @@ export function DashboardShell() {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => {
-                        if (tab.id === "overview") {
-                          setActiveView("overview")
-                          if (leftPanelCollapsed) toggleLeftPanel()
-                        } else {
-                          setActiveView(tab.id)
-                        }
-                      }}
+                      onClick={() => setActiveView(tab.id)}
                       className={cn(
                         "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
                         isActive
@@ -288,18 +227,91 @@ export function DashboardShell() {
                   )
                 })}
               </div>
+
+              {/* Right column: header + content */}
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                {/* Header bar */}
+                <div className="flex shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2">
+                  <Brain className="h-4 w-4 shrink-0 text-cyan-400" />
+                  <span className="truncate flex-1 text-[11px] font-semibold uppercase tracking-wider text-gray-300">
+                    Intel Panel
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleLeftPanel}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                    aria-label="Collapse panel"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="shrink-0 px-3 pt-2 pb-1 overflow-hidden">
+                  <SatelliteSearch className="min-w-0" />
+                </div>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <InsightsCard className="h-full w-full rounded-none border-0 bg-transparent shadow-none backdrop-blur-none" />
+                </div>
+                {/* Adversary Tracker link */}
+                <button
+                  type="button"
+                  onClick={() => setActiveView("adversary-detail")}
+                  className="mx-3 mb-3 flex items-center gap-2.5 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-left transition-all hover:bg-red-500/10 hover:border-red-500/30"
+                >
+                  <Target className="h-4 w-4 shrink-0 text-red-400" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-semibold text-foreground">Adversary Tracker</p>
+                    <p className="text-[9px] text-muted-foreground">5 threats monitored</p>
+                  </div>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ── Collapsed: compact styled pill, centered by parent ── */
+            <div className="flex w-full flex-col items-center gap-1 rounded-2xl border border-white/10 bg-card/60 py-2 backdrop-blur-xl overflow-hidden">
+              {SIDEBAR_TABS.map((tab) => {
+                const Icon = tab.icon
+                const isActive = activeView === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      if (tab.id === "overview") {
+                        setActiveView("overview")
+                        if (leftPanelCollapsed) toggleLeftPanel()
+                      } else {
+                        setActiveView(tab.id)
+                      }
+                    }}
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                      isActive
+                        ? tab.id === "adversary-detail"
+                          ? "bg-red-500/10 text-red-400"
+                          : "bg-white/[0.10] text-foreground"
+                        : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
+                    )}
+                    title={tab.label}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </button>
+                )
+              })}
               {/* Expand toggle — only in overview */}
               {activeView === "overview" && (
                 <button
                   type="button"
                   onClick={toggleLeftPanel}
-                  className="mx-auto mb-3 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
                   aria-label="Expand panel"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               )}
-            </>
+            </div>
           )}
         </div>
 
@@ -339,6 +351,8 @@ export function DashboardShell() {
                 <SatelliteDetailPage />
               </Suspense>
             )}
+            {activeView === "orbital" && <OrbitalOps threats={orbitalThreats} />}
+            {activeView === "fleet-risk" && <FleetRiskOps />}
             {activeView === "adversary-detail" && <AdversaryOps />}
           </div>
         )}
@@ -362,8 +376,6 @@ export function DashboardShell() {
         </div>
       </div>
 
-      {/* Threat Response Agent overlay — streams AI analysis when threat crosses threshold */}
-      <ThreatResponseOverlay />
     </main>
   );
 }

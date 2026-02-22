@@ -62,7 +62,7 @@ function makeTextSprite(
 ): { texture: THREE.CanvasTexture; width: number; height: number } {
   const canvas = document.createElement("canvas")
   const ctx = canvas.getContext("2d")!
-  const dpr = 3 // high DPR for crispness — only drawn once so cost is minimal
+  const dpr = 5 // high DPR for crispness — only drawn once so cost is minimal
   const padding = 8
 
   // Measure
@@ -129,7 +129,7 @@ function SpriteLabel({
     if (threatPercent != null) {
       lines.push({
         text: `${threatPercent}%`,
-        fontSize: 11,
+        fontSize: 7,
         bold: true,
         color:
           (threatPercent ?? 0) >= 70
@@ -142,7 +142,7 @@ function SpriteLabel({
 
     lines.push({
       text: name.length > 18 ? name.slice(0, 17) + "…" : name,
-      fontSize: 8,
+      fontSize: 5,
       color: "rgba(200,220,255,0.6)",
     })
 
@@ -156,7 +156,7 @@ function SpriteLabel({
     })
 
     const aspect = width / Math.max(height, 1)
-    const h = size * 16
+    const h = size * 11
     const w = h * aspect
 
     return { spriteMat: mat, spriteScale: new THREE.Vector3(w, h, 1) }

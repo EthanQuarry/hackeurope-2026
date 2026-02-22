@@ -76,10 +76,10 @@ export function HostileMarker({
           whiteSpace: "nowrap",
         }}>
           <div style={{
-            fontSize: "7px",
+            fontSize: "5px",
             fontFamily: "monospace",
             color: "rgba(255,145,0,0.5)",
-            letterSpacing: "0.3px",
+            letterSpacing: "0.2px",
           }}>
             {name}
           </div>
