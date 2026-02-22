@@ -154,22 +154,16 @@ export function DashboardShell() {
               <InsightsCard className="min-h-0 flex-1" />
             </div>
 
-            {/* Right: Satellite detail card (only when selected) */}
-            <div className="absolute right-0 top-0">
-              <SatelliteCard />
+            {/* Right: Stats panels (stacked, collapsible) + satellite card when selected */}
+            <div className="absolute right-0 top-0 bottom-20 flex flex-col gap-2 overflow-y-auto">
+              {selectedSatelliteId && <SatelliteCard />}
+              <StatsCards />
             </div>
 
             {/* Bottom center: AI Chat input bar */}
             <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
               <AiChatBar />
             </div>
-
-            {/* Bottom: Stats cards — hidden when satellite card is open to avoid overlap */}
-            {!selectedSatelliteId && (
-              <div className="absolute bottom-0 left-0 right-0">
-                <StatsCards />
-              </div>
-            )}
           </div>
         ) : (
           /* Ops pages: full mission view */
