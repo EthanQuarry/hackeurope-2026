@@ -19,6 +19,7 @@ import { useFleetStore } from "@/stores/fleet-store";
 import { useThreatStore } from "@/stores/threat-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useGlobeStore } from "@/stores/globe-store";
+import { useResponseStream } from "@/hooks/use-response-stream";
 import {
   generateInterceptTrajectory,
   DEMO_SJ26_ID,
@@ -41,9 +42,11 @@ import type {
 import type { ThreatSeverity } from "@/lib/constants";
 import { PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants";
 
-/** Threat alert threshold — when a satellite's risk score crosses this,
- *  a trigger fires (placeholder for agent call). */
+/** Threat alert threshold — visual alerts on the globe */
 const THREAT_ALERT_THRESHOLD = 70
+
+/** Higher threshold that triggers the AI response agent overlay */
+const RESPONSE_AGENT_THRESHOLD = 90
 
 /** Compute risk score (0-100) per OUR satellite from ops-level threat data.
  *  Score goes on the TARGET (our asset under threat), not the attacker.
@@ -60,11 +63,8 @@ function buildThreatScores(
   };
 
   for (const t of proximity) {
-    // Score goes on the TARGET asset — how much danger is it in?
-    const distFactor = Math.max(0, 1 - t.missDistanceKm / 500);
-    const score = Math.round(
-      Math.min(99, (t.confidence * 0.6 + distFactor * 0.4) * 100),
-    );
+    // Score = Bayesian posterior directly — it already factors in distance
+    const score = Math.round(Math.min(99, t.confidence * 100));
     update(t.targetAssetId, score);
   }
 
@@ -87,20 +87,16 @@ function buildThreatScores(
 function checkThresholdTriggers(
   current: Map<string, number>,
   previous: Map<string, number>,
+  threshold: number,
 ): string[] {
   const triggered: string[] = []
   for (const [id, score] of current) {
     const prev = previous.get(id) ?? 0
-    if (score >= THREAT_ALERT_THRESHOLD && prev < THREAT_ALERT_THRESHOLD) {
+    if (score >= threshold && prev < threshold) {
       triggered.push(id)
     }
   }
   return triggered
-}
-
-// TODO: Replace with actual agent call when ready
-function onThreatAlertTriggered(_satelliteIds: string[]) {
-  // Placeholder — will trigger AI agent analysis pipeline
 }
 
 interface HostileMarkerData {
@@ -169,6 +165,7 @@ const MemoScene = React.memo(function Scene({
   simTimeRef,
   speedRef,
   controlsRef,
+  onResponseAgentTrigger,
 }: {
   satellites: SatelliteData[];
   selectedSatelliteId: string | null;
@@ -176,6 +173,7 @@ const MemoScene = React.memo(function Scene({
   simTimeRef: React.RefObject<number>;
   speedRef: React.RefObject<number>;
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
+  onResponseAgentTrigger?: (satelliteId: string, score: number) => void;
 }) {
   // Threat store subscriptions live here — only Scene re-renders when these update
   const storeThreats = useThreatStore((s) => s.threats);
@@ -188,28 +186,31 @@ const MemoScene = React.memo(function Scene({
 
   // Use store data (populated by polling), fall back to mocks
   const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris;
-  const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS;
-  const proximityThreats =
-    storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS;
-  const signalThreats =
-    storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS;
-  const anomalyThreats =
-    storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS;
+  const threats = storeThreats;
+  const proximityThreats = storeProximity;
+  const signalThreats = storeSignal;
+  const anomalyThreats = storeAnomaly;
 
   // Live risk scores on OUR satellites — updates every poll cycle
   const prevScoresRef = useRef(new Map<string, number>())
   const threatScores = useMemo(() => {
     const scores = buildThreatScores(proximityThreats, signalThreats, anomalyThreats)
 
-    // Check for threshold crossings
-    const triggered = checkThresholdTriggers(scores, prevScoresRef.current)
-    if (triggered.length > 0) {
-      onThreatAlertTriggered(triggered)
+    // Check for visual alert threshold crossings
+    checkThresholdTriggers(scores, prevScoresRef.current, THREAT_ALERT_THRESHOLD)
+
+    // Check for response agent threshold crossings (90%)
+    const responseTriggered = checkThresholdTriggers(scores, prevScoresRef.current, RESPONSE_AGENT_THRESHOLD)
+    if (responseTriggered.length > 0 && onResponseAgentTrigger) {
+      for (const satId of responseTriggered) {
+        onResponseAgentTrigger(satId, scores.get(satId) ?? 90)
+      }
     }
+
     prevScoresRef.current = scores
 
     return scores
-  }, [proximityThreats, signalThreats, anomalyThreats]);
+  }, [proximityThreats, signalThreats, anomalyThreats, onResponseAgentTrigger]);
 
   // Derive hostile markers, excluding IDs that already exist as fleet satellites
   const hostileMarkers = useMemo(() => {
@@ -381,6 +382,40 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
     [selectSatellite, setActiveView],
   );
 
+  // Wire response agent trigger
+  const { triggerResponse } = useResponseStream();
+  const proximityThreats = useThreatStore((s) => s.proximityThreats);
+
+  const handleResponseAgentTrigger = useCallback(
+    (satelliteId: string, score: number) => {
+      // Find the highest-confidence proximity threat for this satellite
+      const threat = proximityThreats
+        .filter((t) => t.targetAssetId === satelliteId)
+        .sort((a, b) => b.confidence - a.confidence)[0];
+
+      if (!threat) return;
+
+      // Find the target satellite for position data
+      const targetSat = allSatellites.find((s) => s.id === satelliteId);
+      const focusPos = targetSat?.trajectory?.[0]
+        ? { lat: targetSat.trajectory[0].lat, lon: targetSat.trajectory[0].lon, altKm: targetSat.altitude_km }
+        : threat.secondaryPosition;
+
+      triggerResponse({
+        satelliteId,
+        satelliteName: threat.targetAssetName,
+        threatSatelliteId: threat.foreignSatId,
+        threatSatelliteName: threat.foreignSatName,
+        threatScore: score,
+        missDistanceKm: threat.missDistanceKm,
+        approachPattern: threat.approachPattern,
+        tcaMinutes: threat.tcaInMinutes,
+        focusPosition: focusPos,
+      });
+    },
+    [proximityThreats, allSatellites, triggerResponse],
+  );
+
   return (
     <div
       className={cn(
@@ -401,6 +436,7 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
           simTimeRef={simTimeRef}
           speedRef={speedRef}
           controlsRef={controlsRef}
+          onResponseAgentTrigger={handleResponseAgentTrigger}
         />
       </Canvas>
     </div>

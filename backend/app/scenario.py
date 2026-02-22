@@ -181,12 +181,12 @@ def sj26_miss_distance_km() -> float:
     phase = current_phase()
     p = _smoothstep(phase_progress())
     if phase == 0:
-        return _lerp(1200.0, 1000.0, p)
+        return _lerp(1200.0, 1000.0, p)    # benign distance
     if phase == 1:
-        return _lerp(800.0, 200.0, p)
+        return _lerp(1000.0, 400.0, p)     # starting to close but still far
     if phase == 2:
-        return _lerp(200.0, 5.0, p)
-    return _lerp(5.0, 0.3, p)
+        return _lerp(400.0, 2.0, p)        # aggressive closing
+    return _lerp(2.0, 0.1, p)              # critical — near collision
 
 
 # ---------------------------------------------------------------------------

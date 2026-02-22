@@ -210,3 +210,33 @@ class CommsChatResponse(BaseModel):
     command_ready: bool = False
     parsed_command: str | None = None
     parsed_intent: ParsedIntent | None = None
+
+
+# --- Threat Response Decision Models ---
+
+class ResponseOption(BaseModel):
+    action: str
+    description: str
+    risk_level: str
+    confidence: float = Field(ge=0, le=1)
+    delta_v_ms: float = 0.0
+    time_to_execute_min: float = 0.0
+    pros: list[str] = []
+    cons: list[str] = []
+
+
+class ThreatResponseDecision(BaseModel):
+    satellite_id: str
+    satellite_name: str
+    threat_satellite_id: str
+    threat_satellite_name: str
+    threat_summary: str
+    threat_score: float
+    risk_level: str
+    options_evaluated: list[ResponseOption] = []
+    recommended_action: str
+    recommended_action_index: int = 0
+    reasoning: str
+    escalation_required: bool = False
+    time_sensitivity: str = "medium"
+    intelligence_summary: str = ""

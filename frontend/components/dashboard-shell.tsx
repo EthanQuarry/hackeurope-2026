@@ -15,6 +15,7 @@ import { ProximityOps } from "@/components/ops/proximity-ops";
 import { SignalOps } from "@/components/ops/signal-ops";
 import { AnomalyOps } from "@/components/ops/anomaly-ops";
 import { CommsOps } from "@/components/ops/comms-ops";
+import { ThreatResponseOverlay } from "@/components/cards/threat-response-overlay";
 const SatelliteDetailPage = lazy(() =>
   import("@/components/satellite-detail-page").then((m) => ({
     default: m.SatelliteDetailPage,
@@ -117,13 +118,10 @@ export function DashboardShell() {
     intervalMs: THREAT_REFRESH_MS,
     onData: setAnomalyThreats,
   });
-  // Use live data when available, fall back to mocks
-  const proximityThreats =
-    storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS;
-  const signalThreats =
-    storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS;
-  const anomalyThreats =
-    storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS;
+  // Live data only — no mock fallbacks
+  const proximityThreats = storeProximity;
+  const signalThreats = storeSignal;
+  const anomalyThreats = storeAnomaly;
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -202,6 +200,8 @@ export function DashboardShell() {
           </div>
         )}
       </div>
+      {/* Threat Response Agent overlay — self-manages visibility via store */}
+      <ThreatResponseOverlay />
     </main>
   );
 }

@@ -125,6 +125,7 @@ def _build_usa245_satellite(idx: int) -> dict:
         "name": "USA-245 (NROL-65)",
         "noradId": 39232,
         "status": "allied",
+        "country_code": "US",
         "altitude_km": round(alt_km, 1),
         "velocity_kms": round(v_kms, 2),
         "inclination_deg": round(inc_deg, 1),
@@ -239,6 +240,7 @@ def _build_sj26_satellite(idx: int) -> dict:
         "name": "SJ-26 (SHIJIAN-26)",
         "noradId": scenario.SJ26_NORAD_ID,
         "status": status,
+        "country_code": "PRC",
         "altitude_km": round(SJ_ALT, 1),
         "velocity_kms": round(v_kms, 2),
         "inclination_deg": round(SJ_INC, 1),
@@ -312,8 +314,31 @@ async def get_satellites():
 @router.post("/scenario/reset")
 async def reset_scenario():
     """Reset the SJ-26 scenario clock back to phase 0."""
+    global _satellites_cache, _satellites_cache_time
     scenario.reset()
+    # Force satellite cache refresh so SJ-26 gets fresh trajectory/status
+    _satellites_cache = None
+    _satellites_cache_time = 0
+    logger.info("Scenario reset — phase 0, cache cleared")
     return {"status": "reset", "phase": 0}
+
+
+@router.get("/scenario/debug")
+async def debug_scenario():
+    """Debug: show current scenario state."""
+    from app.bayesian_scorer import score_satellite
+    miss = scenario.sj26_miss_distance_km()
+    post = score_satellite(miss, "PRC")
+    return {
+        "phase": scenario.current_phase(),
+        "progress": round(scenario.phase_progress(), 3),
+        "elapsed": round(scenario.elapsed(), 1),
+        "speed": scenario.get_speed(),
+        "status": scenario.sj26_status(),
+        "miss_km": round(miss, 1),
+        "bayesian_posterior": round(post, 4),
+        "display_percent": min(99, round(post * 100)),
+    }
 
 
 @router.get("/scenario/sj26")

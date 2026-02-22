@@ -242,3 +242,33 @@ export interface CommsChatResponse {
   parsed_command: string | null
   parsed_intent: ParsedIntent | null
 }
+
+/** A single response option from the threat response agent */
+export interface ThreatResponseOption {
+  action: string
+  description: string
+  risk_level: string
+  confidence: number
+  delta_v_ms: number
+  time_to_execute_min: number
+  pros: string[]
+  cons: string[]
+}
+
+/** Full structured decision from the threat response agent */
+export interface ThreatResponseDecision {
+  satellite_id: string
+  satellite_name: string
+  threat_satellite_id: string
+  threat_satellite_name: string
+  threat_summary: string
+  threat_score: number
+  risk_level: string
+  options_evaluated: ThreatResponseOption[]
+  recommended_action: string
+  recommended_action_index: number
+  reasoning: string
+  escalation_required: boolean
+  time_sensitivity: string
+  intelligence_summary: string
+}
