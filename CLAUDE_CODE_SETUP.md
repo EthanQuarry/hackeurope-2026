@@ -19,3 +19,4 @@ Enter in the Access Key & Secret key
 ### Run command
 
 `AWS_PROFILE=default claude --dangerously-skip-permissions`
+

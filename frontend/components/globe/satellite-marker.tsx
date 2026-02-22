@@ -223,6 +223,31 @@ export function SatelliteMarker({
   const showLabel = selected || (labelsEnabled && (status === "threatened" || status === "watched"))
   const markerSize = status === "threatened" ? size * 1.3 : size
 
+  // Cached Three.js geometries & materials — avoids recreation every render
+  const markerGeo = useMemo(() => new THREE.SphereGeometry(markerSize, 12, 12), [markerSize])
+  const markerMat = useMemo(() => new THREE.MeshBasicMaterial({ color: threeColor }), [threeColor])
+  const glowGeo = useMemo(() => new THREE.SphereGeometry(markerSize * 2.5, 12, 12), [markerSize])
+  const glowMat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: threeColor,
+        transparent: true,
+        opacity: selected ? 0.4 : status === "threatened" ? 0.25 : 0.12,
+      }),
+    [threeColor, selected, status],
+  )
+  const flagGeo = useMemo(() => new THREE.SphereGeometry(markerSize, 16, 16), [markerSize])
+  const flagMat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#ffcc00"),
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+      }),
+    [],
+  )
+
   // Full orbit ring — clean closed loop (no maneuver splice)
   const fullOrbitRing = useMemo(() => {
     if (!showFullOrbit || scenePoints.length < 4) return null
@@ -269,14 +294,13 @@ export function SatelliteMarker({
       {/* Satellite dot */}
       <mesh
         ref={meshRef}
+        geometry={markerGeo}
+        material={markerMat}
         onClick={(e) => {
           e.stopPropagation()
           onSelect?.(id)
         }}
       >
-        <sphereGeometry args={[markerSize, 12, 12]} />
-        <meshBasicMaterial color={threeColor} />
-
         {/* Floating label with threat % and name */}
         {showLabel && name && (
           <Html
@@ -321,26 +345,11 @@ export function SatelliteMarker({
       </mesh>
 
       {/* Glow */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[markerSize * 2.5, 12, 12]} />
-        <meshBasicMaterial
-          color={threeColor}
-          transparent
-          opacity={selected ? 0.4 : status === "threatened" ? 0.25 : 0.12}
-        />
-      </mesh>
+      <mesh ref={glowRef} geometry={glowGeo} material={glowMat} />
 
       {/* Bayesian threat flag ring — amber pulse when posterior > threshold */}
       {isFlagged && (
-        <mesh ref={flagRingRef}>
-          <sphereGeometry args={[markerSize, 16, 16]} />
-          <meshBasicMaterial
-            color="#ffcc00"
-            transparent
-            opacity={0.5}
-            depthWrite={false}
-          />
-        </mesh>
+        <mesh ref={flagRingRef} geometry={flagGeo} material={flagMat} />
       )}
     </group>
   )

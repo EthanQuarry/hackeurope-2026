@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useCallback } from "react"
+import { useMemo, useCallback, lazy, Suspense } from "react"
 
 import { GlobeView } from "@/components/globe/globe-view"
 import { DashboardHeader } from "@/components/dashboard-header"
@@ -14,7 +14,11 @@ import { SignalOps } from "@/components/ops/signal-ops"
 import { AnomalyOps } from "@/components/ops/anomaly-ops"
 import { CommsOps } from "@/components/ops/comms-ops"
 import { OrbitalOps } from "@/components/ops/orbital-ops"
-import { SatelliteDetailPage } from "@/components/satellite-detail-page"
+const SatelliteDetailPage = lazy(() =>
+  import("@/components/satellite-detail-page").then((m) => ({
+    default: m.SatelliteDetailPage,
+  })),
+)
 import { useUIStore } from "@/stores/ui-store"
 import { useGlobeStore } from "@/stores/globe-store"
 import { useFleetStore } from "@/stores/fleet-store"
@@ -181,7 +185,17 @@ export function DashboardShell() {
             {activeView === "orbital" && (
               <OrbitalOps threats={orbitalThreats} />
             )}
-            {activeView === "satellite-detail" && <SatelliteDetailPage />}
+            {activeView === "satellite-detail" && (
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    Loading…
+                  </div>
+                }
+              >
+                <SatelliteDetailPage />
+              </Suspense>
+            )}
           </div>
         )}
       </div>

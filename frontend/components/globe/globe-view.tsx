@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useRef } from "react"
+import React, { useCallback, useMemo, useRef } from "react"
 import { Canvas } from "@react-three/fiber"
 import { OrbitControls } from "@react-three/drei"
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
@@ -26,7 +26,7 @@ import {
   MOCK_SIGNAL_THREATS,
   MOCK_ANOMALY_THREATS,
 } from "@/lib/mock-data"
-import type { DebrisData, SatelliteData, ThreatData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
+import type { SatelliteData, ProximityThreat, SignalThreat, AnomalyThreat } from "@/types"
 import type { ThreatSeverity } from "@/lib/constants"
 import { PROXIMITY_FLAG_THRESHOLD } from "@/lib/constants"
 
@@ -107,31 +107,63 @@ interface GlobeViewProps {
   compacted?: boolean
 }
 
-function Scene({
+/* ── Scene: subscribes to threat stores directly so GlobeView doesn't
+ *    re-render on every threat/debris poll update.  Wrapped with React.memo
+ *    so it also skips re-renders when parent props haven't changed. ──────── */
+const MemoScene = React.memo(function Scene({
   satellites,
-  debris,
-  threats,
-  hostileMarkers,
-  threatScores,
   selectedSatelliteId,
   onSelectSatellite,
   simTimeRef,
   speedRef,
   controlsRef,
-  satScores,
 }: {
   satellites: SatelliteData[]
-  debris: DebrisData[]
-  threats: ThreatData[]
-  hostileMarkers: HostileMarkerData[]
-  threatScores: Map<string, number>
   selectedSatelliteId: string | null
   onSelectSatellite: (id: string) => void
   simTimeRef: React.RefObject<number>
   speedRef: React.RefObject<number>
   controlsRef: React.RefObject<OrbitControlsImpl | null>
-  satScores: Record<string, number>
 }) {
+  // Threat store subscriptions live here — only Scene re-renders when these update
+  const storeThreats = useThreatStore((s) => s.threats)
+  const storeDebris = useThreatStore((s) => s.debris)
+  const storeProximity = useThreatStore((s) => s.proximityThreats)
+  const storeSignal = useThreatStore((s) => s.signalThreats)
+  const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
+
+  const fallbackDebris = useMemo(() => generateMockDebris(2500), [])
+
+  // Use store data (populated by polling), fall back to mocks
+  const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris
+  const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS
+  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
+  const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
+  const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+
+  // Live threat scores from ops-level data — updates every poll cycle
+  const threatScores = useMemo(
+    () => buildThreatScores(proximityThreats, signalThreats, anomalyThreats),
+    [proximityThreats, signalThreats, anomalyThreats],
+  )
+
+  // Derive hostile markers, excluding IDs that already exist as fleet satellites
+  const hostileMarkers = useMemo(() => {
+    const fleetIds = new Set(satellites.map((s) => s.id))
+    return deriveHostileMarkers(proximityThreats, signalThreats, anomalyThreats)
+      .filter((h) => !fleetIds.has(h.id))
+  }, [satellites, proximityThreats, signalThreats, anomalyThreats])
+
+  // Derive per-satellite max Bayesian posterior from proximity threats
+  const satScores = useMemo(() => {
+    const scores: Record<string, number> = {}
+    for (const threat of proximityThreats) {
+      scores[threat.foreignSatId] = Math.max(scores[threat.foreignSatId] ?? 0, threat.confidence)
+      scores[threat.targetAssetId] = Math.max(scores[threat.targetAssetId] ?? 0, threat.confidence)
+    }
+    return scores
+  }, [proximityThreats])
+
   return (
     <>
       {/* Custom shader starfield with twinkling */}
@@ -218,7 +250,7 @@ function Scene({
       <CameraFocus controlsRef={controlsRef} simTimeRef={simTimeRef} />
     </>
   )
-}
+})
 
 export function GlobeView({ compacted = false }: GlobeViewProps) {
   const simTimeRef = useRef(Date.now())
@@ -229,56 +261,21 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
   const selectSatellite = useFleetStore((s) => s.selectSatellite)
   const setActiveView = useUIStore((s) => s.setActiveView)
   const storeSatellites = useFleetStore((s) => s.satellites)
-  const storeThreats = useThreatStore((s) => s.threats)
-  const storeDebris = useThreatStore((s) => s.debris)
-  const storeProximity = useThreatStore((s) => s.proximityThreats)
-  const storeSignal = useThreatStore((s) => s.signalThreats)
-  const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
 
-  const fallbackDebris = useMemo(() => generateMockDebris(2500), [])
-
-  // Use store data (populated by polling), fall back to mocks
   // Filter out allied satellites except scenario-critical ones (USA-245)
   const allSatellites = storeSatellites.length > 0 ? storeSatellites : MOCK_SATELLITES
   const satellites = useMemo(
     () => allSatellites.filter((s) => s.status !== "allied" || s.id === "sat-6"),
     [allSatellites]
   )
-  const debris = storeDebris.length > 0 ? storeDebris : fallbackDebris
-  const threats = storeThreats.length > 0 ? storeThreats : MOCK_THREATS
 
-  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
-  const signalThreats = storeSignal.length > 0 ? storeSignal : MOCK_SIGNAL_THREATS
-  const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
-
-  // Live threat scores from ops-level data — updates every poll cycle
-  const threatScores = useMemo(
-    () => buildThreatScores(proximityThreats, signalThreats, anomalyThreats),
-    [proximityThreats, signalThreats, anomalyThreats],
-  )
-
-  // Select satellite AND open detail page on globe click
+  // Select satellite immediately, defer the heavier view transition to next frame
   const handleSelectSatellite = useCallback((id: string) => {
     selectSatellite(id)
-    setActiveView("satellite-detail")
+    requestAnimationFrame(() => {
+      setActiveView("satellite-detail")
+    })
   }, [selectSatellite, setActiveView])
-
-  // Derive hostile markers, excluding IDs that already exist as fleet satellites
-  const hostileMarkers = useMemo(() => {
-    const fleetIds = new Set(satellites.map((s) => s.id))
-    return deriveHostileMarkers(proximityThreats, signalThreats, anomalyThreats)
-      .filter((h) => !fleetIds.has(h.id))
-  }, [satellites, proximityThreats, signalThreats, anomalyThreats])
-
-  // Derive per-satellite max Bayesian posterior from proximity threats
-  const satScores = useMemo(() => {
-    const scores: Record<string, number> = {}
-    for (const threat of proximityThreats) {
-      scores[threat.foreignSatId] = Math.max(scores[threat.foreignSatId] ?? 0, threat.confidence)
-      scores[threat.targetAssetId] = Math.max(scores[threat.targetAssetId] ?? 0, threat.confidence)
-    }
-    return scores
-  }, [proximityThreats])
 
   return (
     <div
@@ -293,18 +290,13 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         style={{ background: "#000006" }}
         dpr={[1, 2]}
       >
-        <Scene
+        <MemoScene
           satellites={satellites}
-          debris={debris}
-          threats={threats}
-          hostileMarkers={hostileMarkers}
-          threatScores={threatScores}
           selectedSatelliteId={selectedSatelliteId}
           onSelectSatellite={handleSelectSatellite}
           simTimeRef={simTimeRef}
           speedRef={speedRef}
           controlsRef={controlsRef}
-          satScores={satScores}
         />
       </Canvas>
     </div>
