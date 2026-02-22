@@ -7,6 +7,7 @@ import { THREAT_COLORS, type ThreatSeverity } from "@/lib/constants"
 import { MOCK_PROXIMITY_THREATS, MOCK_ANOMALY_THREATS } from "@/lib/mock-data"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUIStore } from "@/stores/ui-store"
+import { useThreatStore } from "@/stores/threat-store"
 
 interface MiniCardProps {
   name: string
@@ -41,6 +42,11 @@ function MiniCard({ name, description, severity, foreignSatId }: MiniCardProps) 
 }
 
 export function InsightsCard({ className }: { className?: string }) {
+  const storeProximity = useThreatStore((s) => s.proximityThreats)
+  const storeAnomaly = useThreatStore((s) => s.anomalyThreats)
+  const proximityThreats = storeProximity.length > 0 ? storeProximity : MOCK_PROXIMITY_THREATS
+  const anomalyThreats = storeAnomaly.length > 0 ? storeAnomaly : MOCK_ANOMALY_THREATS
+
   return (
     <div
       className={cn(
@@ -67,7 +73,7 @@ export function InsightsCard({ className }: { className?: string }) {
               </h3>
             </div>
             <div className="space-y-2">
-              {MOCK_PROXIMITY_THREATS.map((threat) => (
+              {proximityThreats.map((threat) => (
                 <MiniCard
                   key={threat.id}
                   name={threat.foreignSatName}
@@ -88,7 +94,7 @@ export function InsightsCard({ className }: { className?: string }) {
               </h3>
             </div>
             <div className="space-y-2">
-              {MOCK_ANOMALY_THREATS.map((threat) => (
+              {anomalyThreats.map((threat) => (
                 <MiniCard
                   key={threat.id}
                   name={threat.satelliteName}

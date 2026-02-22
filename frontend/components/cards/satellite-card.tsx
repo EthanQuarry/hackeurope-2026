@@ -30,11 +30,15 @@ function getOrbitType(inclination: number): string {
 
 function getPurpose(name: string): string {
   const lower = name.toLowerCase()
-  if (lower.includes("sentinel") || lower.includes("guardian")) return "Earth Observation"
-  if (lower.includes("aegis") || lower.includes("overwatch")) return "Surveillance"
-  if (lower.includes("vanguard") || lower.includes("centurion")) return "Communications"
-  if (lower.includes("specter")) return "Signals Intelligence"
-  if (lower.includes("horizon")) return "Navigation"
+  if (lower.includes("iss") || lower.includes("zarya") || lower.includes("tianhe")) return "Space Station"
+  if (lower.includes("noaa") || lower.includes("aqua") || lower.includes("terra") || lower.includes("sentinel") || lower.includes("landsat") || lower.includes("cryosat") || lower.includes("envisat")) return "Earth Observation"
+  if (lower.includes("usa-") || lower.includes("nrol")) return "Reconnaissance"
+  if (lower.includes("hubble") || lower.includes("tess")) return "Science"
+  if (lower.includes("goes")) return "Weather"
+  if (lower.includes("gps") || lower.includes("glonass") || lower.includes("galileo") || lower.includes("beidou")) return "Navigation"
+  if (lower.includes("wgs") || lower.includes("muos") || lower.includes("aehf") || lower.includes("intelsat")) return "Military SATCOM"
+  if (lower.includes("starlink") || lower.includes("oneweb") || lower.includes("iridium")) return "Communications"
+  if (lower.includes("cosmos") || lower.includes("yaogan") || lower.includes("tianlian")) return "Military"
   return "Multi-mission"
 }
 

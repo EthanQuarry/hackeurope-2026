@@ -64,10 +64,10 @@ const DUMMY_ADVERSARIES: AdversarySatellite[] = [
     threatScore: 0.91,
     assessedMission: "Counter-space / inspector satellite — tracking US NRO payload USA-326",
     recentEvents: [
-      { id: "ev-1", timestamp: Date.now() - 300000, type: "maneuver", title: "Prograde burn detected", description: "0.4 m/s prograde burn reduced miss distance with SPECTER-4 to 800m. Not consistent with station-keeping.", severity: "threatened" },
-      { id: "ev-2", timestamp: Date.now() - 1800000, type: "proximity", title: "RPO approach phase", description: "Entered proximity operations zone around SPECTER-4. Co-orbital approach pattern with sun-hiding geometry.", severity: "threatened" },
+      { id: "ev-1", timestamp: Date.now() - 300000, type: "maneuver", title: "Prograde burn detected", description: "0.4 m/s prograde burn reduced miss distance with USA-281 to 800m. Not consistent with station-keeping.", severity: "threatened" },
+      { id: "ev-2", timestamp: Date.now() - 1800000, type: "proximity", title: "RPO approach phase", description: "Entered proximity operations zone around USA-281. Co-orbital approach pattern with sun-hiding geometry.", severity: "threatened" },
       { id: "ev-3", timestamp: Date.now() - 7200000, type: "anomaly", title: "RF emission spike", description: "S-band emission intensity increased 12 dB above baseline. Possible active sensor sweep.", severity: "watched" },
-      { id: "ev-4", timestamp: Date.now() - 86400000, type: "maneuver", title: "Plane change maneuver", description: "Inclination adjusted 0.03° to match SPECTER-4 orbital plane.", severity: "watched" },
+      { id: "ev-4", timestamp: Date.now() - 86400000, type: "maneuver", title: "Plane change maneuver", description: "Inclination adjusted 0.03° to match USA-281 orbital plane.", severity: "watched" },
     ],
   },
   {
@@ -83,7 +83,7 @@ const DUMMY_ADVERSARIES: AdversarySatellite[] = [
     assessedMission: "Debris mitigation / dual-use — demonstrated GEO object grappling capability",
     recentEvents: [
       { id: "ev-5", timestamp: Date.now() - 3600000, type: "maneuver", title: "Station-keeping burn", description: "Nominal east-west station-keeping. Position maintained near 104.5°E.", severity: "nominal" },
-      { id: "ev-6", timestamp: Date.now() - 172800000, type: "proximity", title: "Close approach to OVERWATCH-2 relay", description: "Drifted within 18.5 km of OVERWATCH-2 GEO relay. Pattern consistent with inspection.", severity: "watched" },
+      { id: "ev-6", timestamp: Date.now() - 172800000, type: "proximity", title: "Close approach to WGS-10 relay", description: "Drifted within 18.5 km of WGS-10 GEO relay. Pattern consistent with inspection.", severity: "watched" },
     ],
   },
   {
@@ -113,7 +113,7 @@ const DUMMY_ADVERSARIES: AdversarySatellite[] = [
     threatScore: 0.72,
     assessedMission: "SIGINT collection — repeated co-location with Western GEO MILSATCOM",
     recentEvents: [
-      { id: "ev-8", timestamp: Date.now() - 259200000, type: "signal", title: "Co-location with SENTINEL-1 relay", description: "Positioned within 0.1° of SENTINEL-1 GEO relay node. Interception probability 34%.", severity: "watched" },
+      { id: "ev-8", timestamp: Date.now() - 259200000, type: "signal", title: "Co-location with SENTINEL-1 relay", description: "Positioned within 0.1° of ISS (ZARYA) relay node. Interception probability 34%.", severity: "watched" },
     ],
   },
   {
@@ -128,7 +128,7 @@ const DUMMY_ADVERSARIES: AdversarySatellite[] = [
     threatScore: 0.62,
     assessedMission: "ELINT triplet constellation — signals intelligence collection",
     recentEvents: [
-      { id: "ev-9", timestamp: Date.now() - 1800000, type: "anomaly", title: "Antenna pointing change", description: "Antenna redirected 15° from nadir, now aligned with GUARDIAN-3 orbital plane.", severity: "watched" },
+      { id: "ev-9", timestamp: Date.now() - 1800000, type: "anomaly", title: "Antenna pointing change", description: "Antenna redirected 15° from nadir, now aligned with NOAA-20 orbital plane.", severity: "watched" },
     ],
   },
 ]

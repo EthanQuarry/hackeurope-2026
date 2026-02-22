@@ -60,7 +60,7 @@ function eventToLog(event: Record<string, unknown>, id: number): TerminalLogEntr
 function* mockAnalysisStream(): Generator<Record<string, unknown>> {
   yield { type: "scan", text: "initiating orbital scan — 2,487 tracked objects in LEO" }
   yield { type: "scan", text: "cross-referencing conjunction database... 3 active events" }
-  yield { type: "context", agent: "orbital-analyst", text: "evaluating SPECTER-4 conjunction — miss distance 0.8 km, TCA T+20 min" }
+  yield { type: "context", agent: "orbital-analyst", text: "evaluating USA-281 conjunction — miss distance 0.8 km, TCA T+20 min" }
   yield { type: "context", agent: "orbital-analyst", text: "secondary object COSMOS 2251 DEB — uncontrolled, tumbling, no maneuver capability" }
   yield { type: "reasoning", agent: "threat-assessor", text: "debris on predicted COLA trajectory — computing collision probability" }
   yield { type: "tool_call", agent: "threat-assessor", tools: ["compute_pc", "propagate_orbit"] }
@@ -69,7 +69,7 @@ function* mockAnalysisStream(): Generator<Record<string, unknown>> {
   yield { type: "reasoning", agent: "response-planner", text: "Pc exceeds threshold — evaluating avoidance maneuver options" }
   yield { type: "tool_call", agent: "response-planner", tools: ["plan_maneuver", "check_constraints"] }
   yield { type: "tool_result", agent: "response-planner", tool: "plan_maneuver", summary: "optimal burn: along-track +0.12 m/s at T-15 min, miss distance improves to 42 km" }
-  yield { type: "context", agent: "orbital-analyst", text: "evaluating OVERWATCH-2 conjunction — miss distance 12.4 km, TCA T+60 min" }
+  yield { type: "context", agent: "orbital-analyst", text: "evaluating WGS-10 conjunction — miss distance 12.4 km, TCA T+60 min" }
   yield { type: "reasoning", agent: "threat-assessor", text: "secondary object exhibiting anomalous maneuvering — 3 burns in 48h" }
   yield { type: "intent", classification: "Maneuvering — intent unclear", confidence: 0.62 }
   yield { type: "reasoning", agent: "threat-assessor", text: "low confidence on intent — recommend continued monitoring, escalate if miss distance decreases" }
