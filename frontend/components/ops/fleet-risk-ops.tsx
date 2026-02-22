@@ -84,7 +84,7 @@ const CanvasSparkline = memo(function CanvasSparkline({ snapshots, width, height
     ctx.stroke()
 
     // Draw per-segment fills + lines
-    ctx.lineWidth = 1.5
+    ctx.lineWidth = 1.8
     ctx.lineCap = "round"
     for (let i = 1; i < pts.length; i++) {
       const prev = pts[i - 1]
@@ -277,7 +277,7 @@ export function FleetRiskOps() {
 
                   {/* Right: sparkline */}
                   <div className="flex-1 min-w-0">
-                    <ResponsiveSparkline snapshots={snapshots} height={32} />
+                    <ResponsiveSparkline snapshots={snapshots} height={48} />
                   </div>
                 </div>
               )

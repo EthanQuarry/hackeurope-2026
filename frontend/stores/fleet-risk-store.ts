@@ -15,7 +15,7 @@ interface FleetRiskState {
   clearAll: () => void
 }
 
-const MAX_SNAPSHOTS = 600
+const MAX_SNAPSHOTS = 2400
 
 export const useFleetRiskStore = create<FleetRiskState>((set) => ({
   timelines: {},

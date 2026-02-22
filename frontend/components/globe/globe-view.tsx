@@ -336,7 +336,7 @@ const MemoScene = React.memo(function Scene({
       />
 
       <CameraFocus controlsRef={controlsRef} simTimeRef={simTimeRef} />
-      <CinematicCamera controlsRef={controlsRef} />
+      <CinematicCamera controlsRef={controlsRef} simTimeRef={simTimeRef} />
     </>
   );
 });
@@ -425,6 +425,9 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
 
   const handleResponseAgentTrigger = useCallback(
     (satelliteId: string, score: number) => {
+      // Only trigger the response overlay for USA-245 (the SJ-26 demo target)
+      if (satelliteId !== DEMO_USA245_ID) return;
+
       // Find the highest-confidence proximity threat for this satellite
       const threat = proximityThreats
         .filter((t) => t.targetAssetId === satelliteId)
@@ -438,9 +441,6 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         ? { lat: targetSat.trajectory[0].lat, lon: targetSat.trajectory[0].lon, altKm: targetSat.altitude_km }
         : threat.secondaryPosition;
 
-      // Only lock camera for the malicious manoeuvre demo (SJ-26 → USA-245)
-      const isMaliciousDemo = activeDemo === "malicious-manoeuvre" && satelliteId === DEMO_USA245_ID;
-
       triggerResponse({
         satelliteId,
         satelliteName: threat.targetAssetName,
@@ -451,10 +451,10 @@ export function GlobeView({ compacted = false }: GlobeViewProps) {
         approachPattern: threat.approachPattern,
         tcaMinutes: threat.tcaInMinutes,
         focusPosition: focusPos,
-        lockCamera: isMaliciousDemo,
+        lockCamera: true,
       });
     },
-    [proximityThreats, allSatellites, triggerResponse, activeDemo],
+    [proximityThreats, allSatellites, triggerResponse],
   );
 
   const handlePointerMissed = useCallback(() => {

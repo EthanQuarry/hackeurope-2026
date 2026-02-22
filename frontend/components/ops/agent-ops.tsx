@@ -863,52 +863,6 @@ function ExecutionProgress() {
 }
 
 /* ================================================================
-   Full Autonomy Toggle
-   ================================================================ */
-
-function AutonomyToggle() {
-  const fullAutonomy = useAgentOpsStore((s) => s.fullAutonomy)
-  const setFullAutonomy = useAgentOpsStore((s) => s.setFullAutonomy)
-
-  return (
-    <button
-      onClick={() => setFullAutonomy(!fullAutonomy)}
-      className={cn(
-        "flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-all font-mono text-xs font-bold uppercase tracking-wider",
-        fullAutonomy
-          ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300 shadow-lg shadow-cyan-500/20"
-          : "border-white/10 bg-white/5 text-gray-500 hover:border-white/20 hover:text-gray-400",
-      )}
-    >
-      {fullAutonomy && (
-        <div className="relative">
-          <Zap className="h-3.5 w-3.5 text-cyan-400" />
-          <div className="absolute inset-0 animate-ping">
-            <Zap className="h-3.5 w-3.5 text-cyan-400 opacity-40" />
-          </div>
-        </div>
-      )}
-      {!fullAutonomy && <Zap className="h-3.5 w-3.5" />}
-      <span>FULL AUTONOMY</span>
-      {/* Toggle track */}
-      <div
-        className={cn(
-          "relative h-4 w-8 rounded-full transition-colors ml-1",
-          fullAutonomy ? "bg-cyan-500/40" : "bg-white/10",
-        )}
-      >
-        <div
-          className={cn(
-            "absolute top-0.5 h-3 w-3 rounded-full transition-all",
-            fullAutonomy ? "left-4 bg-cyan-400 shadow-lg shadow-cyan-400/50" : "left-0.5 bg-gray-500",
-          )}
-        />
-      </div>
-    </button>
-  )
-}
-
-/* ================================================================
    Threshold settings dropdown
    ================================================================ */
 
@@ -1012,9 +966,6 @@ function AgentStandby({
             threshold
           </p>
         </div>
-
-        {/* Autonomy toggle in standby */}
-        <AutonomyToggle />
 
         <div className="w-80 mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-6">
           <div className="flex items-center justify-between mb-4">
@@ -1220,7 +1171,6 @@ export function AgentOps() {
             {/* Right side: HUD + autonomy + settings */}
             <div className="flex items-center gap-3 shrink-0">
               <ThreatScoreHUD score={activeSession.triggerRisk} />
-              <AutonomyToggle />
               <ThresholdSettings threshold={threshold} onThresholdChange={handleThresholdChange} />
             </div>
           </div>

@@ -569,7 +569,7 @@ function BeamInterceptionVisual({
 
         {/* ── Probability readout (right side) ── */}
         <text
-          x="700"
+          x="670"
           y="125"
           textAnchor="middle"
           className="fill-muted-foreground font-mono"
@@ -578,7 +578,7 @@ function BeamInterceptionVisual({
           INTERCEPT PROBABILITY
         </text>
         <text
-          x="700"
+          x="670"
           y="165"
           textAnchor="middle"
           className={cn(
@@ -594,7 +594,7 @@ function BeamInterceptionVisual({
           {(prob * 100).toFixed(0)}%
         </text>
         <text
-          x="700"
+          x="670"
           y="185"
           textAnchor="middle"
           className="fill-muted-foreground/60 font-mono"

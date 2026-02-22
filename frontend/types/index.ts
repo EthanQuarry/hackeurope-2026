@@ -109,6 +109,14 @@ export interface AnomalyThreat {
   position: { lat: number; lon: number; altKm: number }
 }
 
+/** Orbital elements for a single satellite */
+export interface OrbitElements {
+  altitudeKm: number
+  inclinationDeg: number
+  periodMin: number
+  velocityKms: number
+}
+
 /** Orbital similarity / co-orbital shadowing threat */
 export interface OrbitalSimilarityThreat {
   id: string
@@ -123,6 +131,8 @@ export interface OrbitalSimilarityThreat {
   pattern: "co-planar" | "co-altitude" | "co-inclination" | "shadowing"
   confidence: number
   position: { lat: number; lon: number; altKm: number }
+  foreignOrbit?: OrbitElements
+  targetOrbit?: OrbitElements
 }
 
 /** Geo-US loiter threat — Chinese/Russian satellites geostationary or hovering over US */

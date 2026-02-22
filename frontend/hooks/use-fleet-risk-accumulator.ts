@@ -16,10 +16,10 @@ const driftState: Record<string, number> = {}
 function addVariance(satId: string, trueRisk: number): number {
   if (trueRisk === 0) return 0
   const prev = driftState[satId] ?? 0
-  // Large random walk step: ±0.25 per tick for dramatic swings
-  const step = (Math.random() - 0.5) * 0.50
-  // Weak mean-reversion so it drifts far before pulling back
-  const drift = prev * 0.85 + step
+  // Large random walk step: ±0.40 per tick for dramatic demo swings
+  const step = (Math.random() - 0.5) * 0.80
+  // Very weak mean-reversion — lets the line wander far before pulling back
+  const drift = prev * 0.93 + step
   driftState[satId] = drift
   return Math.max(0, Math.min(1, trueRisk + drift))
 }
@@ -36,7 +36,7 @@ export function useFleetRiskAccumulator() {
 
   useEffect(() => {
     const now = Date.now()
-    if (now - lastPushRef.current < 2000) return
+    if (now - lastPushRef.current < 500) return
     if (satellites.length === 0) return
     lastPushRef.current = now
 

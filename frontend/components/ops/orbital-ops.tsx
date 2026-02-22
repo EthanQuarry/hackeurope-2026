@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { ThreatBadge } from "@/components/shared/threat-badge"
 import { cn } from "@/lib/utils"
 import { useThreatStore } from "@/stores/threat-store"
-import type { OrbitalSimilarityThreat } from "@/types"
+import type { OrbitalSimilarityThreat, OrbitElements } from "@/types"
 
 interface OrbitalOpsProps {
   threats: OrbitalSimilarityThreat[]
@@ -41,13 +41,49 @@ function StatBox({ label, value, alert }: { label: string; value: string | numbe
   )
 }
 
-function DataRow({ label, value, alert }: { label: string; value: string | number; alert?: boolean }) {
+/* ── Side-by-side orbital element comparison row ── */
+
+function OrbitCompareRow({
+  label,
+  unit,
+  foreignVal,
+  targetVal,
+  delta,
+  alert,
+}: {
+  label: string
+  unit: string
+  foreignVal: string
+  targetVal: string
+  delta: string
+  alert?: boolean
+}) {
   return (
-    <div className="flex items-center justify-between border-b border-border/20 py-2.5">
-      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
-      <span className={cn("font-mono text-sm tabular-nums", alert ? "text-red-400 font-semibold" : "text-foreground")}>
-        {value}
-      </span>
+    <div className="grid grid-cols-[1fr_5rem_1fr] items-center gap-1 border-b border-border/20 py-2">
+      {/* Foreign value — left-aligned, red-tinted */}
+      <div className="text-left">
+        <span className="font-mono text-[11px] tabular-nums font-semibold text-red-400">
+          {foreignVal}
+        </span>
+        <span className="ml-1 font-mono text-[8px] text-muted-foreground/50">{unit}</span>
+      </div>
+      {/* Label + delta — centered */}
+      <div className="flex flex-col items-center">
+        <span className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground/60">{label}</span>
+        <span className={cn(
+          "font-mono text-[9px] tabular-nums font-bold",
+          alert ? "text-amber-400" : "text-muted-foreground",
+        )}>
+          Δ{delta}
+        </span>
+      </div>
+      {/* Target value — right-aligned, cyan-tinted */}
+      <div className="text-right">
+        <span className="font-mono text-[8px] text-muted-foreground/50">{unit} </span>
+        <span className="font-mono text-[11px] tabular-nums font-semibold text-cyan-400">
+          {targetVal}
+        </span>
+      </div>
     </div>
   )
 }
@@ -144,29 +180,127 @@ export function OrbitalOps({ threats }: OrbitalOpsProps) {
       {/* Center — globe shows through */}
       <div />
 
-      {/* Right panel — selected threat detail */}
+      {/* Right panel — selected threat detail with side-by-side comparison */}
       <div className="pointer-events-auto flex flex-col overflow-hidden rounded-r-sm rounded-l-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-lg">
         {selected ? (
           <ScrollArea className="min-h-0 flex-1">
             <div className="p-4">
-              <div className="mb-4 flex items-center justify-between">
+              {/* Header */}
+              <div className="mb-3 flex items-center justify-between">
                 <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                  Match Detail
+                  Orbital Comparison
                 </span>
                 <ThreatBadge severity={selected.severity} />
               </div>
 
-              <div className="space-y-0">
-                <DataRow label="Foreign Asset" value={selected.foreignSatName} />
-                <DataRow label="Target Asset" value={selected.targetAssetName} />
-                <DataRow label="Pattern" value={PATTERN_LABELS[selected.pattern]} alert={selected.pattern === "co-planar"} />
-                <DataRow label="Inclination Δ" value={`${selected.inclinationDiffDeg.toFixed(2)}°`} alert={selected.inclinationDiffDeg < 2} />
-                <DataRow label="Altitude Δ" value={`${selected.altitudeDiffKm.toFixed(1)} km`} alert={selected.altitudeDiffKm < 20} />
-                <DataRow label="Divergence Score" value={selected.divergenceScore.toFixed(4)} alert={selected.divergenceScore < 0.05} />
-                <DataRow label="Confidence" value={`${(selected.confidence * 100).toFixed(1)}%`} />
+              {/* Satellite labels — side-by-side header */}
+              <div className="grid grid-cols-[1fr_5rem_1fr] items-end gap-1 mb-1">
+                <div className="text-left">
+                  <div className="font-mono text-[7px] uppercase tracking-wider text-red-400/60">Foreign</div>
+                  <div className="font-mono text-[11px] font-semibold text-red-400 truncate" title={selected.foreignSatName}>
+                    {selected.foreignSatName}
+                  </div>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className={cn(
+                    "rounded px-1.5 py-0.5 font-mono text-[7px] font-bold uppercase",
+                    PATTERN_COLORS[selected.pattern],
+                  )}>
+                    {PATTERN_LABELS[selected.pattern]}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono text-[7px] uppercase tracking-wider text-cyan-400/60">Target</div>
+                  <div className="font-mono text-[11px] font-semibold text-cyan-400 truncate" title={selected.targetAssetName}>
+                    {selected.targetAssetName}
+                  </div>
+                </div>
               </div>
 
-              {/* Confidence bar */}
+              {/* Divider */}
+              <div className="border-t border-border/40 mb-1" />
+
+              {/* Side-by-side orbital elements */}
+              {selected.foreignOrbit && selected.targetOrbit ? (
+                <div>
+                  <OrbitCompareRow
+                    label="Alt"
+                    unit="km"
+                    foreignVal={selected.foreignOrbit.altitudeKm.toFixed(1)}
+                    targetVal={selected.targetOrbit.altitudeKm.toFixed(1)}
+                    delta={`${selected.altitudeDiffKm.toFixed(1)} km`}
+                    alert={selected.altitudeDiffKm < 20}
+                  />
+                  <OrbitCompareRow
+                    label="Inc"
+                    unit="deg"
+                    foreignVal={selected.foreignOrbit.inclinationDeg.toFixed(2)}
+                    targetVal={selected.targetOrbit.inclinationDeg.toFixed(2)}
+                    delta={`${selected.inclinationDiffDeg.toFixed(2)}°`}
+                    alert={selected.inclinationDiffDeg < 2}
+                  />
+                  <OrbitCompareRow
+                    label="Period"
+                    unit="min"
+                    foreignVal={selected.foreignOrbit.periodMin.toFixed(1)}
+                    targetVal={selected.targetOrbit.periodMin.toFixed(1)}
+                    delta={`${Math.abs(selected.foreignOrbit.periodMin - selected.targetOrbit.periodMin).toFixed(1)} min`}
+                  />
+                  <OrbitCompareRow
+                    label="Vel"
+                    unit="km/s"
+                    foreignVal={selected.foreignOrbit.velocityKms.toFixed(2)}
+                    targetVal={selected.targetOrbit.velocityKms.toFixed(2)}
+                    delta={`${Math.abs(selected.foreignOrbit.velocityKms - selected.targetOrbit.velocityKms).toFixed(3)} km/s`}
+                  />
+                </div>
+              ) : (
+                /* Fallback for data without orbit elements (e.g. cached/mock) */
+                <div className="space-y-0">
+                  <div className="flex items-center justify-between border-b border-border/20 py-2.5">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Inclination Δ</span>
+                    <span className={cn("font-mono text-sm tabular-nums", selected.inclinationDiffDeg < 2 ? "text-red-400 font-semibold" : "text-foreground")}>
+                      {selected.inclinationDiffDeg.toFixed(2)}°
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-border/20 py-2.5">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Altitude Δ</span>
+                    <span className={cn("font-mono text-sm tabular-nums", selected.altitudeDiffKm < 20 ? "text-red-400 font-semibold" : "text-foreground")}>
+                      {selected.altitudeDiffKm.toFixed(1)} km
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Divergence + Confidence stats */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className={cn(
+                  "rounded-md border px-3 py-2",
+                  selected.divergenceScore < 0.05 ? "border-red-500/40 bg-red-500/10" : "border-border/40 bg-secondary/30",
+                )}>
+                  <div className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground">Divergence</div>
+                  <div className={cn(
+                    "mt-0.5 font-mono text-base tabular-nums font-semibold",
+                    selected.divergenceScore < 0.05 ? "text-red-400" : "text-foreground",
+                  )}>
+                    {selected.divergenceScore.toFixed(4)}
+                  </div>
+                </div>
+                <div className={cn(
+                  "rounded-md border px-3 py-2",
+                  selected.confidence > 0.6 ? "border-red-500/40 bg-red-500/10" : "border-border/40 bg-secondary/30",
+                )}>
+                  <div className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground">Confidence</div>
+                  <div className={cn(
+                    "mt-0.5 font-mono text-base tabular-nums font-semibold",
+                    selected.confidence > 0.6 ? "text-red-400" : "text-foreground",
+                  )}>
+                    {(selected.confidence * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Bayesian posterior bar */}
               <div className="mt-4 space-y-1">
                 <div className="flex justify-between">
                   <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
@@ -193,7 +327,7 @@ export function OrbitalOps({ threats }: OrbitalOpsProps) {
                 </p>
               </div>
 
-              {/* Orbital element comparison */}
+              {/* Visual delta bars */}
               <div className="mt-4 space-y-2">
                 <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
                   Orbital Element Delta
