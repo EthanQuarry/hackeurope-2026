@@ -238,13 +238,10 @@ const MemoScene = React.memo(function Scene({
   }, [satellites, proximityThreats, signalThreats, anomalyThreats]);
 
   // Derive per-satellite max Bayesian posterior from proximity threats
+  // Only assign to targetAssetId (the asset being threatened), not foreignSatId (the threat source)
   const satScores = useMemo(() => {
     const scores: Record<string, number> = {};
     for (const threat of proximityThreats) {
-      scores[threat.foreignSatId] = Math.max(
-        scores[threat.foreignSatId] ?? 0,
-        threat.confidence,
-      );
       scores[threat.targetAssetId] = Math.max(
         scores[threat.targetAssetId] ?? 0,
         threat.confidence,
