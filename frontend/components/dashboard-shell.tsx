@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 import { useGlobeStore } from "@/stores/globe-store";
 import { useFleetStore } from "@/stores/fleet-store";
 import { useThreatStore } from "@/stores/threat-store";
+import { useResponseStore } from "@/stores/response-store";
 import { usePolling } from "@/hooks/use-polling";
 import { useScenarioSocket } from "@/hooks/use-scenario-socket";
 import { THREAT_REFRESH_MS, DEBRIS_REFRESH_MS } from "@/lib/constants";
@@ -115,6 +116,8 @@ export function DashboardShell() {
     fetch(`${api.satellites.replace("/satellites", "/scenario/reset")}`, {
       method: "POST",
     }).catch(() => {});
+    // Clear response agent de-dupe so USA-245 can trigger again
+    useResponseStore.getState().resetTriggered();
   }, []);
 
   useFleetRiskAccumulator();
