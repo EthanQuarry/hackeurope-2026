@@ -567,42 +567,29 @@ function BeamInterceptionVisual({
           {groundStation}
         </text>
 
-        {/* ── Probability readout (right side) ── */}
-        <text
-          x="670"
-          y="125"
-          textAnchor="middle"
-          className="fill-muted-foreground font-mono"
-          style={{ fontSize: "9px", letterSpacing: "0.1em" }}
-        >
-          INTERCEPT PROBABILITY
-        </text>
-        <text
-          x="670"
-          y="165"
-          textAnchor="middle"
+      </svg>
+
+      {/* ── Probability readout — HTML overlay so it never clips ── */}
+      <div className="absolute right-6 top-4 flex flex-col items-center">
+        <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+          Intercept Probability
+        </span>
+        <span
           className={cn(
-            "font-mono font-bold",
+            "font-mono text-4xl font-bold tabular-nums leading-tight",
             prob > 0.5
-              ? "fill-red-400"
+              ? "text-red-400"
               : prob > 0.2
-                ? "fill-amber-400"
-                : "fill-cyan-400",
+                ? "text-amber-400"
+                : "text-cyan-400",
           )}
-          style={{ fontSize: "36px" }}
         >
           {(prob * 100).toFixed(0)}%
-        </text>
-        <text
-          x="670"
-          y="185"
-          textAnchor="middle"
-          className="fill-muted-foreground/60 font-mono"
-          style={{ fontSize: "8px" }}
-        >
+        </span>
+        <span className="font-mono text-[8px] text-muted-foreground/60">
           {prob > 0.5 ? "HIGH RISK" : prob > 0.2 ? "ELEVATED" : "LOW"}
-        </text>
-      </svg>
+        </span>
+      </div>
     </div>
   )
 }
