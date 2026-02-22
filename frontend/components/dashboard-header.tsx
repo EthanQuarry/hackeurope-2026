@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Play, Pause, Shield, Crosshair, Radio, AlertTriangle, LayoutGrid, ChevronDown, Globe, Satellite, GitBranch } from "lucide-react"
+import { Play, Pause, Shield, Crosshair, Radio, AlertTriangle, LayoutGrid, ChevronDown, Globe, Satellite } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { SPEED_PRESETS, PLANET_CONFIG } from "@/lib/constants"
@@ -15,7 +15,7 @@ interface DashboardHeaderProps {
   simTime: number
   onSpeedChange: (speed: number) => void
   onPlayToggle: () => void
-  threatCounts?: { proximity: number; signal: number; anomaly: number; orbital: number }
+  threatCounts?: { proximity: number; signal: number; anomaly: number }
 }
 
 const NAV_TABS: { id: ActiveView; label: string; icon: typeof LayoutGrid }[] = [
@@ -23,7 +23,6 @@ const NAV_TABS: { id: ActiveView; label: string; icon: typeof LayoutGrid }[] = [
   { id: "proximity", label: "PROXIMITY", icon: Crosshair },
   { id: "signal", label: "SIGNAL", icon: Radio },
   { id: "anomaly", label: "ANOMALY", icon: AlertTriangle },
-  { id: "orbital", label: "ORBITAL", icon: GitBranch },
   { id: "comms", label: "COMMS", icon: Satellite },
 ]
 
@@ -106,11 +105,10 @@ export function DashboardHeader({
     proximity: threatCounts?.proximity,
     signal: threatCounts?.signal,
     anomaly: threatCounts?.anomaly,
-    orbital: threatCounts?.orbital,
   }
 
   return (
-    <header className="flex items-center gap-4 rounded-2xl border border-white/10 bg-card/60 px-6 py-3 shadow-2xl backdrop-blur-xl">
+    <header className="flex min-w-max items-center gap-4 rounded-2xl border border-white/10 bg-card/60 px-6 py-3 shadow-2xl backdrop-blur-xl">
       {/* Left: Logo + branding + planet selector */}
       <div className="flex items-center gap-3">
         <Shield className="h-5 w-5 text-primary" />
