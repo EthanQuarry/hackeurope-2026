@@ -21,6 +21,7 @@ import { FleetRiskOps } from "@/components/ops/fleet-risk-ops"
 import { AgentOps } from "@/components/ops/agent-ops"
 import { useFleetRiskAccumulator } from "@/hooks/use-fleet-risk-accumulator"
 import { useAgentTrigger } from "@/hooks/use-agent-trigger"
+import { useAgentOpsStore } from "@/stores/agent-ops-store"
 const SatelliteDetailPage = lazy(() =>
   import("@/components/satellite-detail-page").then((m) => ({
     default: m.SatelliteDetailPage,
@@ -71,6 +72,8 @@ export function DashboardShell() {
 
   useFleetRiskAccumulator()
   useAgentTrigger()
+
+  const agentPending = useAgentOpsStore((s) => s.pendingThreat)
 
   const activeView = useUIStore((s) => s.activeView)
   const setActiveView = useUIStore((s) => s.setActiveView)
@@ -210,24 +213,33 @@ export function DashboardShell() {
                 {SIDEBAR_TABS.map((tab) => {
                   const Icon = tab.icon
                   const isActive = activeView === tab.id
+                  const hasWarning = tab.id === "agent-ops" && !!agentPending
                   return (
                     <button
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveView(tab.id)}
                       className={cn(
-                        "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                        "relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
                         isActive
                           ? tab.id === "adversary-detail"
                             ? "bg-red-500/10 text-red-400"
                             : tab.id === "agent-ops"
                             ? "bg-purple-500/10 text-purple-400"
                             : "bg-white/[0.10] text-foreground"
-                          : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
+                          : hasWarning
+                            ? "text-red-400 bg-red-500/10 hover:bg-red-500/20"
+                            : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
                       )}
-                      title={tab.label}
+                      title={hasWarning ? "⚠ Threat detected — click to engage agent" : tab.label}
                     >
                       <Icon className="h-4 w-4" />
+                      {hasWarning && (
+                        <>
+                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 animate-ping" />
+                        </>
+                      )}
                     </button>
                   )
                 })}
@@ -279,6 +291,7 @@ export function DashboardShell() {
               {SIDEBAR_TABS.map((tab) => {
                 const Icon = tab.icon
                 const isActive = activeView === tab.id
+                const hasWarning = tab.id === "agent-ops" && !!agentPending
                 return (
                   <button
                     key={tab.id}
@@ -292,18 +305,26 @@ export function DashboardShell() {
                       }
                     }}
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                      "relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
                       isActive
                         ? tab.id === "adversary-detail"
                           ? "bg-red-500/10 text-red-400"
                           : tab.id === "agent-ops"
                           ? "bg-purple-500/10 text-purple-400"
                           : "bg-white/[0.10] text-foreground"
-                        : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
+                        : hasWarning
+                          ? "text-red-400 bg-red-500/10 hover:bg-red-500/20"
+                          : cn(tab.color, "hover:bg-white/[0.06] hover:text-foreground")
                     )}
-                    title={tab.label}
+                    title={hasWarning ? "⚠ Threat detected — click to engage agent" : tab.label}
                   >
                     <Icon className="h-4 w-4" />
+                    {hasWarning && (
+                      <>
+                        <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+                        <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 animate-ping" />
+                      </>
+                    )}
                   </button>
                 )
               })}

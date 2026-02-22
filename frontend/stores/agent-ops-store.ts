@@ -20,12 +20,35 @@ function createDefaultSteps(): AgentFlowStep[] {
   ]
 }
 
+/* ── Pending threat (queued by trigger, consumed on user click) ── */
+
+export interface PendingThreat {
+  satelliteId: string
+  satelliteName: string
+  threatSatelliteId: string
+  threatSatelliteName: string
+  triggerRisk: number
+  triggerReason: string
+  threatData: {
+    missDistanceKm?: number
+    approachPattern?: string
+    tcaMinutes?: number
+    countryCode?: string
+    anomalyType?: string
+  }
+}
+
 /* ── Store interface ─────────────────────────────────── */
 
 interface AgentOpsState {
   /** Configurable risk threshold (0-1) that triggers the agent */
   threshold: number
   setThreshold: (value: number) => void
+
+  /** Queued threat waiting for user to open the agent panel */
+  pendingThreat: PendingThreat | null
+  setPendingThreat: (threat: PendingThreat) => void
+  clearPendingThreat: () => void
 
   /** Current active agent session (null = no agent running) */
   activeSession: AgentSession | null
@@ -84,11 +107,20 @@ let lineCounter = 0
 
 export const useAgentOpsStore = create<AgentOpsState>((set, get) => ({
   threshold: 0.7,
+  pendingThreat: null,
   activeSession: null,
   history: [],
   triggeredIds: new Set(),
 
   setThreshold: (value) => set({ threshold: value }),
+
+  setPendingThreat: (threat) => {
+    const next = new Set(get().triggeredIds)
+    next.add(threat.satelliteId)
+    set({ pendingThreat: threat, triggeredIds: next })
+  },
+
+  clearPendingThreat: () => set({ pendingThreat: null }),
 
   startSession: (params) => {
     const session: AgentSession = {

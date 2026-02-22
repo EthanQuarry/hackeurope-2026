@@ -23,6 +23,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useAgentOpsStore } from "@/stores/agent-ops-store"
+import { useAgentSimulation } from "@/hooks/use-agent-simulation"
 import type {
   AgentFlowStep,
   AgentFlowStepId,
@@ -699,6 +700,39 @@ export function AgentOps() {
   const threshold = useAgentOpsStore((s) => s.threshold)
   const setThreshold = useAgentOpsStore((s) => s.setThreshold)
   const activeSession = useAgentOpsStore((s) => s.activeSession)
+  const pendingThreat = useAgentOpsStore((s) => s.pendingThreat)
+  const clearPendingThreat = useAgentOpsStore((s) => s.clearPendingThreat)
+  const startSession = useAgentOpsStore((s) => s.startSession)
+  const { runSimulation } = useAgentSimulation()
+
+  /* When this panel opens with a pending threat, consume it and start */
+  const consumedRef = useRef(false)
+  useEffect(() => {
+    if (pendingThreat && !activeSession && !consumedRef.current) {
+      consumedRef.current = true
+      startSession({
+        satelliteId: pendingThreat.satelliteId,
+        satelliteName: pendingThreat.satelliteName,
+        threatSatelliteId: pendingThreat.threatSatelliteId,
+        threatSatelliteName: pendingThreat.threatSatelliteName,
+        triggerRisk: pendingThreat.triggerRisk,
+        triggerReason: pendingThreat.triggerReason,
+      })
+      runSimulation({
+        satelliteId: pendingThreat.satelliteId,
+        satelliteName: pendingThreat.satelliteName,
+        threatSatelliteId: pendingThreat.threatSatelliteId,
+        threatSatelliteName: pendingThreat.threatSatelliteName,
+        triggerRisk: pendingThreat.triggerRisk,
+        triggerReason: pendingThreat.triggerReason,
+        threatData: pendingThreat.threatData,
+      })
+      clearPendingThreat()
+    }
+    if (!pendingThreat) {
+      consumedRef.current = false
+    }
+  }, [pendingThreat, activeSession, startSession, runSimulation, clearPendingThreat])
 
   const [selectedStepId, setSelectedStepId] = useState<AgentFlowStepId | null>(null)
 

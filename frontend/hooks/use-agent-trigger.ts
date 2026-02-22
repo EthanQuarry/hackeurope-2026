@@ -5,8 +5,6 @@ import { useFleetRiskStore } from "@/stores/fleet-risk-store"
 import { useThreatStore } from "@/stores/threat-store"
 import { useFleetStore } from "@/stores/fleet-store"
 import { useAgentOpsStore } from "@/stores/agent-ops-store"
-import { useUIStore } from "@/stores/ui-store"
-import { useAgentSimulation } from "./use-agent-simulation"
 import type {
   ProximityThreat,
   SignalThreat,
@@ -31,15 +29,13 @@ interface ThreatCandidate {
 const CHECK_INTERVAL_MS = 3_000
 
 /**
- * Side-effect-only hook that monitors fleet risk data and auto-triggers
- * an agent session when any satellite's risk crosses the configurable
- * threshold.
+ * Side-effect-only hook that monitors fleet risk data and sets a pending
+ * threat alert when any satellite's risk crosses the configurable threshold.
  *
- * Must be mounted once at the app root (e.g. inside DashboardShell).
+ * Does NOT auto-open the agent panel — it only queues the alert so the
+ * sidebar button can show a warning badge. The user clicks to engage.
  */
 export function useAgentTrigger(): void {
-  /* ── Subscribe to stores ───────────────────────────── */
-
   const timelines = useFleetRiskStore((s) => s.timelines)
   const satellites = useFleetStore((s) => s.satellites)
 
@@ -49,42 +45,29 @@ export function useAgentTrigger(): void {
   const orbitalThreats = useThreatStore((s) => s.orbitalSimilarityThreats)
   const geoLoiterThreats = useThreatStore((s) => s.geoUsLoiterThreats)
 
-  const { runSimulation } = useAgentSimulation()
-
-  /* ── Refs for debounce ─────────────────────────────── */
-
   const lastCheckRef = useRef(0)
-
-  /* ── Effect: check on every timeline change ────────── */
 
   useEffect(() => {
     const now = Date.now()
     if (now - lastCheckRef.current < CHECK_INTERVAL_MS) return
     lastCheckRef.current = now
 
-    /* Read threshold & trigger guard from agent-ops store (non-reactive read) */
     const store = useAgentOpsStore.getState()
-    const { threshold, hasTriggered, activeSession } = store
+    const { threshold, hasTriggered, activeSession, pendingThreat } = store
 
-    /* Don't trigger if a session is already running */
-    if (activeSession) return
-
-    /* Need satellites loaded */
+    /* Don't queue if a session is already running or an alert is pending */
+    if (activeSession || pendingThreat) return
     if (satellites.length === 0) return
 
-    /* Iterate satellites — find FIRST one over threshold that hasn't fired */
     for (const sat of satellites) {
       const timeline = timelines[sat.id]
       if (!timeline || timeline.snapshots.length === 0) continue
 
-      /* Latest risk value */
       const latestRisk = timeline.snapshots[timeline.snapshots.length - 1].risk
-
       if (latestRisk < threshold) continue
       if (hasTriggered(sat.id)) continue
 
       /* ── Find matching threat with highest confidence ── */
-
       const candidates: ThreatCandidate[] = []
 
       for (const t of proximityThreats) {
@@ -152,28 +135,12 @@ export function useAgentTrigger(): void {
         }
       }
 
-      /* Be defensive — no threat data, no trigger */
       if (candidates.length === 0) continue
 
-      /* Pick highest-confidence threat */
       candidates.sort((a, b) => b.confidence - a.confidence)
       const best = candidates[0]
 
-      /* ── Fire session ──────────────────────────────── */
-
-      store.startSession({
-        satelliteId: sat.id,
-        satelliteName: sat.name,
-        threatSatelliteId: best.threatSatelliteId,
-        threatSatelliteName: best.threatSatelliteName,
-        triggerRisk: latestRisk,
-        triggerReason: best.reason,
-      })
-
-      /* Switch UI to agent-ops view */
-      useUIStore.getState().setActiveView("agent-ops")
-
-      /* Extract threat-data fields for the simulation */
+      /* Extract threat-data fields */
       const raw = best.raw as unknown as Record<string, unknown>
       const threatData = {
         missDistanceKm: raw.missDistanceKm as number | undefined,
@@ -183,8 +150,8 @@ export function useAgentTrigger(): void {
         anomalyType: raw.anomalyType as string | undefined,
       }
 
-      /* Kick off the simulation with threat context */
-      runSimulation({
+      /* Queue the pending threat — sidebar will show warning badge */
+      store.setPendingThreat({
         satelliteId: sat.id,
         satelliteName: sat.name,
         threatSatelliteId: best.threatSatelliteId,
@@ -194,7 +161,6 @@ export function useAgentTrigger(): void {
         threatData,
       })
 
-      /* Only trigger for the FIRST satellite that crosses threshold */
       break
     }
   }, [
@@ -205,6 +171,5 @@ export function useAgentTrigger(): void {
     anomalyThreats,
     orbitalThreats,
     geoLoiterThreats,
-    runSimulation,
   ])
 }
