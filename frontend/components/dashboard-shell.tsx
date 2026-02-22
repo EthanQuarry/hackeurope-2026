@@ -14,7 +14,6 @@ import {
   ChevronLeft,
   ChevronRight,
   GitBranch,
-  Lightbulb,
   Satellite,
   ShieldAlert,
   Target,
@@ -25,7 +24,6 @@ import { api } from "@/lib/api";
 
 import { GlobeView } from "@/components/globe/globe-view";
 import { DashboardHeader } from "@/components/dashboard-header";
-import { InsightsCard } from "@/components/cards/insights-card";
 import { SatelliteCard } from "@/components/cards/satellite-card";
 import { StatsCards } from "@/components/cards/stats-cards";
 import { SatelliteSearch } from "@/components/cards/satellite-search";
@@ -67,16 +65,10 @@ import type {
 
 const SIDEBAR_TABS: {
   id: ActiveView;
-  icon: typeof Lightbulb;
+  icon: typeof GitBranch;
   label: string;
   color: string;
 }[] = [
-  {
-    id: "overview",
-    icon: Lightbulb,
-    label: "Insights",
-    color: "text-muted-foreground",
-  },
   {
     id: "orbital",
     icon: GitBranch,
@@ -355,9 +347,7 @@ export function DashboardShell() {
                 <div className="shrink-0 px-3 pt-2 pb-1 overflow-hidden">
                   <SatelliteSearch className="min-w-0" />
                 </div>
-                <div className="min-h-0 flex-1 overflow-hidden">
-                  <InsightsCard className="h-full w-full rounded-none border-0 bg-transparent shadow-none backdrop-blur-none" />
-                </div>
+                <div className="min-h-0 flex-1 overflow-hidden" />
                 {/* Adversary Tracker link */}
                 <button
                   type="button"
